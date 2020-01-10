@@ -1,0 +1,4 @@
+git+https://gitlab.com/nekokatt/hikari@feature/http_adapter
+pyyaml==5.3
+asyncpg==0.20.0
+pydantic==1.3
