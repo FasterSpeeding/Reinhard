@@ -8,19 +8,22 @@ from hikari import client
 from hikari.internal_utilities import aio
 from hikari.internal_utilities import assertions
 from hikari.internal_utilities import containers
+from hikari.orm.models import bases
 from hikari.orm.models import guilds
 from hikari.orm.models import messages
 
 
 @dataclasses.dataclass()
-class CommandsClientOptions(client.client_options.ClientOptions):
-    ...
+class CommandsClientOptions(client.client_options.ClientOptions, bases.MarshalMixin):
+    access_levels: typing.MutableMapping[int, int] = dataclasses.field(
+        default_factory=dict
+    )
 
 
 class Command:
     __slots__ = ("func", "level", "module", "triggers")
     func: aio.CoroutineFunctionT
-    level: typing.Optional[int]
+    level: int
     module: typing.Optional[CommandModule]
     triggers: typing.Tuple[str]
 
@@ -84,6 +87,12 @@ class CommandModule:
                 )
             self.module_commands.append(function)
 
+    def get_command(self, content: str) -> typing.Optional[Command]:
+        for command in self.module_commands:
+            for trigger in command.triggers:
+                if content.startswith(trigger):
+                    return command
+
     async def handle_error(
         self, error: BaseException, message: messages.Message
     ) -> bool:
@@ -93,11 +102,16 @@ class CommandModule:
             return True
         return False
 
-    def get_command(self, content: str) -> typing.Optional[Command]:
-        for command in self.module_commands:
-            for trigger in command.triggers:
-                if content.startswith(trigger):
-                    return command
+    def get_module_event_listeners(
+        self,
+    ) -> typing.Generator[typing.Tuple[str, aio.CoroutineFunctionT]]:
+        return (
+            (name[3:], function)
+            for name, function in inspect.getmembers(
+                self, predicate=inspect.iscoroutinefunction
+            )
+            if name.startswith("on_")
+        )
 
     def register_command(
         self,
@@ -118,7 +132,6 @@ class CommandClient(client.Client, CommandModule):
     __slots__ = ("get_prefixes", "modules", "prefixes")
     modules: typing.MutableMapping[str, CommandModule]
     get_prefixes: typing.Optional[aio.CoroutineFunctionT]  # TODO: or normal method.
-    prefixes: typing.List[str]
 
     def __init__(
         self,
@@ -128,18 +141,16 @@ class CommandClient(client.Client, CommandModule):
         modules: typing.List[str] = None,
         options: typing.Optional[CommandsClientOptions] = None,
     ) -> None:
-        super().__init__(token=token, options=options)
+        super().__init__(token=token, options=options or CommandsClientOptions())
+        self.load_modules(*(modules or containers.EMPTY_SEQUENCE))
         self.bind_commands()
         self.bind_listeners()
-        self.load_modules(*(modules or containers.EMPTY_SEQUENCE))
         self.prefixes = prefixes
 
     def bind_listeners(self) -> None:
-        for name, function in inspect.getmembers(
-            self, predicate=inspect.iscoroutinefunction
-        ):
-            if name.startswith("on_"):
-                self.add_event(name[3:], function)
+        for module in (self, *self.modules.values()):
+            for name, function in module.get_module_event_listeners():
+                self.add_event(name, function)
 
     async def check_prefix(self, message: messages.Message) -> typing.Optional[str]:
         trigger_prefix = None
@@ -150,7 +161,7 @@ class CommandClient(client.Client, CommandModule):
         return trigger_prefix
 
     def get_global_command(self, content: str) -> typing.Optional[Command]:
-        for module in [self, *self.modules]:
+        for module in (self, *self.modules.values()):
             command = module.get_command(content)
             if command:
                 return command
@@ -173,6 +184,12 @@ class CommandClient(client.Client, CommandModule):
             module.__class__.__name__: module(self) for module in modules
         }  # TODO: This so that modules is a string not the Modules themselves
 
+    async def access_check(self, command: Command, message: messages.Message) -> bool:
+        return (
+            self._client_options.access_levels.get(message.author.id, 0)
+            >= command.level
+        )  # TODO: sql filter.
+
     async def on_message_create(self, message: messages.Message) -> bool:
         prefix = await self.check_prefix(
             message
@@ -182,7 +199,7 @@ class CommandClient(client.Client, CommandModule):
 
         command_args = message.content[len(prefix) :]
         command = self.get_global_command(command_args)
-        if not command:
+        if not command or not await self.access_check(command, message):
             return False
 
         command_args = command_args[len(command.func.__name__) :]

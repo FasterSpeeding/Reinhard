@@ -1,54 +1,38 @@
 from __future__ import annotations
+import dataclasses
 
 
-import pydantic
+from hikari.orm.models import bases
 import typing
 
 
-class CustomModelBase(pydantic.BaseModel):
-    def dict(
-        self,
-        *,
-        include: typing.Union[
-            pydantic.typing.AbstractSetIntStr, pydantic.typing.DictIntStrAny
-        ] = None,
-        exclude: typing.Union[
-            pydantic.typing.AbstractSetIntStr, pydantic.typing.DictIntStrAny
-        ] = None,
-        by_alias: bool = False,
-        skip_defaults: bool = None,
-        exclude_unset: bool = False,
-        exclude_defaults: bool = False,
-        exclude_none: bool = False,
-    ) -> pydantic.typing.DictStrAny:
-        return dict(
-            (
-                (key, value)
-                for key, value in super()
-                .dict(
-                    include=include,
-                    exclude=exclude,
-                    by_alias=by_alias,
-                    skip_defaults=skip_defaults,
-                    exclude_unset=exclude_unset,
-                    exclude_defaults=exclude_defaults,
-                    exclude_none=exclude_none,
-                )
-                .items()
-                if value is not None
-            )
-        )
+from reinhard import command_client
 
 
-class DatabaseConfig(CustomModelBase):
-    password: str
-    host: str = "localhost"
-    user: str = "postgres"
-    database: str = "postgres"
-    port: int = 5432
+@dataclasses.dataclass()
+class DatabaseConfig(bases.MarshalMixin):
+    password: str = dataclasses.field(repr=False)
+    host: str = dataclasses.field(default="localhost", repr=False)
+    user: str = dataclasses.field(default="postgres", repr=False)
+    database: str = dataclasses.field(default="postgres", repr=False)
+    port: int = dataclasses.field(default=5432, repr=False)
 
 
-class Config(CustomModelBase):
+@dataclasses.dataclass()
+class Config(bases.MarshalMixin):
     database: DatabaseConfig
-    prefixes: typing.List[str] = None
-    token: str
+    token: str = dataclasses.field(repr=False)
+    prefixes: typing.List[str] = dataclasses.field(default_factory=lambda: ["."])
+    options: command_client.CommandsClientOptions = dataclasses.field(
+        default_factory=command_client.CommandsClientOptions
+    )
+
+    def __post_init__(self):
+        self.database = DatabaseConfig.from_dict(self.database)
+        #  TODO: push changes to hikari
+        if self.prefixes is None:
+            self.prefixes = ["."]
+        if isinstance(self.options, dict):
+            self.options = command_client.CommandsClientOptions(
+                **self.options
+            )  # TODO: from_dict later on

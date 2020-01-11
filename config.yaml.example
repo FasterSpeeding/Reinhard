@@ -1,3 +1,6 @@
 token: "A.DISCORD.TOKEN"
 database:
   password: "BLANK"
+options:
+  access_levels:
+    115590097100865541: 5
