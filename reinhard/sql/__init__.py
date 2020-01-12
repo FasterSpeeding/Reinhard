@@ -4,6 +4,7 @@ import typing
 
 
 from hikari.internal_utilities import assertions
+import asyncpg
 
 
 def script_getter_factory(key: str):
@@ -19,9 +20,10 @@ def script_getter_factory(key: str):
 class CachedScripts:
     scripts: typing.MutableMapping[str, str]
 
-    def __init__(self, root_dir: str = ".") -> None:
+    def __init__(self, root_dir: typing.Optional[str] = "./reinhard/sql") -> None:
         self.scripts = {}
-        self.load_all_sql_files(root_dir)
+        if root_dir is not None:
+            self.load_all_sql_files(root_dir)
 
     def load_sql_file(self, file_path: str) -> None:
         assertions.assert_that(
@@ -34,13 +36,21 @@ class CachedScripts:
             )  # TODO: allow overwriting?
             self.scripts[name] = file.read()
 
-    def load_all_sql_files(
-        self, root_dir: str = "."
-    ) -> None:  # TODO: whitelist files instead of just taking the full load.
+    def load_all_sql_files(self, root_dir: str = "./reinhard/sql") -> None:
         root_dir = pathlib.Path(root_dir)
         for file in root_dir.rglob("*"):
             if file.is_file() and file.name.endswith(".sql"):
                 self.load_sql_file(str(file.absolute()))
 
     schema = script_getter_factory("schema")
-    get_stars = script_getter_factory("get_stars")
+    get_stars = script_getter_factory("get_star")
+    create_stars = script_getter_factory("create_star")
+
+
+async def initalise_schema(
+    sql_scripts: CachedScripts, conn: asyncpg.Connection
+) -> None:
+    try:
+        await conn.execute(sql_scripts.schema)
+    except asyncpg.PostgresError as e:
+        raise RuntimeError("Failed to initalise database.") from e

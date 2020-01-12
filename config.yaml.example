@@ -1,6 +1,10 @@
 token: "A.DISCORD.TOKEN"
 database:
-  password: "BLANK"
+  host: "69.69.69.69"
+  name: "postgres"
+  password: "A PASSWORD"
+  database: "postgres"
+  port: 5432
 options:
   access_levels:
     115590097100865541: 5

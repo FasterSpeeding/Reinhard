@@ -23,16 +23,11 @@ class Config(bases.MarshalMixin):
     database: DatabaseConfig
     token: str = dataclasses.field(repr=False)
     prefixes: typing.List[str] = dataclasses.field(default_factory=lambda: ["."])
-    options: command_client.CommandsClientOptions = dataclasses.field(
-        default_factory=command_client.CommandsClientOptions
+    options: command_client.CommandClientOptions = dataclasses.field(
+        default_factory=dict,
     )
 
     def __post_init__(self):
+        # TODO: push changes to hikari.
         self.database = DatabaseConfig.from_dict(self.database)
-        #  TODO: push changes to hikari
-        if self.prefixes is None:
-            self.prefixes = ["."]
-        if isinstance(self.options, dict):
-            self.options = command_client.CommandsClientOptions(
-                **self.options
-            )  # TODO: from_dict later on
+        self.options = command_client.CommandClientOptions.from_dict(self.options)

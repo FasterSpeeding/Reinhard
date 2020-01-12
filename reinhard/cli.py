@@ -5,13 +5,12 @@ import os
 import yaml
 
 
-from reinhard.modules import stars
 from reinhard import client
 from reinhard import config
 
 
 async def async_main(config_obj: config.Config):
-    bot_client = client.BotClient(config_obj, modules=[stars.StarboardModule])
+    bot_client = client.BotClient(config_obj, modules=["reinhard.modules.stars"])
 
     await bot_client.run()
 
