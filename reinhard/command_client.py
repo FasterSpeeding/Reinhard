@@ -87,6 +87,18 @@ class Command:
     async def execute(
         self, message: messages.Message, args: str
     ) -> typing.Optional[str]:
+        """
+        Used to execute a command, catches any :class:`CommandErrors` and calls the module's error handler on error.
+
+        Args:
+            message:
+                The :class:`hikari.orm.models.messages.Message` object to execute this command using.
+            args:
+                The string args that followed the triggering prefix and command alias to be parsed.
+
+        Returns:
+            An optional :class:`str` response to be sent in chat.
+        """
         try:
             return await self._func(self._module, message, self.parse_args(args))
         except CommandError as e:
@@ -96,10 +108,12 @@ class Command:
             raise e
 
     def generate_trigger(self) -> str:
+        """Get a trigger for this command based on it's function's name."""
         return self.name.replace("_", " ")
 
     @property
     def name(self):
+        """Get the name of this command."""
         return self._func.__name__
 
     def parse_args(self, args: str) -> typing.List[typing.Union[int, str]]:
@@ -126,6 +140,14 @@ class CommandModule:
         self.command_client = command_client
 
     def bind_commands(self) -> None:
+        """
+        Loads any commands that are attached to this class into `module_commands`.
+
+        Raises:
+            ValueError:
+                if the commands for this module have already been binded or if any duplicate triggers are found while
+                loading commands.
+        """
         assertions.assert_that(
             not getattr(self, "module_commands", None),
             f"Cannot bind commands in module '{self.__class__.__name__}' when commands have already been binded.",
@@ -143,6 +165,17 @@ class CommandModule:
             self.module_commands.append(function)
 
     def get_command(self, content: str) -> typing.Optional[Command]:
+        """
+        Get a command based on a message's content (minus prefix) from the loaded commands if any command triggers are
+        found in the content.
+
+        Args:
+            content:
+                The string content to try and find a command for (minus the triggering prefix).
+
+        Returns:
+            A :class:`Command` object if the command is found else `None`
+        """
         for command in self.module_commands:
             for trigger in command.triggers:
                 if content.startswith(trigger):
@@ -160,6 +193,7 @@ class CommandModule:
     def get_module_event_listeners(
         self,
     ) -> typing.Generator[typing.Tuple[str, aio.CoroutineFunctionT]]:
+        """Get a generator of the event listeners attached to this module."""
         return (
             (name[3:], function)
             for name, function in inspect.getmembers(
@@ -172,8 +206,23 @@ class CommandModule:
         self,
         func: aio.CoroutineFunctionT,
         trigger: str = None,
-        aliases: typing.List[str] = None,
+        *aliases: typing.List[str],
     ) -> None:
+        """
+        Register a command in this module.
+
+        Args:
+            func:
+                The Coroutine Function to be called when executing this command.
+            trigger:
+                The string that will be this command's main trigger.
+            *aliases:
+                More string triggers for this command.
+
+        Raises:
+            ValueError:
+                If any of the triggers for this command are found on a loaded command.
+        """
         command_obj = Command(func=func, module=self, trigger=trigger, aliases=aliases)
         for trigger in command_obj.triggers:
             assertions.assert_that(
@@ -224,6 +273,18 @@ class CommandClient(client.Client, CommandModule):
         # TODO: built in help command.
 
     async def access_check(self, command: Command, message: messages.Message) -> bool:
+        """
+        Used to check if a command can be accessed by the calling user and in the calling channel/guild.
+
+        Args:
+            command:
+                The :class:`Command` object to check access levels for.
+            message:
+                The :class:`messages.Message` object to check access levels for.
+
+        Returns:
+            A :class:`bool` representation of whether this command can be accessed.
+        """
         return (
             self._client_options.access_levels.get(message.author.id, 0)
             >= command.level
@@ -236,6 +297,17 @@ class CommandClient(client.Client, CommandModule):
                 self.add_event(name, function)
 
     async def check_prefix(self, message: messages.Message) -> typing.Optional[str]:
+        """
+        Used to check if a message's content match any currently registered prefix (including any prefixes registered
+        for the guild if this is being called from one.
+
+        Args:
+            message:
+                The :class:`messages.Message` object that we're checking for a prefix in it's content.
+
+        Returns:
+            A :class:`str` representation of the triggering prefix if found, else :class:`None`
+        """
         trigger_prefix = None
         for prefix in await self._get_prefixes(message.guild_id):
             if message.content.startswith(prefix):
@@ -244,6 +316,16 @@ class CommandClient(client.Client, CommandModule):
         return trigger_prefix
 
     def get_global_command(self, content: str) -> typing.Optional[Command]:
+        """
+        Used to get a command from on a messages's content (checks all loaded modules).
+
+        Args:
+            content:
+                The :class:`str` content of the message (minus the prefix) to get a command from.
+
+        Returns:
+            The :class:`Command` object if found, else :class:`None`
+        """
         for module in (self, *self.modules.values()):
             command = module.get_command(content)
             if command:
@@ -252,6 +334,17 @@ class CommandClient(client.Client, CommandModule):
     async def _get_prefixes(
         self, guild: typing.Optional[guilds.GuildLikeT]
     ) -> typing.List[str]:
+        """
+        Used to get the registered global prefixes and a guild's prefix from the function `get_prefixes` if this is
+        being called from a guild and `get_prefixes` has been implemented on this object.
+
+        Args:
+            guild:
+                The object or ID of the guild to check or :class:`None`.
+
+        Returns:
+            An :class:`typing.Sequence` of :class:`str` representation of the applicable prefixes.
+        """
         if guild is None or not hasattr(self, "get_prefixes"):
             return self.prefixes
 
@@ -263,6 +356,13 @@ class CommandClient(client.Client, CommandModule):
         return [guild_prefix, *self.prefixes]
 
     def load_modules(self, *modules: typing.Type[str]) -> None:
+        """
+        Used to load modules based on string paths.
+
+        Args:
+            *modules:
+                The :class:`str` paths of modules to load (in the format of `root.dir.module`)
+        """
         for module_path in modules:
             found = False
             module = importlib.import_module(module_path)
@@ -281,6 +381,7 @@ class CommandClient(client.Client, CommandModule):
                 )
 
     async def on_message_create(self, message: messages.Message) -> None:
+        """Handles command triggering based on message creation."""
         prefix = await self.check_prefix(
             message
         )  # TODO: maybe one day we won't have to await this.
