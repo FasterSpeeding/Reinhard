@@ -11,15 +11,18 @@ from hikari.internal_utilities import containers
 
 def get_snowflake(content: str) -> int:
     if re.fullmatch(r"<?[@#]?!?\d+>?", content):
-        for to_replace in (("<", ""), ("@", ""), ("#", ""), ("!", ""), (">", "")):
-            content = content.replace(*to_replace)
-        return int(content)
+        result = ""
+        for char in content:
+            if char in ("<", "@", "#", "!", ">"):
+                continue
+            result += char
+        return int(result)
     raise CommandError("Invalid mention or ID supplied.")
 
 
 def return_error_str_factory(
     errors: typing.Union[Exception, typing.List[Exception]],
-    errors_responses: typing.Optional[typing.MutableMapping[Exception: str]] = None,
+    errors_responses: typing.Optional[typing.MutableMapping[Exception, str]] = None,
 ):
     def return_error_str_func_binder(func: aio.CoroutineFunctionT):
         async def return_error_str(*args, **kwargs) -> typing.Optional[str]:
