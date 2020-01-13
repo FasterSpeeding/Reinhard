@@ -2,6 +2,7 @@ from __future__ import annotations
 import dataclasses
 import importlib
 import inspect
+import logging
 import typing
 
 
@@ -9,6 +10,7 @@ from hikari import client
 from hikari.internal_utilities import aio
 from hikari.internal_utilities import assertions
 from hikari.internal_utilities import containers
+from hikari.internal_utilities import loggers
 from hikari.internal_utilities import unspecified
 from hikari.orm.models import bases
 from hikari.orm.models import guilds
@@ -113,7 +115,7 @@ class Command:
 
 
 class CommandModule:
-    __slots__ = ("command_client", "error_handler", "module_commands")
+    __slots__ = ("command_client", "error_handler", "logger", "module_commands")
 
     #: The command client this module is loaded in.
     #:
@@ -121,6 +123,11 @@ class CommandModule:
     command_client: typing.Optional[CommandClient]
 
     error_handler: typing.Optional[aio.CoroutineFunctionT]
+
+    #: The class wide logger.
+    #:
+    #: :type: :class:`logging.Logger`
+    logger: logging.Logger
 
     #: A list of the commands that are loaded in this module.
     #:
@@ -130,6 +137,7 @@ class CommandModule:
     def __init__(self, command_client: CommandClient) -> None:
         self.bind_commands()
         self.command_client = command_client
+        self.logger = loggers.get_named_logger(self)
 
     def bind_commands(self) -> None:
         """
@@ -188,7 +196,7 @@ class CommandModule:
             if name.startswith("on_")
         )
 
-    def register_command(self, func: aio.CoroutineFunctionT, trigger: str = None, *aliases: typing.List[str]) -> None:
+    def register_command(self, func: aio.CoroutineFunctionT, trigger: str = None, *aliases: str) -> None:
         """
         Register a command in this module.
 
@@ -204,13 +212,24 @@ class CommandModule:
             ValueError:
                 If any of the triggers for this command are found on a loaded command.
         """
-        command_obj = Command(func=func, module=self, trigger=trigger, aliases=aliases)
+        command_obj = Command(func=func, module=self, trigger=trigger, aliases=list(aliases))
         for trigger in command_obj.triggers:
             assertions.assert_that(
                 self.get_command(trigger) is None,
                 f"Command trigger '{trigger}' already registered in '{self.__class__.__name__}' module.",
             )
         self.module_commands.append(command_obj)
+
+    def unregister_command(self, command: typing.Union[Command, str]):
+        if isinstance(command, str):
+            command = self.get_command(command)
+        elif not isinstance(command, Command):
+            raise ValueError("Command must be string command trigger or a 'Command' object.")
+
+        try:
+            self.module_commands.remove(command)
+        except ValueError:
+            raise ValueError("Invalid command passed for this module.") from None
 
 
 class CommandClient(client.Client, CommandModule):
@@ -334,7 +353,7 @@ class CommandClient(client.Client, CommandModule):
 
         return [guild_prefix, *self.prefixes]
 
-    def load_modules(self, *modules: typing.Type[str]) -> None:
+    def load_modules(self, *modules: str) -> None:
         """
         Used to load modules based on string paths.
 
@@ -381,7 +400,7 @@ class CommandClient(client.Client, CommandModule):
         files = unspecified.UNSPECIFIED
         if len(content) > 2000:
             files = [
-                ("message.txt", bytes(content, "utf-8")),
+                ("message.txt", bytes(content, "utf-8")),  # TODO: pretty sure this might be a bug with the file hander i wrote.
             ]
             content = "This response is too large to send, see attached file."
 
