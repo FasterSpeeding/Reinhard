@@ -23,9 +23,7 @@ class Config(bases.MarshalMixin):
     database: DatabaseConfig
     token: str = dataclasses.field(repr=False)
     prefixes: typing.List[str] = dataclasses.field(default_factory=lambda: ["."])
-    options: command_client.CommandClientOptions = dataclasses.field(
-        default_factory=dict,
-    )
+    options: command_client.CommandClientOptions = dataclasses.field(default_factory=dict)
 
     def __post_init__(self):
         # TODO: push changes to hikari.

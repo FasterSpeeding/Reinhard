@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS StarboardEntries (
 CREATE TABLE IF NOT EXISTS PostStars (
     message_id BIGINT NOT NULL,  -- Is that sufficient?
     channel_id BIGINT NOT NULL,
-    starer_id BIGINT NOT NULL
+    starer_id BIGINT NOT NULL,
     PRIMARY KEY (message_id, starer_id)
 );
 

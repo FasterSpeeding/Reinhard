@@ -1,4 +1,5 @@
 import os
+import re
 import pathlib
 import typing
 
@@ -7,7 +8,7 @@ from hikari.internal_utilities import assertions
 import asyncpg
 
 
-def script_getter_factory(key: str):
+def script_getter_factory(key: str):  # Could just make this retrieve the file.
     """
     A script_getter factory that allows for pre-setting the script key/name. This is used to map out expected script
     using explicit properties and to handle errors for when the modules aren't loaded.
@@ -28,10 +29,10 @@ class CachedScripts:
 
     scripts: typing.MutableMapping[str, str]
 
-    def __init__(self, root_dir: typing.Optional[str] = "./reinhard/sql") -> None:
+    def __init__(self, root_dir: typing.Optional[str] = "./reinhard/sql", pattern: str = None) -> None:
         self.scripts = {}
         if root_dir is not None:
-            self.load_all_sql_files(root_dir)
+            self.load_all_sql_files(root_dir, pattern)
 
     def load_sql_file(self, file_path: str) -> None:
         """
@@ -41,9 +42,7 @@ class CachedScripts:
             file_path:
                 The string path of the module to load.
         """
-        assertions.assert_that(
-            file_path.lower().endswith(".sql"), "File must be of type 'sql'"
-        )
+        assertions.assert_that(file_path.lower().endswith(".sql"), "File must be of type 'sql'")
         with open(file_path) as file:
             name = os.path.basename(file.name)[:-4]
             assertions.assert_that(
@@ -51,28 +50,32 @@ class CachedScripts:
             )  # TODO: allow overwriting?
             self.scripts[name] = file.read()
 
-    def load_all_sql_files(self, root_dir: str = "./reinhard/sql") -> None:
+    def load_all_sql_files(self, root_dir: str = "./reinhard/sql", pattern: str = None) -> None:
         """
         Load all the sql files from location recursively.
 
         Args:
             root_dir:
                 The string path of the root directory, defaults to reinhard's sql folder.
+            pattern:
+                The optional regex string to use for matching the names of files to load.
         """
         root_dir = pathlib.Path(root_dir)
         for file in root_dir.rglob("*"):
-            if file.is_file() and file.name.endswith(".sql"):
+            if file.is_file() and file.name.endswith(".sql") and not pattern or re.match(pattern, file.name):
                 self.load_sql_file(str(file.absolute()))
 
-    schema = script_getter_factory("schema")
-    find_post_stars_by_ids = script_getter_factory("find_post_stars_by_ids")
+    create_post_star = script_getter_factory("create_post_star")
+    create_starboard_channel = script_getter_factory("create_starboard_channel")
+    delete_post_star = script_getter_factory("delete_post_star")
+    find_post_star_by_ids = script_getter_factory("find_post_star_by_ids")
     find_starboard_channel = script_getter_factory("find_starboard_channel")
     find_starboard_entry_by_id = script_getter_factory("find_starboard_entry_by_id")
+    schema = script_getter_factory("schema")
+    update_starboard_channel = script_getter_factory("update_starboard_channel")
 
 
-async def initalise_schema(
-    sql_scripts: CachedScripts, conn: asyncpg.Connection
-) -> None:
+async def initalise_schema(sql_scripts: CachedScripts, conn: asyncpg.Connection) -> None:
     """
     Initalise the database schema if not already present.
 
