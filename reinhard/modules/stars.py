@@ -16,6 +16,7 @@ class StarboardModule(command_client.CommandModule):
         self.sql_scripts = sql.CachedScripts(pattern=".*star.*")
 
     async def on_message_reaction_add(self, reaction: models.reactions.Reaction, user: models.users.User):
+        self.logger.warning(reaction.emoji)
         if reaction.emoji != "\N{WHITE MEDIUM STAR}" or reaction.message.author == user:
             return
 
@@ -27,13 +28,14 @@ class StarboardModule(command_client.CommandModule):
                 )
 
     async def on_message_reaction_remove(self, reaction: models.reactions.Reaction, user: models.users.User):
+        self.logger.warning(reaction.emoji)
         if reaction.emoji != "\N{WHITE MEDIUM STAR}" or reaction.message.author == user:
             return
 
         async with self.command_client.sql_pool.acquire() as conn:
             await conn.execute(self.sql_scripts.delete_post_star, reaction.message.id, user.id)
 
-    @command_client.Command(trigger="set starboard", aliases=["register starboard"])
+    @command_client.command(trigger="set starboard", aliases=["register starboard"])
     async def set_starboard(self, message: models.messages.Message, args: str) -> str:
         if args:
             channel_id = util.get_snowflake(args.split(" ", 1)[0])
@@ -54,27 +56,25 @@ class StarboardModule(command_client.CommandModule):
 
         return f"Set starboard channel to {channel.name}."
 
-    @command_client.Command
-    @util.return_error_str_factory(
-        (errors.NotFoundError, errors.BadRequest), {errors.BadRequest: "Invalid ID provided."}
-    )
+    @command_client.command
+    @util.return_error_str((errors.NotFoundError, errors.BadRequest), {errors.BadRequest: "Invalid ID provided."})
     async def star(self, message: models.messages.Message, args: str) -> str:
-        target_message = await self.command_client._fabric.http_api.get_channel_message(
-            message_id=str(util.get_snowflake(args.split(" ", 1)[0])), channel_id=str(message.channel.id)
+        target_message = await self.command_client._fabric.http_adapter.get_channel_message(
+            message=util.get_snowflake(args.split(" ", 1)[0]), channel=message.channel,
         )
 
-        if int(target_message["author"]["id"]) == message.author.id:
+        if int(target_message.author) == message.author:
             return "You cannot star your own message."
 
         async with self.command_client.sql_pool.acquire() as conn:
             star_event = await conn.fetchrow(
-                self.sql_scripts.find_post_star_by_ids, int(target_message["id"]), message.author.id
+                self.sql_scripts.find_post_star_by_ids, target_message.id, message.author.id
             )
             if star_event is None:
                 await conn.execute(
                     self.sql_scripts.create_post_star,
-                    int(target_message["id"]),
-                    int(target_message["channel_id"]),
+                    target_message.id,
+                    target_message.channel.id,
                     message.author.id,
                 )
                 response = "Added star to message."

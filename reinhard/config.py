@@ -17,11 +17,11 @@ class DatabaseConfig(bases.MarshalMixin):
     database: str = dataclasses.field(default="postgres", repr=False)
     port: int = dataclasses.field(default=5432, repr=False)
 
-
 @dataclasses.dataclass()
 class Config(bases.MarshalMixin):
     database: DatabaseConfig
     token: str = dataclasses.field(repr=False)
+    log_level: str = "INFO"
     prefixes: typing.List[str] = dataclasses.field(default_factory=lambda: ["."])
     options: command_client.CommandClientOptions = dataclasses.field(default_factory=dict)
 

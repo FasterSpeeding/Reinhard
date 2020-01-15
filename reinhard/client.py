@@ -28,42 +28,47 @@ class BotClient(command_client.CommandClient):
         self.sql_pool: typing.Optional[asyncpg.pool.Pool] = None
         self.sql_scripts = sql.CachedScripts(pattern=".*schema.sql")
 
-    @command_client.Command(level=5)
+    @command_client.command(level=5)
     async def error(self, message: models.messages.Message, args) -> None:
         raise Exception("This is an exception, get used to it.")
 
     async def error_handler(self, e: BaseException, message: models.messages.Message) -> None:
-        await self._fabric.http_api.create_message(
-            str(message.channel_id),
-            embed={
-                "title": "An exception occured",
-                "color": 15746887,
-                "description": f"```python\n{str(e)[:1950]}```",
-            },
+        await self._fabric.http_adapter.create_message(
+            message.channel,
+            embed=models.embeds.Embed(
+                title=f"An {type(e).__name__} occured",
+                color=15746887,
+                description=f"```python\n{str(e)[:1950]}```",
+            ),
         )
 
-    @command_client.Command(level=5)
+    @command_client.command(level=5)
     async def echo(self, _, args) -> typing.Optional[str]:
         return args
 
-    @command_client.Command(level=5)
+    @command_client.command(level=5)
     async def eval(self, message: models.messages.Message, args):
         args.strip(" ").strip("```")
 
-    @command_client.Command
+    @command_client.command
     async def ping(self, message: models.messages.Message, _) -> None:
         message_sent = time.perf_counter()
-        message_obj = await self._fabric.http_api.create_message(str(message.channel_id), content="Nyaa!")
+        message_obj = await self._fabric.http_adapter.create_message(message.channel, content="Nyaa!")
         api_latency = round((time.perf_counter() - message_sent) * 1000)
-        gateway_latency = round(self._fabric.gateways[None].heartbeat_latency * 1000)
-        await self._fabric.http_api.edit_message(
-            channel_id=message_obj["channel_id"],
-            message_id=message_obj["id"],
+        gateway_latency = round(self.heartbeat_latencies[None] * 1000)
+
+        await self._fabric.http_adapter.update_message(
+            message_obj,
             content=f"Pong! :ping_pong:\nAPI: {api_latency}\nGateway:{gateway_latency}",
         )
 
-    async def run(self) -> None:
+    async def close(self):
+        await super().close()
+        await self.sql_pool.close()
+
+    async def run_async(self) -> None:
         self.sql_pool = await asyncpg.create_pool(**self.config.database.to_dict())
         async with self.sql_pool.acquire() as conn:
-            await sql.initalise_schema(self.sql_scripts, conn)  # TODO: separate schemas and folders?
-        await super().run()
+            await sql.initialise_schema(self.sql_scripts, conn)  # TODO: separate schemas and folders?
+
+        await super().run_async()

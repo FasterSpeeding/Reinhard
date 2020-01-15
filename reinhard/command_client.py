@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 import dataclasses
 import importlib
 import inspect
@@ -12,10 +13,42 @@ from hikari.internal_utilities import assertions
 from hikari.internal_utilities import containers
 from hikari.internal_utilities import loggers
 from hikari.internal_utilities import unspecified
+from hikari.orm.http import base_http_adapter
 from hikari.orm.models import bases
 from hikari.orm.models import guilds
+from hikari.orm.models import media
 from hikari.orm.models import messages
+from hikari.orm.state import base_registry
+from hikari.orm import fabric
 
+
+class Context:
+    __slots__ = ("_fabric", "command", "message", "module")
+
+    _fabric: fabric.Fabric
+
+    #: The message that triggered this command.
+    #:
+    #: :type: :class: `hikari.orm.models.messages.Message`
+    message: messages.Message
+
+    #: The module this command was triggered by.
+    #:
+    #: :type: :class:`CommandModule`
+    module: CommandModule
+
+    def __init__(self, fabric_obj: fabric.Fabric, message: messages.Message, module: CommandModule):
+        self._fabric = fabric_obj
+        self.message = message
+        self.module = module
+
+    @property
+    def http(self) -> base_http_adapter.BaseHTTPAdapter:
+        return self._fabric.http_adapter
+
+    @property
+    def state(self) -> base_registry.BaseRegistry:
+        return self._fabric.state_registry
 
 @dataclasses.dataclass()
 class CommandClientOptions(client.client_options.ClientOptions, bases.MarshalMixin):
@@ -58,26 +91,20 @@ class Command:
     def __init__(
         self,
         func: typing.Optional[aio.CoroutineFunctionT] = None,
+        trigger: typing.Optional[str] = None,
         *,
         aliases: typing.Optional[typing.List[str]] = None,
         level: int = 0,
         module: typing.Optional[CommandModule] = None,
-        trigger: typing.Optional[str] = None,
     ) -> None:
         self._func = func
         self.level = level
         self._module = module
-        if self._func and not trigger:
+        if not trigger:
             trigger = self.generate_trigger()
         self.triggers = tuple(trig for trig in (trigger, *(aliases or containers.EMPTY_COLLECTION)) if trig is not None)
 
-    def __call__(self, func: aio.CoroutineFunctionT) -> Command:
-        self._func = func
-        if not self.triggers:
-            self.triggers = (self.generate_trigger(),)
-        return self
-
-    def bind_module(self, module: CommandModule) -> None:
+    def bind_module(self, module: CommandModule) -> None:  # TODO: depricate
         self._module = module
 
     async def execute(self, message: messages.Message, args: str) -> typing.Optional[str]:
@@ -98,7 +125,7 @@ class Command:
         except CommandError as e:
             return str(e)
         except Exception as e:
-            await self._module.handle_error(e, message)
+            await self._module.handle_error(e, message)  # TODO: move
             raise e
 
     def generate_trigger(self) -> str:
@@ -112,6 +139,13 @@ class Command:
 
     def parse_args(self, args: str) -> typing.List[typing.Union[int, str]]:
         return args  # TODO: actually parse
+
+
+def command(__arg=..., cls=Command, **kwargs):
+    def decorator(coro_fn):
+        return cls(coro_fn, **kwargs)
+
+    return decorator if __arg is ... else decorator(__arg)
 
 
 class CommandModule:
@@ -135,9 +169,10 @@ class CommandModule:
     module_commands: typing.List[Command]
 
     def __init__(self, command_client: CommandClient) -> None:
+        super().__init__()  # TODO: ?
+        self.logger = loggers.get_named_logger(self)
         self.bind_commands()
         self.command_client = command_client
-        self.logger = loggers.get_named_logger(self)
 
     def bind_commands(self) -> None:
         """
@@ -175,10 +210,10 @@ class CommandModule:
             A :class:`typing.Tuple` of :class:`Command` object and the :class:`str` trigger that was matched if the
             command was found else a :class:`typing.Tuple` of :class:`None` and :class:`None`.
         """
-        for command in self.module_commands:
-            for trigger in command.triggers:
+        for command_obj in self.module_commands:
+            for trigger in command_obj.triggers:
                 if content.startswith(trigger):
-                    return command, trigger
+                    return command_obj, trigger
         return None, None
 
     async def handle_error(self, error: BaseException, message: messages.Message) -> bool:
@@ -188,11 +223,11 @@ class CommandModule:
             return True
         return False
 
-    def get_module_event_listeners(self,) -> typing.Generator[typing.Tuple[str, aio.CoroutineFunctionT]]:
+    def get_module_event_listeners(self) -> typing.Generator[typing.Tuple[str, aio.CoroutineFunctionT]]:
         """Get a generator of the event listeners attached to this module."""
         return (
             (name[3:], function)
-            for name, function in inspect.getmembers(self, predicate=inspect.iscoroutinefunction)
+            for name, function in inspect.getmembers(self, predicate=asyncio.iscoroutinefunction)
             if name.startswith("on_")
         )
 
@@ -220,14 +255,14 @@ class CommandModule:
             )
         self.module_commands.append(command_obj)
 
-    def unregister_command(self, command: typing.Union[Command, str]):
-        if isinstance(command, str):
-            command = self.get_command(command)
-        elif not isinstance(command, Command):
+    def unregister_command(self, command_obj: typing.Union[Command, str]):
+        if isinstance(command_obj, str):
+            command_obj = self.get_command(command_obj)
+        elif not isinstance(command_obj, Command):
             raise ValueError("Command must be string command trigger or a 'Command' object.")
 
         try:
-            self.module_commands.remove(command)
+            self.module_commands.remove(command_obj)
         except ValueError:
             raise ValueError("Invalid command passed for this module.") from None
 
@@ -272,12 +307,12 @@ class CommandClient(client.Client, CommandModule):
         self.prefixes = prefixes
         # TODO: built in help command.
 
-    async def access_check(self, command: Command, message: messages.Message) -> bool:
+    async def access_check(self, command_obj: Command, message: messages.Message) -> bool:
         """
         Used to check if a command can be accessed by the calling user and in the calling channel/guild.
 
         Args:
-            command:
+            command_obj:
                 The :class:`Command` object to check access levels for.
             message:
                 The :class:`messages.Message` object to check access levels for.
@@ -285,13 +320,13 @@ class CommandClient(client.Client, CommandModule):
         Returns:
             A :class:`bool` representation of whether this command can be accessed.
         """
-        return self._client_options.access_levels.get(message.author.id, 0) >= command.level  # TODO: sql filter.
+        return self._client_options.access_levels.get(message.author.id, 0) >= command_obj.level  # TODO: sql filter.
 
     def bind_listeners(self) -> None:
         """Used to add event listeners from all loaded command modules to hikari's internal event listener."""
         for module in (self, *self.modules.values()):
             for name, function in module.get_module_event_listeners():
-                print(name)
+                self.logger.warning(name)
                 self.add_event(name, function)
 
     async def check_prefix(self, message: messages.Message) -> typing.Optional[str]:
@@ -326,9 +361,9 @@ class CommandClient(client.Client, CommandModule):
             the command was found found, else a :class:`typing.Tuple` of :class:`None` and :class:`None`.
         """
         for module in (self, *self.modules.values()):
-            command, trigger = module.get_command(content)
-            if command:
-                return command, trigger
+            command_obj, trigger = module.get_command(content)
+            if command_obj:
+                return command_obj, trigger
         return None, None
 
     async def _get_prefixes(self, guild: typing.Optional[guilds.GuildLikeT]) -> typing.List[str]:
@@ -346,7 +381,7 @@ class CommandClient(client.Client, CommandModule):
         if guild is None or not hasattr(self, "get_prefixes"):
             return self.prefixes
 
-        if inspect.iscoroutinefunction(self.get_prefixes):
+        if asyncio.iscoroutinefunction(self.get_prefixes):
             guild_prefix = await self.get_prefixes(int(guild))  # TODO: maybe don't
         else:
             guild_prefix = self.get_prefixes(int(guild))
@@ -379,19 +414,15 @@ class CommandClient(client.Client, CommandModule):
             return
 
         command_args = message.content[len(prefix) :]
-        command, trigger = self.get_global_command(command_args)
-        if not command or not await self.access_check(command, message):
+        command_obj, trigger = self.get_global_command(command_args)
+        if not command_obj or not await self.access_check(command_obj, message):
             return
 
         command_args = command_args[len(trigger) + 1 :]
         # TODO: for now this is also a bit basic...
-        try:
-            result = await command.execute(message, command_args)
-            if isinstance(result, str):
-                await self.respond(message, result)
-        except Exception as e:  # TODO: right now both the error handler on the module and on the client will be called.
-            await self.handle_error(e, message)
-            raise e
+        result = await command_obj.execute(message, command_args)
+        if isinstance(result, str):
+            await self.respond(message, result)
 
     async def respond(self, message: messages.Message, content: str) -> None:
         """Used to handle response length and permission checks for command responses."""
@@ -399,15 +430,14 @@ class CommandClient(client.Client, CommandModule):
         # TODO: automatically sanitise somewhere?
         files = unspecified.UNSPECIFIED
         if len(content) > 2000:
-            files = [
-                ("message.txt", bytes(content, "utf-8")),  # TODO: pretty sure this might be a bug with the file hander i wrote.
-            ]
+            files = [media.InMemoryFile("message.txt", bytes(content, "utf-8")), ]
             content = "This response is too large to send, see attached file."
 
-        await self._fabric.http_api.create_message(str(message.channel_id), content=content, files=files)
+        await self._fabric.http_adapter.create_message(message.channel, content=content, files=files)
 
 
 __all__ = [
+    "command",
     "Command",
     "CommandClient",
     "CommandClientOptions",

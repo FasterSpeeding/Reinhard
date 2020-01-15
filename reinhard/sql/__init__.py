@@ -43,7 +43,7 @@ class CachedScripts:
                 The string path of the module to load.
         """
         assertions.assert_that(file_path.lower().endswith(".sql"), "File must be of type 'sql'")
-        with open(file_path) as file:
+        with open(file_path, "r") as file:
             name = os.path.basename(file.name)[:-4]
             assertions.assert_that(
                 name not in self.scripts, f"Script '{name}' already loaded."
@@ -75,9 +75,9 @@ class CachedScripts:
     update_starboard_channel = script_getter_factory("update_starboard_channel")
 
 
-async def initalise_schema(sql_scripts: CachedScripts, conn: asyncpg.Connection) -> None:
+async def initialise_schema(sql_scripts: CachedScripts, conn: asyncpg.Connection) -> None:
     """
-    Initalise the database schema if not already present.
+    Initialise the database schema if not already present.
 
     Args:
         sql_scripts:
@@ -88,4 +88,4 @@ async def initalise_schema(sql_scripts: CachedScripts, conn: asyncpg.Connection)
     try:
         await conn.execute(sql_scripts.schema)
     except asyncpg.PostgresError as e:
-        raise RuntimeError("Failed to initalise database.") from e
+        raise RuntimeError("Failed to initialise database.") from e

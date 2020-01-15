@@ -1,3 +1,4 @@
+import functools
 import re
 import typing
 
@@ -20,21 +21,19 @@ def get_snowflake(content: str) -> int:
     raise CommandError("Invalid mention or ID supplied.")
 
 
-def return_error_str_factory(
+def return_error_str(
     errors: typing.Union[Exception, typing.List[Exception]],
     errors_responses: typing.Optional[typing.MutableMapping[Exception, str]] = None,
 ):
-    def return_error_str_func_binder(func: aio.CoroutineFunctionT):
-        async def return_error_str(*args, **kwargs) -> typing.Optional[str]:
+    def decorator(func: aio.CoroutineFunctionT):
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs) -> typing.Optional[str]:
             try:
                 return await func(*args, **kwargs)
             except errors as e:
                 return (errors_responses or containers.EMPTY_DICT).get(type(e)) or str(e)
                 # .format(error=str(e)) ?
 
-        # Hack-around to allow compatibility with the `Command` class.
-        return_error_str.__name__ = func.__name__
+        return wrapper
 
-        return return_error_str
-
-    return return_error_str_func_binder
+    return decorator
