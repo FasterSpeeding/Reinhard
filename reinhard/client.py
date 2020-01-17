@@ -36,7 +36,7 @@ class BotClient(command_client.CommandClient):
         await self._fabric.http_adapter.create_message(
             message.channel,
             embed=models.embeds.Embed(
-                title=f"An {type(e).__name__} occured",
+                title=f"An {type(e).__name__} occurred",
                 color=15746887,
                 description=f"```python\n{str(e)[:1950]}```",
             ),

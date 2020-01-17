@@ -15,25 +15,34 @@ class StarboardModule(command_client.CommandModule):
         super().__init__(*args, **kwargs)
         self.sql_scripts = sql.CachedScripts(pattern=".*star.*")
 
-    async def on_message_reaction_add(self, reaction: models.reactions.Reaction, user: models.users.User):
-        self.logger.warning(reaction.emoji)
-        if reaction.emoji != "\N{WHITE MEDIUM STAR}" or reaction.message.author == user:
+    # , reaction: models.reactions.Reaction, user: models.users.User
+    async def on_raw_message_reaction_add(self, payload):
+        message_obj = await self.command_client._fabric.state_registry.get_mandatory_message_by_id(
+            message_id=payload.message_id, channel_id=payload.channel_id
+        )
+        if payload.emoji.name != "\N{WHITE MEDIUM STAR}" or payload.user_id == message_obj.author_id:
             return
 
         async with self.command_client.sql_pool.acquire() as conn:
-            star_event = await conn.fetchrow(self.sql_scripts.find_post_star_by_ids, reaction.message.id, user.id)
+            star_event = await conn.fetchrow(
+                self.sql_scripts.find_post_star_by_ids, int(payload.message_id), int(payload.user_id)
+            )
             if star_event is None:
                 await conn.execute(
-                    self.sql_scripts.create_post_star, reaction.message.id, reaction.message.channel_id, user.id
+                    self.sql_scripts.create_post_star,
+                    int(payload.message_id),
+                    int(payload.channel_id),
+                    int(payload.user_id),
                 )
 
-    async def on_message_reaction_remove(self, reaction: models.reactions.Reaction, user: models.users.User):
-        self.logger.warning(reaction.emoji)
-        if reaction.emoji != "\N{WHITE MEDIUM STAR}" or reaction.message.author == user:
+    #  reaction: models.reactions.Reaction, user: models.users.User
+    async def on_raw_message_reaction_remove(self, payload):
+        # Would check to see if this is the message's author but we'll take this at the
+        if payload.emoji.name != "\N{WHITE MEDIUM STAR}":
             return
 
         async with self.command_client.sql_pool.acquire() as conn:
-            await conn.execute(self.sql_scripts.delete_post_star, reaction.message.id, user.id)
+            await conn.execute(self.sql_scripts.delete_post_star, int(payload.message_id), int(payload.user_id))
 
     @command_client.command(trigger="set starboard", aliases=["register starboard"])
     async def set_starboard(self, message: models.messages.Message, args: str) -> str:
@@ -63,7 +72,7 @@ class StarboardModule(command_client.CommandModule):
             message=util.get_snowflake(args.split(" ", 1)[0]), channel=message.channel,
         )
 
-        if int(target_message.author) == message.author:
+        if target_message.author == message.author:
             return "You cannot star your own message."
 
         async with self.command_client.sql_pool.acquire() as conn:
@@ -72,10 +81,7 @@ class StarboardModule(command_client.CommandModule):
             )
             if star_event is None:
                 await conn.execute(
-                    self.sql_scripts.create_post_star,
-                    target_message.id,
-                    target_message.channel.id,
-                    message.author.id,
+                    self.sql_scripts.create_post_star, target_message.id, target_message.channel.id, message.author.id,
                 )
                 response = "Added star to message."
             else:

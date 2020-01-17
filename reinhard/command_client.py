@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import dataclasses
+import enum
 import importlib
 import inspect
 import logging
@@ -12,14 +13,21 @@ from hikari.internal_utilities import aio
 from hikari.internal_utilities import assertions
 from hikari.internal_utilities import containers
 from hikari.internal_utilities import loggers
+from hikari.internal_utilities import type_hints
 from hikari.internal_utilities import unspecified
 from hikari.orm.http import base_http_adapter
 from hikari.orm.models import bases
+from hikari.orm.models import embeds
 from hikari.orm.models import guilds
 from hikari.orm.models import media
 from hikari.orm.models import messages
 from hikari.orm.state import base_registry
 from hikari.orm import fabric
+
+
+class TriggerTypes(enum.Enum):
+    PREFIX = enum.auto()
+    MENTION = enum.auto()  # TODO: trigger commands with a mention
 
 
 class Context:
@@ -37,6 +45,16 @@ class Context:
     #: :type: :class:`CommandModule`
     module: CommandModule
 
+    #: The string prefix or mention that triggered this command.
+    #:
+    #: :type: :class:`str`
+    trigger: str
+
+    #: The type of trigger that triggered this command.
+    #:
+    #: :type: :class:`TriggerTypes`
+    trigger_type: TriggerTypes
+
     def __init__(self, fabric_obj: fabric.Fabric, message: messages.Message, module: CommandModule):
         self._fabric = fabric_obj
         self.message = message
@@ -49,6 +67,29 @@ class Context:
     @property
     def state(self) -> base_registry.BaseRegistry:
         return self._fabric.state_registry
+
+    async def reply(
+        self,
+        *,
+        content: type_hints.NotRequired[str] = unspecified.UNSPECIFIED,
+        tts: bool = False,
+        files: type_hints.NotRequired[typing.Collection[media.AbstractFile]] = unspecified.UNSPECIFIED,
+        embed: type_hints.NotRequired[embeds.Embed] = unspecified.UNSPECIFIED,
+        soft_send: bool = False,
+    ) -> None:
+        """Used to handle response length and permission checks for command responses."""
+        # TODO: send message perm check, currently not easy to do with hikari,
+        #   raise permission error? if soft_send set to False else just silently fail
+        # TODO: automatically sanitise somewhere?
+        if content is not unspecified.UNSPECIFIED and len(content) > 2000:
+            files = files or containers.EMPTY_SEQUENCE
+            files.append(media.InMemoryFile("message.txt", bytes(content, "utf-8")))
+            content = "This response is too large to send, see attached file."
+
+        await self._fabric.http_adapter.create_message(
+            self.message.channel, content=content, tts=tts, embed=embed, files=files
+        )
+
 
 @dataclasses.dataclass()
 class CommandClientOptions(client.client_options.ClientOptions, bases.MarshalMixin):
@@ -424,13 +465,15 @@ class CommandClient(client.Client, CommandModule):
         if isinstance(result, str):
             await self.respond(message, result)
 
-    async def respond(self, message: messages.Message, content: str) -> None:
+    async def respond(self, message: messages.Message, content: str) -> None:  # TODO: depricate and rely on ctx.
         """Used to handle response length and permission checks for command responses."""
         # TODO: send message perm check, currently not easy to do with hikari.
         # TODO: automatically sanitise somewhere?
         files = unspecified.UNSPECIFIED
         if len(content) > 2000:
-            files = [media.InMemoryFile("message.txt", bytes(content, "utf-8")), ]
+            files = [
+                media.InMemoryFile("message.txt", bytes(content, "utf-8")),
+            ]
             content = "This response is too large to send, see attached file."
 
         await self._fabric.http_adapter.create_message(message.channel, content=content, files=files)
