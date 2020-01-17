@@ -1,5 +1,4 @@
 from __future__ import annotations
-import asyncpg
 import logging
 import time
 import typing
@@ -7,6 +6,7 @@ import typing
 
 from hikari.internal_utilities import loggers
 from hikari.orm import models
+import asyncpg
 
 
 from reinhard import command_client
@@ -26,7 +26,7 @@ class BotClient(command_client.CommandClient):
         self.config = bot_config
         self.logger = loggers.get_named_logger(self)
         self.sql_pool: typing.Optional[asyncpg.pool.Pool] = None
-        self.sql_scripts = sql.CachedScripts(pattern=".*schema.sql")
+        self.sql_scripts = sql.CachedScripts(pattern=r"[.*schema.sql]|[*prefix.sql]")
 
     @command_client.command(level=5)
     async def error(self, message: models.messages.Message, args) -> None:
@@ -49,6 +49,11 @@ class BotClient(command_client.CommandClient):
     @command_client.command(level=5)
     async def eval(self, message: models.messages.Message, args):
         args.strip(" ").strip("```")
+
+    async def get_guild_prefix(self, guild_id: int):
+        async with self.sql_pool.acquire() as conn:
+            data = await conn.fetchrow(self.sql_scripts.find_guild_prefix, guild_id)
+            return data["prefix"] if data is not None else data
 
     @command_client.command
     async def ping(self, message: models.messages.Message, _) -> None:

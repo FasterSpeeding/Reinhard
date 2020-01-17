@@ -65,10 +65,13 @@ class CachedScripts:
             if file.is_file() and file.name.endswith(".sql") and not pattern or re.match(pattern, file.name):
                 self.load_sql_file(str(file.absolute()))
 
+    # TODO: split up?
     create_post_star = script_getter_factory("create_post_star")
     create_starboard_channel = script_getter_factory("create_starboard_channel")
     delete_post_star = script_getter_factory("delete_post_star")
+    find_guild_prefix = script_getter_factory("find_guild_prefix")
     find_post_star_by_ids = script_getter_factory("find_post_star_by_ids")
+    find_post_stars_by_id = script_getter_factory("find_post_stars_by_id")
     find_starboard_channel = script_getter_factory("find_starboard_channel")
     find_starboard_entry_by_id = script_getter_factory("find_starboard_entry_by_id")
     schema = script_getter_factory("schema")

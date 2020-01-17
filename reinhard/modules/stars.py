@@ -37,12 +37,21 @@ class StarboardModule(command_client.CommandModule):
 
     #  reaction: models.reactions.Reaction, user: models.users.User
     async def on_raw_message_reaction_remove(self, payload):
-        # Would check to see if this is the message's author but we'll take this at the
+        # Could check to see if this is the message's author but we'll take this at the
         if payload.emoji.name != "\N{WHITE MEDIUM STAR}":
             return
 
         async with self.command_client.sql_pool.acquire() as conn:
+            amount_of_stars = len(conn.fetch(self.sql_scripts.find_post_stars_by_id, int(payload.message_id)))
             await conn.execute(self.sql_scripts.delete_post_star, int(payload.message_id), int(payload.user_id))
+            post_stars = conn.fetch(self.sql_scripts.find_post_stars_by_id, int(payload.message_id))
+            if amount_of_stars == len(post_stars):
+                return
+
+    async def consume_star_increment(self, message):
+        async with self.command_client.sql_pool.acquire() as conn:
+            ...
+
 
     @command_client.command(trigger="set starboard", aliases=["register starboard"])
     async def set_starboard(self, message: models.messages.Message, args: str) -> str:

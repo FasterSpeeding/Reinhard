@@ -1,4 +1,5 @@
 from __future__ import annotations
+import abc
 import asyncio
 import dataclasses
 import enum
@@ -21,13 +22,30 @@ from hikari.orm.models import embeds
 from hikari.orm.models import guilds
 from hikari.orm.models import media
 from hikari.orm.models import messages
+from hikari.orm.models import permissions
 from hikari.orm.state import base_registry
 from hikari.orm import fabric
+from hikari import errors
+
+
+class Executable(abc.ABC):
+    ...
 
 
 class TriggerTypes(enum.Enum):
     PREFIX = enum.auto()
     MENTION = enum.auto()  # TODO: trigger commands with a mention
+
+
+class PermissionError(errors.HikariError):
+    __slots__ = ("missing_permissions",)
+
+    missing_permissions: permissions.Permission
+
+    def __init__(self):
+        pass
+        # self.missing_permissions =
+        # for permission in m
 
 
 class Context:
@@ -76,7 +94,7 @@ class Context:
         files: type_hints.NotRequired[typing.Collection[media.AbstractFile]] = unspecified.UNSPECIFIED,
         embed: type_hints.NotRequired[embeds.Embed] = unspecified.UNSPECIFIED,
         soft_send: bool = False,
-    ) -> None:
+    ) -> messages.Message:
         """Used to handle response length and permission checks for command responses."""
         # TODO: send message perm check, currently not easy to do with hikari,
         #   raise permission error? if soft_send set to False else just silently fail
@@ -86,7 +104,7 @@ class Context:
             files.append(media.InMemoryFile("message.txt", bytes(content, "utf-8")))
             content = "This response is too large to send, see attached file."
 
-        await self._fabric.http_adapter.create_message(
+        return await self._fabric.http_adapter.create_message(
             self.message.channel, content=content, tts=tts, embed=embed, files=files
         )
 
@@ -317,9 +335,9 @@ class CommandClient(client.Client, CommandModule):
         This inherits from :class:`CommandModule` and can act as an independent Command Module for small bots.
     """
 
-    __slots__ = ("get_prefixes", "modules", "prefixes")
+    __slots__ = ("get_guild_prefix", "modules", "prefixes")
 
-    get_prefixes: typing.Union[aio.CoroutineFunctionT, None]  # TODO: or normal method.
+    get_guild_prefix: typing.Union[aio.CoroutineFunctionT, None]  # TODO: or normal method.
     # TODO: rename this to something singular
 
     #: The command modules that are loaded in this client.
@@ -409,8 +427,8 @@ class CommandClient(client.Client, CommandModule):
 
     async def _get_prefixes(self, guild: typing.Optional[guilds.GuildLikeT]) -> typing.List[str]:
         """
-        Used to get the registered global prefixes and a guild's prefix from the function `get_prefixes` if this is
-        being called from a guild and `get_prefixes` has been implemented on this object.
+        Used to get the registered global prefixes and a guild's prefix from the function `get_guild_prefix` if this is
+        being called from a guild and `get_guild_prefix` has been implemented on this object.
 
         Args:
             guild:
@@ -419,13 +437,13 @@ class CommandClient(client.Client, CommandModule):
         Returns:
             An :class:`typing.Sequence` of :class:`str` representation of the applicable prefixes.
         """
-        if guild is None or not hasattr(self, "get_prefixes"):
+        if guild is None or not hasattr(self, "get_guild_prefix"):
             return self.prefixes
 
-        if asyncio.iscoroutinefunction(self.get_prefixes):
-            guild_prefix = await self.get_prefixes(int(guild))  # TODO: maybe don't
+        if asyncio.iscoroutinefunction(self.get_guild_prefix):
+            guild_prefix = await self.get_guild_prefix(int(guild))  # TODO: maybe don't
         else:
-            guild_prefix = self.get_prefixes(int(guild))
+            guild_prefix = self.get_guild_prefix(int(guild))
 
         return [guild_prefix, *self.prefixes]
 
