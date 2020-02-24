@@ -21,12 +21,16 @@ class BotClient(command_client.CommandClient):
         self, bot_config: config.Config, *, modules: typing.List[str] = None,
     ):
         super().__init__(
-            prefixes=bot_config.prefixes, token=bot_config.token, modules=modules, options=bot_config.options,
+            prefixes=bot_config.prefixes, modules=modules, options=bot_config.options,
         )
         self.config = bot_config
         self.logger = loggers.get_named_logger(self)
         self.sql_pool: typing.Optional[asyncpg.pool.Pool] = None
         self.sql_scripts = sql.CachedScripts(pattern=r"[.*schema.sql]|[*prefix.sql]")
+
+    @command_client.command
+    async def about(self, message: models.messages.Message, _):
+        return "TODO: This"
 
     @command_client.command(level=5)
     async def error(self, message: models.messages.Message, args) -> None:
@@ -36,9 +40,7 @@ class BotClient(command_client.CommandClient):
         await self._fabric.http_adapter.create_message(
             message.channel,
             embed=models.embeds.Embed(
-                title=f"An {type(e).__name__} occurred",
-                color=15746887,
-                description=f"```python\n{str(e)[:1950]}```",
+                title=f"An {type(e).__name__} occurred", color=15746887, description=f"```python\n{str(e)[:1950]}```",
             ),
         )
 
@@ -60,20 +62,19 @@ class BotClient(command_client.CommandClient):
         message_sent = time.perf_counter()
         message_obj = await self._fabric.http_adapter.create_message(message.channel, content="Nyaa!")
         api_latency = round((time.perf_counter() - message_sent) * 1000)
-        gateway_latency = round(self.heartbeat_latencies[None] * 1000)
+        gateway_latency = round(self.heartbeat_latencies[0] * 1000)
 
         await self._fabric.http_adapter.update_message(
-            message_obj,
-            content=f"Pong! :ping_pong:\nAPI: {api_latency}\nGateway:{gateway_latency}",
+            message_obj, content=f"Pong! :ping_pong:\nAPI: {api_latency}\nGateway:{gateway_latency}",
         )
 
-    async def close(self):
-        await super().close()
+    async def shutdown(self, *args, **kwargs) -> None:
+        await super().shutdown(*args, **kwargs)
         await self.sql_pool.close()
 
-    async def run_async(self) -> None:
+    async def start(self, *args, **kwargs) -> None:
         self.sql_pool = await asyncpg.create_pool(**self.config.database.to_dict())
         async with self.sql_pool.acquire() as conn:
             await sql.initialise_schema(self.sql_scripts, conn)  # TODO: separate schemas and folders?
 
-        await super().run_async()
+        await super().start(*args, **kwargs)

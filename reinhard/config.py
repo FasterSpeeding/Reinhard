@@ -17,6 +17,7 @@ class DatabaseConfig(bases.MarshalMixin):
     database: str = dataclasses.field(default="postgres", repr=False)
     port: int = dataclasses.field(default=5432, repr=False)
 
+
 @dataclasses.dataclass()
 class Config(bases.MarshalMixin):
     database: DatabaseConfig
@@ -26,6 +27,5 @@ class Config(bases.MarshalMixin):
     options: command_client.CommandClientOptions = dataclasses.field(default_factory=dict)
 
     def __post_init__(self):
-        # TODO: push changes to hikari.
         self.database = DatabaseConfig.from_dict(self.database)
         self.options = command_client.CommandClientOptions.from_dict(self.options)

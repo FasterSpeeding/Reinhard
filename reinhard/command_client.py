@@ -9,7 +9,6 @@ import logging
 import typing
 
 
-from hikari import client
 from hikari.internal_utilities import aio
 from hikari.internal_utilities import assertions
 from hikari.internal_utilities import containers
@@ -24,8 +23,18 @@ from hikari.orm.models import media
 from hikari.orm.models import messages
 from hikari.orm.models import permissions
 from hikari.orm.state import base_registry
+from hikari.orm import client
 from hikari.orm import fabric
 from hikari import errors
+
+
+SEND_MESSAGE_PERMISSIONS = permissions.VIEW_CHANNEL | permissions.SEND_MESSAGES
+ATTACH_FILE_PERMISSIONS = SEND_MESSAGE_PERMISSIONS | permissions.ATTACH_FILES
+CHARACTERS_TO_SANITIZE = {"@": ""}
+
+
+def sanitize_content(content: str) -> str:
+    return content  # TODO: This.
 
 
 class Executable(abc.ABC):
@@ -42,16 +51,16 @@ class PermissionError(errors.HikariError):
 
     missing_permissions: permissions.Permission
 
-    def __init__(self):
+    def __init__(self, required_permissions: permissions.Permission, actual_permissions: permissions.Permission):
         pass
         # self.missing_permissions =
         # for permission in m
 
 
 class Context:
-    __slots__ = ("_fabric", "command", "message", "module")
+    __slots__ = ("fabric", "command", "message", "module")
 
-    _fabric: fabric.Fabric
+    fabric: fabric.Fabric
 
     #: The message that triggered this command.
     #:
@@ -73,18 +82,18 @@ class Context:
     #: :type: :class:`TriggerTypes`
     trigger_type: TriggerTypes
 
-    def __init__(self, fabric_obj: fabric.Fabric, message: messages.Message, module: CommandModule):
-        self._fabric = fabric_obj
+    def __init__(self, fabric_obj: fabric.Fabric, message: messages.Message, module: CommandModule, trigger: str, trigger_type: TriggerTypes):
+        self.fabric = fabric_obj
         self.message = message
         self.module = module
 
     @property
     def http(self) -> base_http_adapter.BaseHTTPAdapter:
-        return self._fabric.http_adapter
+        return self.fabric.http_adapter
 
     @property
     def state(self) -> base_registry.BaseRegistry:
-        return self._fabric.state_registry
+        return self.fabric.state_registry
 
     async def reply(
         self,
@@ -93,18 +102,23 @@ class Context:
         tts: bool = False,
         files: type_hints.NotRequired[typing.Collection[media.AbstractFile]] = unspecified.UNSPECIFIED,
         embed: type_hints.NotRequired[embeds.Embed] = unspecified.UNSPECIFIED,
-        soft_send: bool = False,
+        soft_send: bool = False, # TODO: what was this?
+        sanitize: bool = True,
     ) -> messages.Message:
         """Used to handle response length and permission checks for command responses."""
-        # TODO: send message perm check, currently not easy to do with hikari,
-        #   raise permission error? if soft_send set to False else just silently fail
         # TODO: automatically sanitise somewhere?
         if content is not unspecified.UNSPECIFIED and len(content) > 2000:
             files = files or containers.EMPTY_SEQUENCE
             files.append(media.InMemoryFile("message.txt", bytes(content, "utf-8")))
             content = "This response is too large to send, see attached file."
+        elif content is not unspecified.UNSPECIFIED:
+            content = sanitize_content(content)
 
-        return await self._fabric.http_adapter.create_message(
+        # TODO: this needs to be easier to do on hikari's level.
+        # if not files and not SEND_MESSAGE_PERMISSIONS or files and ATTACH_FILE_PERMISSIONS:
+        #     raise PermissionError(ATTACH_FILE_PERMISSIONS if files else SEND_MESSAGE_PERMISSIONS)
+
+        return await self.fabric.http_adapter.create_message(
             self.message.channel, content=content, tts=tts, embed=embed, files=files
         )
 
@@ -353,12 +367,11 @@ class CommandClient(client.Client, CommandModule):
     def __init__(
         self,
         prefixes: typing.List[str],
-        token: str,
         *,
         modules: typing.List[str] = None,
         options: typing.Optional[CommandClientOptions] = None,
     ) -> None:
-        super().__init__(token=token, options=options or CommandClientOptions())
+        super().__init__(options=options or CommandClientOptions())
         self.modules = {}
         self.load_modules(*(modules or containers.EMPTY_SEQUENCE))
         self.bind_commands()
@@ -445,7 +458,7 @@ class CommandClient(client.Client, CommandModule):
         else:
             guild_prefix = self.get_guild_prefix(int(guild))
 
-        return [guild_prefix, *self.prefixes]
+        return [guild_prefix, *self.prefixes] if guild_prefix else self.prefixes
 
     def load_modules(self, *modules: str) -> None:
         """

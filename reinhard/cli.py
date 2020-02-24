@@ -1,5 +1,7 @@
+import json
 import logging
 import os
+import typing
 
 
 import yaml
@@ -8,12 +10,38 @@ import yaml
 from reinhard import client
 from reinhard import config
 
+CONFIG_PARSERS = {"yaml": yaml.safe_load, "json": json.load}
+
+
+def parse_config(config_path: typing.Optional[str] = None, config_marshaler: typing.Callable = config.Config.from_dict):
+    if config_path is None:
+        return config_marshaler({})
+
+    file_type = config_path.split(".")[-1].lower()
+    parser = CONFIG_PARSERS.get(file_type)
+    if parser is None:
+        raise TypeError(f"Unsupported file type received `{config_path.split('.')[-1]}`")
+
+    if config_path is not None:
+        with open(config_path, "r") as file:
+            return config_marshaler(parser(file))
+
 
 def main():
-    config_path = os.getenv("REINHARD_CONFIG_FILE", "config.yaml")
+    config_path = os.getenv("REINHARD_CONFIG_FILE")
 
-    with open(config_path, "r") as file:
-        config_obj = config.Config.from_dict(yaml.safe_load(file))
+    if config_path is None:
+        for file_type in CONFIG_PARSERS.keys():
+            config_path = f"config.{file_type}"
+            if os.path.exists(config_path):
+                break
+        else:
+            logging.getLogger(__name__).warning("Config file not found, initiating without a config.")
+            # FileNotFoundError
+            config_path = None
+
+    if config_path:
+        config_obj = parse_config(config_path)
 
     logging.basicConfig(
         level=config_obj.log_level,
@@ -22,4 +50,4 @@ def main():
     )
 
     bot_client = client.BotClient(config_obj, modules=["reinhard.modules.stars"])
-    bot_client.run()
+    bot_client.run(token=config_obj.token)

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 
+from hikari.net import errors
 from hikari.orm import models
-from hikari import errors
 
 
 from reinhard import command_client
@@ -15,43 +15,45 @@ class StarboardModule(command_client.CommandModule):
         super().__init__(*args, **kwargs)
         self.sql_scripts = sql.CachedScripts(pattern=".*star.*")
 
-    # , reaction: models.reactions.Reaction, user: models.users.User
-    async def on_raw_message_reaction_add(self, payload):
+    async def on_message_reaction_add(self, reaction: models.reactions.Reaction, user: models.users.User):
         message_obj = await self.command_client._fabric.state_registry.get_mandatory_message_by_id(
-            message_id=payload.message_id, channel_id=payload.channel_id
+            message_id=reaction.message_id, channel_id=reaction.channel_id
         )
-        if payload.emoji.name != "\N{WHITE MEDIUM STAR}" or payload.user_id == message_obj.author_id:
+        print(reaction.emoji)
+        if reaction.emoji != "\N{WHITE MEDIUM STAR}" or user == message_obj.author:
             return
 
+        await self.consume_star_increment(message_obj, user)
+
+    async def on_message_reaction_remove(self, reaction: models.reactions.Reaction, user: models.users.User):
+        # Could check to see if this is the message's author but we'll take this at the
+        print(reaction.emoji)
+        if reaction.emoji != "\N{WHITE MEDIUM STAR}":
+            return
+
+        await self.consume_star_decrement(reaction.message_id, user)
+
+    async def consume_star_increment(self, message: models.messages.Message, reactor: models.users.BaseUser) -> bool:
         async with self.command_client.sql_pool.acquire() as conn:
             star_event = await conn.fetchrow(
-                self.sql_scripts.find_post_star_by_ids, int(payload.message_id), int(payload.user_id)
+                self.sql_scripts.find_post_star_by_ids, message.id, reactor.id
             )
             if star_event is None:
                 await conn.execute(
                     self.sql_scripts.create_post_star,
-                    int(payload.message_id),
-                    int(payload.channel_id),
-                    int(payload.user_id),
+                    message.id,
+                    message.channel.id,
+                    reactor.id,
                 )
+            return star_event is None
 
-    #  reaction: models.reactions.Reaction, user: models.users.User
-    async def on_raw_message_reaction_remove(self, payload):
-        # Could check to see if this is the message's author but we'll take this at the
-        if payload.emoji.name != "\N{WHITE MEDIUM STAR}":
-            return
-
+    async def consume_star_decrement(self, message: models.messages.MessageLikeT, reactor: models.users.BaseUser) -> bool:
         async with self.command_client.sql_pool.acquire() as conn:
-            amount_of_stars = len(conn.fetch(self.sql_scripts.find_post_stars_by_id, int(payload.message_id)))
-            await conn.execute(self.sql_scripts.delete_post_star, int(payload.message_id), int(payload.user_id))
-            post_stars = conn.fetch(self.sql_scripts.find_post_stars_by_id, int(payload.message_id))
-            if amount_of_stars == len(post_stars):
-                return
-
-    async def consume_star_increment(self, message):
-        async with self.command_client.sql_pool.acquire() as conn:
-            ...
-
+            original_star = conn.fetchrow(self.sql_scripts.find_post_star_by_ids, int(message), reactor.id)
+            print(dir(original_star))
+            if original_star is None:
+                await conn.execute(self.sql_scripts.delete_post_star, int(message), reactor.id)
+            return original_star is None
 
     @command_client.command(trigger="set starboard", aliases=["register starboard"])
     async def set_starboard(self, message: models.messages.Message, args: str) -> str:
@@ -75,7 +77,9 @@ class StarboardModule(command_client.CommandModule):
         return f"Set starboard channel to {channel.name}."
 
     @command_client.command
-    @util.return_error_str((errors.NotFoundError, errors.BadRequest), {errors.BadRequest: "Invalid ID provided."})
+    @util.return_error_str(
+        (errors.NotFoundHTTPError, errors.BadRequestHTTPError), {errors.BadRequestHTTPError: "Invalid ID provided."}
+    )
     async def star(self, message: models.messages.Message, args: str) -> str:
         target_message = await self.command_client._fabric.http_adapter.get_channel_message(
             message=util.get_snowflake(args.split(" ", 1)[0]), channel=message.channel,
