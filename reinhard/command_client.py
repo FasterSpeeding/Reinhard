@@ -1,6 +1,7 @@
 from __future__ import annotations
 import abc
 import asyncio
+import contextlib
 import dataclasses
 import enum
 import importlib
@@ -9,24 +10,25 @@ import logging
 import typing
 
 
-from hikari.internal_utilities import aio
 from hikari.internal_utilities import assertions
 from hikari.internal_utilities import containers
 from hikari.internal_utilities import loggers
-from hikari.internal_utilities import type_hints
 from hikari.internal_utilities import unspecified
-from hikari.orm.http import base_http_adapter
 from hikari.orm.models import bases
-from hikari.orm.models import embeds
-from hikari.orm.models import guilds
 from hikari.orm.models import media
-from hikari.orm.models import messages
 from hikari.orm.models import permissions
-from hikari.orm.state import base_registry
 from hikari.orm import client
-from hikari.orm import fabric
 from hikari import errors
 
+if typing.TYPE_CHECKING:
+    from hikari.internal_utilities import aio
+    from hikari.internal_utilities import type_hints
+    from hikari.orm.http import base_http_adapter
+    from hikari.orm.models import embeds
+    from hikari.orm.models import guilds
+    from hikari.orm.models import messages
+    from hikari.orm.state import base_registry
+    from hikari.orm import fabric
 
 SEND_MESSAGE_PERMISSIONS = permissions.VIEW_CHANNEL | permissions.SEND_MESSAGES
 ATTACH_FILE_PERMISSIONS = SEND_MESSAGE_PERMISSIONS | permissions.ATTACH_FILES
@@ -82,7 +84,14 @@ class Context:
     #: :type: :class:`TriggerTypes`
     trigger_type: TriggerTypes
 
-    def __init__(self, fabric_obj: fabric.Fabric, message: messages.Message, module: CommandModule, trigger: str, trigger_type: TriggerTypes):
+    def __init__(
+        self,
+        fabric_obj: fabric.Fabric,
+        message: messages.Message,
+        module: CommandModule,
+        trigger: str,
+        trigger_type: TriggerTypes,
+    ):
         self.fabric = fabric_obj
         self.message = message
         self.module = module
@@ -102,7 +111,7 @@ class Context:
         tts: bool = False,
         files: type_hints.NotRequired[typing.Collection[media.AbstractFile]] = unspecified.UNSPECIFIED,
         embed: type_hints.NotRequired[embeds.Embed] = unspecified.UNSPECIFIED,
-        soft_send: bool = False, # TODO: what was this?
+        soft_send: bool = False,  # TODO: what was this?
         sanitize: bool = True,
     ) -> messages.Message:
         """Used to handle response length and permission checks for command responses."""
@@ -196,6 +205,8 @@ class Command:
         try:
             return await self._func(self._module, message, self.parse_args(args))
         except CommandError as e:
+            # '@contextlib.suppress(PermissionError):
+            # reply
             return str(e)
         except Exception as e:
             await self._module.handle_error(e, message)  # TODO: move
