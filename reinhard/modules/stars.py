@@ -1,13 +1,19 @@
 from __future__ import annotations
+import typing
 
 
 from hikari.net import errors
-from hikari.orm import models
-
+from hikari.orm.models import embeds as _embeds
 
 from reinhard import command_client
 from reinhard import sql
 from reinhard import util
+
+if typing.TYPE_CHECKING:
+    import asyncpg
+
+    from hikari.orm import models
+
 
 #  TODO: star status (e.g. deleted)
 #  TODO: freeze stars when deleted?
@@ -18,13 +24,28 @@ UNICODE_STAR = "\N{WHITE MEDIUM STAR}"
 
 
 class StarboardModule(command_client.CommandModule):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.sql_scripts = sql.CachedScripts(pattern=".*star.*")
 
-    async def on_message_reaction_add(self, reaction: models.reactions.Reaction, user: models.users.User):
-        print(user.is_bot)
-        print(reaction.emoji != UNICODE_STAR)
+    @staticmethod
+    async def get_starboard_channel(
+        guild: models.guilds.GuildLikeT, conn: asyncpg.connection
+    ) -> typing.Optional[asyncpg.Record]:
+        return await conn.fetchrow("SELECT * FROM StarboardChannels WHERE guild_id = $1;", int(guild))
+
+    @staticmethod
+    async def get_starboard_entry(
+        message: models.messages.MessageLikeT, conn: asyncpg.connection
+    ) -> typing.Optional[asyncpg.Record]:
+        return await conn.fetchrow("SELECT * From StarboardEntries WHERE message_id = $1", int(message))
+
+    @staticmethod
+    async def get_star_count(message: models.messages.MessageLikeT, conn: asyncpg.connection) -> int:
+        result = await conn.fetchrow("SELECT COUNT(*) FROM PostStars WHERE message_id = $1", int(message))
+        return result["count"]
+
+    async def on_message_reaction_add(self, reaction: models.reactions.Reaction, user: models.users.User) -> None:
         if user.is_bot or reaction.emoji != UNICODE_STAR:
             return
 
@@ -46,85 +67,103 @@ class StarboardModule(command_client.CommandModule):
 
     async def consume_star_increment(self, message: models.messages.Message, reactor: models.users.BaseUser) -> bool:
         async with self.command_client.sql_pool.acquire() as conn:
-            star_event = await conn.fetchrow(self.sql_scripts.find_post_star_by_ids, message.id, reactor.id)
-            if star_event is None:
+            starboard_entry = await self.get_starboard_entry(message, conn)
+            if starboard_entry is None:
+                await conn.execute(
+                    self.sql_scripts.create_starboard_entry, message.id, message.channel.id, reactor.id, 0
+                )
+            post_star = await conn.fetchrow(
+                "SELECT * FROM PostStars WHERE message_id = $1 and starer_id = $2;", message.id, reactor.id,
+            )
+            if post_star is None:
                 await conn.execute(
                     self.sql_scripts.create_post_star, message.id, message.channel.id, reactor.id,
                 )
-            return star_event is None
+                # self.command_client.sql_pool.commit()
+            return post_star is None
 
     async def consume_star_decrement(
         self, message: models.messages.MessageLikeT, reactor: models.users.BaseUser
     ) -> bool:
         async with self.command_client.sql_pool.acquire() as conn:
-            original_star = await conn.fetchrow(self.sql_scripts.find_post_star_by_ids, int(message), reactor.id)
+            original_star = await conn.fetchrow(
+                "SELECT * FROM PostStars WHERE message_id = $1 and starer_id = $2;", int(message), reactor.id,
+            )
             if original_star is not None:
-                await conn.execute(self.sql_scripts.delete_post_star, int(message), reactor.id)
-            return original_star is not None
+                await conn.execute(
+                    "DELETE FROM poststars WHERE message_id = $1 and starer_id = $2", int(message), reactor.id,
+                )
+                if await self.get_star_count(message, conn) == 0:
+                    await conn.execute("DELETE from StarboardEntries WHERE message_id = $1", int(message))
+                return True
+            return False
 
     @command_client.command(trigger="set starboard", aliases=["register starboard"])
-    async def set_starboard(self, message: models.messages.Message, args: str) -> str:
-        if args:
-            channel_id = util.get_snowflake(args.split(" ", 1)[0])
-        else:
-            channel_id = message.channel_id
+    async def set_starboard(self, message: models.messages.Message, args: str) -> None:
+        target_channel = self.command_client._fabric.state_registry.get_mandatory_channel_by_id(
+            util.get_snowflake(args.split(" ", 1)[0]) or message.channel_id
+        )
+        if not target_channel.is_resolved:
+            with util.ReturnErrorStr((errors.NotFoundHTTPError, errors.BadRequestHTTPError)):
+                target_channel = await target_channel
 
-        channel = self.command_client._fabric.state_registry.get_mandatory_channel_by_id(channel_id)
-        if not channel.is_resolved:
-            with util.ReturnErrorStr((errors.NotFoundHTTPError, errors.BadRequestHTTPError),):
+        channel = message.channel
+        if not channel:
+            with util.ReturnErrorStr((errors.NotFoundHTTPError,)):
                 channel = await channel
+
         # Should flag both DM channels and channels from other guilds.
-        if getattr(channel, "guild_id", None) != message.guild_id:
-            return "Unknown channel ID supplied."
+        if getattr(target_channel, "guild_id", None) != channel.guild_id:
+            raise command_client.CommandError("Unknown channel ID supplied.")
 
         async with self.command_client.sql_pool.acquire() as conn:
-            starboard_channel = await conn.fetchrow(self.sql_scripts.find_starboard_channel, message.guild_id)
+            starboard_channel = await self.get_starboard_channel(target_channel.guild, conn)
             if starboard_channel is None:
-                await conn.execute(self.sql_scripts.create_starboard_channel, message.guild_id, channel_id)
-            elif starboard_channel["channel_id"] != channel_id:  # TODO: disable updating the posts on old ones.
-                await conn.execute(self.sql_scripts.update_starboard_channel, message.guild_id, channel_id)
-
-        return f"Set starboard channel to {channel.name}."
+                await conn.execute(self.sql_scripts.create_starboard_channel, channel.guild_id, target_channel.id)
+            elif starboard_channel["channel_id"] != target_channel.id:  # TODO: disable updating the posts on old ones.
+                await conn.execute(
+                    "UPDATE StarboardChannels SET channel_id = $2 WHERE guild_id = $1;",
+                    channel.guild_id,
+                    target_channel.id,
+                )
+        # TODO: edge case unresolved error
+        await message.channel.send(content=f"Set starboard channel to {target_channel.name}.")
 
     @command_client.command
     @util.return_error_str((errors.NotFoundHTTPError, errors.BadRequestHTTPError),)
-    async def star(self, message: models.messages.Message, args: str) -> str:
-        target_message = await self.command_client._fabric.state_registry.get_mandatory_message_by_id(
+    async def star(self, message: models.messages.Message, args: str) -> None:
+        target_message = self.command_client._fabric.state_registry.get_mandatory_message_by_id(
             message_id=util.get_snowflake(args.split(" ", 1)[0]), channel_id=message.channel.id,
         )
         if not target_message.is_resolved:
-            with util.ReturnErrorStr((errors.NotFoundHTTPError, errors.BadRequestHTTPError),):
+            with util.ReturnErrorStr((errors.NotFoundHTTPError, errors.BadRequestHTTPError)):
                 target_message = await target_message
 
         if target_message.author == message.author:
-            return "You cannot star your own message."
+            raise command_client.CommandError("You cannot star your own message.")
 
+        if await self.consume_star_increment(target_message, message.author):
+            response = "Added star to message."
+        else:
+            await self.consume_star_decrement(target_message, message.author)
+            response = "Removed star from message."
+        # TODO: edge case unresolved error
+        await message.channel.send(content=response)
+
+    @command_client.command
+    async def star_info(self, message: models.messages.Message, args: str) -> None:
+        if not args:
+            raise command_client.CommandError("Message ID required.")
+        message_id = util.get_snowflake(args.split(" ", 1)[0])
         async with self.command_client.sql_pool.acquire() as conn:
-            star_event = await conn.fetchrow(
-                self.sql_scripts.find_post_star_by_ids, target_message.id, message.author.id
-            )
-            if star_event is None:
-                await conn.execute(
-                    self.sql_scripts.create_post_star, target_message.id, target_message.channel.id, message.author.id,
-                )
-                response = "Added star to message."
+            starboard_entry = await conn.fetchrow("SELECT * FROM StarboardEntries WHERE message_id = $1;", message_id)
+            if starboard_entry is None:
+                await message.channel.send(content="Starboard entry not found.")
             else:
-                response = "You've already stared that message."
-        return response
+                await message.channel.send(embed=await self.generate_star_embed(message, conn))
 
-    async def star_info(self, message: models.messages.Message, args: str) -> str:
-        # star_event = await conn.fetchrow(
-        #    self.sql_scripts.find_post_star_by_ids, target_message.id, message.author.id
-        # )
-        original_star["message_id"]
-        original_star["channel_id"]
-
-
-
-
-
-
-
-
-    async def generate_star_embed(self, message_id):
-        ...
+    async def generate_star_embed(
+        self, message: models.messages.MessageLikeT, conn: asyncpg.connection
+    ) -> models.embeds.Embed:
+        star_count = await self.get_star_count(message, conn)
+        return _embeds.Embed()

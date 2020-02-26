@@ -26,12 +26,12 @@ class ReturnErrorStr:
 
     def __init__(
         self,
-        errors: typing.Sequence[BaseException],
+        errors: typing.Tuple[BaseException],
         errors_responses: typing.Optional[typing.MutableMapping[BaseException, str]] = None,
     ) -> None:
         #    if isinstance(errors, BaseException):
         #        errors = (errors, )
-        self.errors: typing.Sequence[BaseException] = errors
+        self.errors: typing.Tuple[BaseException] = errors
         self.error_responses: typing.Optional[typing.MutableMapping[BaseException, str]] = errors_responses
 
     def __enter__(self):
@@ -46,7 +46,7 @@ class ReturnErrorStr:
 
 
 def return_error_str(
-    errors: typing.Union[BaseException, typing.Sequence[BaseException]],
+    errors: typing.Union[BaseException, typing.Tuple[BaseException]],
     errors_responses: typing.Optional[typing.MutableMapping[BaseException, str]] = None,
 ):
     def decorator(func: aio.CoroutineFunctionT):

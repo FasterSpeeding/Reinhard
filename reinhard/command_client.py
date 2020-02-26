@@ -40,7 +40,9 @@ def sanitize_content(content: str) -> str:
 
 
 class Executable(abc.ABC):
-    ...
+    @abc.abstractmethod
+    async def execute(self, message: messages.Message, content: str) -> bool:
+        ...
 
 
 class TriggerTypes(enum.Enum):
@@ -186,6 +188,9 @@ class Command:
             trigger = self.generate_trigger()
         self.triggers = tuple(trig for trig in (trigger, *(aliases or containers.EMPTY_COLLECTION)) if trig is not None)
 
+    def __repr__(self):
+        return f"Command({'|'.join(self.triggers)})"
+
     def bind_module(self, module: CommandModule) -> None:  # TODO: depricate
         self._module = module
 
@@ -275,11 +280,12 @@ class CommandModule:
         for name, function in inspect.getmembers(self, predicate=lambda func: isinstance(func, Command)):
             function.bind_module(self)
             for trigger in function.triggers:
-                assertions.assert_that(
-                    self.get_command(trigger)[0] is None,
-                    f"Cannot initialise module '{self.__class__.__name__}' with duplicated trigger '{trigger}'.",
-                )
+                if self.get_command(trigger)[0] is not None:
+                    self.logger.warning(
+                        f"Possible overlapping trigger '{trigger}' found in '{self.__class__.__name__}' module."
+                    )
             self.module_commands.append(function)
+        self.module_commands.sort(key=lambda comm: comm.name, reverse=True)
 
     def get_command(self, content: str) -> typing.Union[typing.Tuple[Command, str], typing.Tuple[None, None]]:
         """
@@ -333,10 +339,10 @@ class CommandModule:
         """
         command_obj = Command(func=func, module=self, trigger=trigger, aliases=list(aliases))
         for trigger in command_obj.triggers:
-            assertions.assert_that(
-                self.get_command(trigger) is None,
-                f"Command trigger '{trigger}' already registered in '{self.__class__.__name__}' module.",
-            )
+            if self.get_command(trigger) is not None:
+                self.logger.warning(
+                    f"Possible overlapping trigger '{trigger}' found in '{self.__class__.__name__}' module."
+                )
         self.module_commands.append(command_obj)
 
     def unregister_command(self, command_obj: typing.Union[Command, str]):
@@ -425,7 +431,10 @@ class CommandClient(client.Client, CommandModule):
             A :class:`str` representation of the triggering prefix if found, else :class:`None`
         """
         trigger_prefix = None
-        for prefix in await self._get_prefixes(message.guild_id):
+        # message.channel shouldn't ever be unresolved.
+        for prefix in await self._get_prefixes(
+            (message.channel if message.channel.is_resolved else await message.channel).guild_id
+        ):
             if message.content.startswith(prefix):
                 trigger_prefix = prefix
                 break

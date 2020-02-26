@@ -7,11 +7,13 @@ CREATE TABLE IF NOT EXISTS StarboardEntries (
     message_id BIGINT PRIMARY KEY,  -- Is that sufficient?
     channel_id BIGINT NOT NULL,
     author_id BIGINT NOT NULL,
-    starboard_entry_id BIGINT NOT NULL
+    message_status INT NOT NULL DEFAULT 0,
+   -- starboard_channel_id BIGINT,
+    starboard_message_id BIGINT
 );
 
 CREATE TABLE IF NOT EXISTS PostStars (
-    message_id BIGINT NOT NULL,  -- Is that sufficient?
+    message_id BIGINT NOT NULL references StarboardEntries(message_id),  -- Is that sufficient?
     channel_id BIGINT NOT NULL,
     starer_id BIGINT NOT NULL,
     PRIMARY KEY (message_id, starer_id)
