@@ -5,9 +5,11 @@ import typing
 from hikari.net import errors
 from hikari.orm.models import embeds as _embeds
 
-from reinhard import command_client
+
+from reinhard.util import command_client
+from reinhard.util import basic as util
 from reinhard import sql
-from reinhard import util
+
 
 if typing.TYPE_CHECKING:
     import asyncpg

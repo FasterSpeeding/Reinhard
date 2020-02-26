@@ -6,7 +6,7 @@ from hikari.orm.models import bases
 import typing
 
 
-from reinhard import command_client
+from reinhard.util import command_client
 
 
 @dataclasses.dataclass()

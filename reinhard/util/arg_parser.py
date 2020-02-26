@@ -5,7 +5,10 @@ def basic_arg_parsers(content: str) -> typing.Iterable[str]:
     last_space: int = -1
     spaces_found_while_quoting: typing.List[int] = []
     last_quote: typing.Optional[int] = None
-    for i, char in enumerate(content + " "):
+    i: int = 0
+    while i < len(content):
+        i += 1
+        char = content[i] if i != len(content) else " "
         if char == " " and i - last_space > 1:
             if last_quote:
                 spaces_found_while_quoting.append(i)
@@ -23,10 +26,10 @@ def basic_arg_parsers(content: str) -> typing.Iterable[str]:
                 spaces_found_while_quoting.clear()
                 last_quote = None
     if last_quote:
-        iterable = enumerate(spaces_found_while_quoting)
-        next(iterable)
-        for i, index in iterable:
-            yield content[spaces_found_while_quoting[i - 1] + 1 : index]
+        i = 1
+        while i < len(spaces_found_while_quoting):
+            yield content[spaces_found_while_quoting[i - 1] + 1 : spaces_found_while_quoting[i]]
+            spaces_found_while_quoting.pop(i - 1)
 
 
 #  TODO: handle when the quotes aren't finished.
@@ -36,5 +39,7 @@ def basic_arg_parsers(content: str) -> typing.Iterable[str]:
 if __name__ == "__main__":
     print(list(basic_arg_parsers("""I 'am "a test.""")))
     print(list(basic_arg_parsers("I will 'defeat.")))
+    print(list(basic_arg_parsers("I will 'defeat the magnitude baby.")))
     print(list(basic_arg_parsers("""I.""")))
     print(list(basic_arg_parsers("""I am `going to` die""")))
+    print(list(basic_arg_parsers("""I am `going "to` die""")))

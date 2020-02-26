@@ -3,22 +3,22 @@ import re
 import typing
 
 
-from reinhard import command_client
+from reinhard.util import command_client
 
 
 from hikari.internal_utilities import aio
 from hikari.internal_utilities import containers
 
 
-def get_snowflake(content: str) -> int:  # TODO: neko said a better way to do this lol
-    if re.fullmatch(r"<?[@#]?!?\d+>?", content):
-        result = ""
-        for char in content:
-            if char in ("<", "@", "#", "!", ">"):
-                continue
-            result += char
-        return int(result)
-    raise command_client.CommandError("Invalid mention or ID supplied.")
+def get_snowflake(content: str) -> int:
+    if content.isdigit():
+        sf = content
+    else:
+        matches = re.findall(r"<[(?:@!?)#&](\d+)>", content)
+        if not matches:
+            raise command_client.CommandError("Invalid mention or ID supplied.")
+        sf = matches[0]
+    return int(sf)
 
 
 class ReturnErrorStr:

@@ -9,7 +9,7 @@ from hikari.orm import models
 import asyncpg
 
 
-from reinhard import command_client
+from reinhard.util import command_client
 from reinhard import config
 from reinhard import sql
 
