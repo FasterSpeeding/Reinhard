@@ -40,8 +40,7 @@ def main():
             # FileNotFoundError
             config_path = None
 
-    if config_path:
-        config_obj = parse_config(config_path)
+    config_obj = parse_config(config_path)
 
     logging.basicConfig(
         level=config_obj.log_level,

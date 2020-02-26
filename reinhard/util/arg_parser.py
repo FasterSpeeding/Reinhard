@@ -1,11 +1,14 @@
 import typing
 
 
+QUOTE_SEPARATORS = ('"', "'")
+
+
 def basic_arg_parsers(content: str) -> typing.Iterable[str]:
     last_space: int = -1
     spaces_found_while_quoting: typing.List[int] = []
     last_quote: typing.Optional[int] = None
-    i: int = 0
+    i: int = -1
     while i < len(content):
         i += 1
         char = content[i] if i != len(content) else " "
@@ -16,7 +19,7 @@ def basic_arg_parsers(content: str) -> typing.Iterable[str]:
             else:
                 yield content[last_space + 1 : i]
                 last_space = i
-        elif char in ('"', "'"):
+        elif char in QUOTE_SEPARATORS: # and content[i -  1] != "\\":
             if last_quote is None:
                 last_quote = i
                 spaces_found_while_quoting.append(last_space)
@@ -32,8 +35,7 @@ def basic_arg_parsers(content: str) -> typing.Iterable[str]:
             spaces_found_while_quoting.pop(i - 1)
 
 
-#  TODO: handle when the quotes aren't finished.
-#  TODO: handle automatic conversion.
+# TODO: handle automatic conversion.
 
 
 if __name__ == "__main__":
@@ -43,3 +45,4 @@ if __name__ == "__main__":
     print(list(basic_arg_parsers("""I.""")))
     print(list(basic_arg_parsers("""I am `going to` die""")))
     print(list(basic_arg_parsers("""I am `going "to` die""")))
+    print(list(basic_arg_parsers("""""")))

@@ -10,10 +10,12 @@ import logging
 import typing
 
 
+from hikari.internal_utilities import aio
 from hikari.internal_utilities import assertions
 from hikari.internal_utilities import containers
 from hikari.internal_utilities import loggers
 from hikari.internal_utilities import unspecified
+from hikari.orm.gateway import event_types as discord_event_types
 from hikari.orm.models import bases
 from hikari.orm.models import media
 from hikari.orm.models import permissions
@@ -21,7 +23,6 @@ from hikari.orm import client
 from hikari import errors
 
 if typing.TYPE_CHECKING:
-    from hikari.internal_utilities import aio
     from hikari.internal_utilities import type_hints
     from hikari.orm.http import base_http_adapter
     from hikari.orm.models import embeds
@@ -33,6 +34,8 @@ if typing.TYPE_CHECKING:
 SEND_MESSAGE_PERMISSIONS = permissions.VIEW_CHANNEL | permissions.SEND_MESSAGES
 ATTACH_FILE_PERMISSIONS = SEND_MESSAGE_PERMISSIONS | permissions.ATTACH_FILES
 CHARACTERS_TO_SANITIZE = {"@": ""}
+
+# TODO: use command hooks instead of specific stuff like get_guild_prefixes?
 
 
 def sanitize_content(content: str) -> str:
@@ -238,7 +241,9 @@ def command(__arg=..., cls=Command, **kwargs):
 
 
 class CommandModule:
-    __slots__ = ("command_client", "error_handler", "logger", "module_commands")
+    __slots__ = ("_event_dispatcher", "command_client", "error_handler", "logger", "module_commands")
+
+    _event_dispatcher: aio.EventDelegate
 
     #: The command client this module is loaded in.
     #:
@@ -259,9 +264,14 @@ class CommandModule:
 
     def __init__(self, command_client: CommandClient) -> None:
         super().__init__()  # TODO: ?
+        self._event_dispatcher = aio.EventDelegate()
         self.logger = loggers.get_named_logger(self)
         self.bind_commands()
+        self.bind_listeners()
         self.command_client = command_client
+
+    def add_event(self, event_name: str, coroutine_function: aio.CoroutineFunctionT) -> None:
+        self._event_dispatcher.add(event_name, coroutine_function)
 
     def bind_commands(self) -> None:
         """
@@ -286,6 +296,15 @@ class CommandModule:
                     )
             self.module_commands.append(function)
         self.module_commands.sort(key=lambda comm: comm.name, reverse=True)
+
+    def bind_listeners(self) -> None:
+        for name, function in self.get_module_event_listeners():
+            if name not in discord_event_types.EventType.__members__.values():
+                self.add_event(name, function)
+
+    async def dispatch_command_event(self, event: str, *args) -> None:
+        # TODO: logging
+        await self._event_dispatcher.dispatch(event, *args)
 
     def get_command(self, content: str) -> typing.Union[typing.Tuple[Command, str], typing.Tuple[None, None]]:
         """
@@ -396,6 +415,12 @@ class CommandClient(client.Client, CommandModule):
         self.prefixes = prefixes
         # TODO: built in help command.
 
+    def add_event(self, event_name: str, coroutine_function: aio.CoroutineFunctionT) -> None:
+        if event_name in discord_event_types.EventType.__members__.values():
+            super(client.Client).add_event(event_name, coroutine_function)
+        else:
+            super(CommandModule).add_event(event_name, coroutine_function)
+
     async def access_check(self, command_obj: Command, message: messages.Message) -> bool:
         """
         Used to check if a command can be accessed by the calling user and in the calling channel/guild.
@@ -415,8 +440,10 @@ class CommandClient(client.Client, CommandModule):
         """Used to add event listeners from all loaded command modules to hikari's internal event listener."""
         for module in (self, *self.modules.values()):
             for name, function in module.get_module_event_listeners():
-                self.logger.warning(name)
-                self.add_event(name, function)
+                if name in discord_event_types.EventType.__members__.values():
+                    self.logger.warning(name)
+                    self.add_event(name, function)
+        super().bind_listeners()
 
     async def check_prefix(self, message: messages.Message) -> typing.Optional[str]:
         """
@@ -516,7 +543,7 @@ class CommandClient(client.Client, CommandModule):
         if isinstance(result, str):
             await self.respond(message, result)
 
-    async def respond(self, message: messages.Message, content: str) -> None:  # TODO: depricate and rely on ctx.
+    async def respond(self, message: messages.Message, content: str) -> None:  # TODO: deprecate and rely on ctx.
         """Used to handle response length and permission checks for command responses."""
         # TODO: send message perm check, currently not easy to do with hikari.
         # TODO: automatically sanitise somewhere?
