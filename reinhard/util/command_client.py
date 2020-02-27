@@ -1,7 +1,6 @@
 from __future__ import annotations
 import abc
 import asyncio
-import contextlib
 import dataclasses
 import enum
 import importlib
@@ -38,6 +37,13 @@ CHARACTERS_TO_SANITIZE = {"@": ""}
 # TODO: use command hooks instead of specific stuff like get_guild_prefixes?
 
 
+class CommandEvents(enum.Enum):
+    ERROR = "error"
+
+    def __str__(self) -> str:
+        return self.value
+
+
 def sanitize_content(content: str) -> str:
     return content  # TODO: This.
 
@@ -58,7 +64,9 @@ class PermissionError(errors.HikariError):
 
     missing_permissions: permissions.Permission
 
-    def __init__(self, required_permissions: permissions.Permission, actual_permissions: permissions.Permission):
+    def __init__(
+        self, required_permissions: permissions.Permission, actual_permissions: permissions.Permission
+    ) -> None:
         pass
         # self.missing_permissions =
         # for permission in m
@@ -96,7 +104,7 @@ class Context:
         module: CommandModule,
         trigger: str,
         trigger_type: TriggerTypes,
-    ):
+    ) -> None:
         self.fabric = fabric_obj
         self.message = message
         self.module = module
@@ -142,6 +150,9 @@ class CommandClientOptions(client.client_options.ClientOptions, bases.MarshalMix
     access_levels: typing.MutableMapping[int, int] = dataclasses.field(default_factory=dict)
     # TODO: handle modules (plus maybe other stuff) here?
 
+    def __post_init__(self) -> None:
+        self.access_levels = {int(key): value for key, value in self.access_levels.items()}
+
 
 class CommandError(Exception):
     __slots__ = ("response",)
@@ -151,10 +162,10 @@ class CommandError(Exception):
     #: :type: :class:`str`
     response: str
 
-    def __init__(self, response: str):
+    def __init__(self, response: str) -> None:
         self.response = response
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.response
 
 
@@ -191,7 +202,7 @@ class Command:
             trigger = self.generate_trigger()
         self.triggers = tuple(trig for trig in (trigger, *(aliases or containers.EMPTY_COLLECTION)) if trig is not None)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Command({'|'.join(self.triggers)})"
 
     def bind_module(self, module: CommandModule) -> None:  # TODO: depricate
@@ -217,7 +228,7 @@ class Command:
             # reply
             return str(e)
         except Exception as e:
-            await self._module.handle_error(e, message)  # TODO: move
+            await self._module.dispatch_command_event(CommandEvents.ERROR, e, message)  # TODO: move
             raise e
 
     def generate_trigger(self) -> str:
@@ -225,7 +236,7 @@ class Command:
         return self.name.replace("_", " ")
 
     @property
-    def name(self):
+    def name(self) -> str:
         """Get the name of this command."""
         return self._func.__name__
 
@@ -234,6 +245,7 @@ class Command:
 
 
 def command(__arg=..., cls=Command, **kwargs):
+    # TODO @functools.wraps(coro_fn)
     def decorator(coro_fn):
         return cls(coro_fn, **kwargs)
 
@@ -241,7 +253,7 @@ def command(__arg=..., cls=Command, **kwargs):
 
 
 class CommandModule:
-    __slots__ = ("_event_dispatcher", "command_client", "error_handler", "logger", "module_commands")
+    __slots__ = ("_event_dispatcher", "command_client", "logger", "module_commands")
 
     _event_dispatcher: aio.EventDelegate
 
@@ -249,8 +261,6 @@ class CommandModule:
     #:
     #: :type: :class:`CommandClient` or :class:`None`
     command_client: typing.Optional[CommandClient]
-
-    error_handler: typing.Optional[aio.CoroutineFunctionT]
 
     #: The class wide logger.
     #:
@@ -263,15 +273,24 @@ class CommandModule:
     module_commands: typing.List[Command]
 
     def __init__(self, command_client: CommandClient) -> None:
-        super().__init__()  # TODO: ?
+        super().__init__()
         self._event_dispatcher = aio.EventDelegate()
         self.logger = loggers.get_named_logger(self)
         self.bind_commands()
         self.bind_listeners()
         self.command_client = command_client
 
-    def add_event(self, event_name: str, coroutine_function: aio.CoroutineFunctionT) -> None:
-        self._event_dispatcher.add(event_name, coroutine_function)
+    def add_event(
+        self, event_name: typing.Union[str, CommandEvents], coroutine_function: aio.CoroutineFunctionT
+    ) -> None:
+        self.logger.debug(
+            "Subscribing %s%s to %s event in %s module.",
+            coroutine_function.__name__,
+            inspect.signature(coroutine_function),
+            event_name,
+            self.__class__.__name__,
+        )
+        self._event_dispatcher.add(str(event_name), coroutine_function)
 
     def bind_commands(self) -> None:
         """
@@ -292,8 +311,14 @@ class CommandModule:
             for trigger in function.triggers:
                 if self.get_command(trigger)[0] is not None:
                     self.logger.warning(
-                        f"Possible overlapping trigger '{trigger}' found in '{self.__class__.__name__}' module."
+                        f"Possible overlapping trigger '%s' found in %s module.", trigger, self.__class__.__name__,
                     )
+            self.logger.debug(
+                "Binded command %s%s in %s module.",
+                function.__name__,
+                inspect.signature(function),
+                self.__class__.__name__,
+            )
             self.module_commands.append(function)
         self.module_commands.sort(key=lambda comm: comm.name, reverse=True)
 
@@ -302,9 +327,9 @@ class CommandModule:
             if name not in discord_event_types.EventType.__members__.values():
                 self.add_event(name, function)
 
-    async def dispatch_command_event(self, event: str, *args) -> None:
-        # TODO: logging
-        await self._event_dispatcher.dispatch(event, *args)
+    async def dispatch_command_event(self, event: typing.Union[CommandEvents, str], *args) -> None:
+        self.logger.debug("Dispatching %s command event in %s module.", str(event), self.__class__.__name__)
+        await self._event_dispatcher.dispatch(str(event), *args)
 
     def get_command(self, content: str) -> typing.Union[typing.Tuple[Command, str], typing.Tuple[None, None]]:
         """
@@ -324,13 +349,6 @@ class CommandModule:
                 if content.startswith(trigger):
                     return command_obj, trigger
         return None, None
-
-    async def handle_error(self, error: BaseException, message: messages.Message) -> bool:
-        error_handler = getattr(self, "error_handler", None)
-        if error_handler is not None:
-            await error_handler(error, message)
-            return True
-        return False
 
     def get_module_event_listeners(self) -> typing.Generator[typing.Tuple[str, aio.CoroutineFunctionT]]:
         """Get a generator of the event listeners attached to this module."""
@@ -360,11 +378,11 @@ class CommandModule:
         for trigger in command_obj.triggers:
             if self.get_command(trigger) is not None:
                 self.logger.warning(
-                    f"Possible overlapping trigger '{trigger}' found in '{self.__class__.__name__}' module."
+                    f"Possible overlapping trigger '%s' found in %s module.", trigger, self.__class__.__name__,
                 )
         self.module_commands.append(command_obj)
 
-    def unregister_command(self, command_obj: typing.Union[Command, str]):
+    def unregister_command(self, command_obj: typing.Union[Command, str]) -> None:
         if isinstance(command_obj, str):
             command_obj = self.get_command(command_obj)
         elif not isinstance(command_obj, Command):
@@ -417,9 +435,9 @@ class CommandClient(client.Client, CommandModule):
 
     def add_event(self, event_name: str, coroutine_function: aio.CoroutineFunctionT) -> None:
         if event_name in discord_event_types.EventType.__members__.values():
-            super(client.Client).add_event(event_name, coroutine_function)
+            super(client.Client, self).add_event(event_name, coroutine_function)
         else:
-            super(CommandModule).add_event(event_name, coroutine_function)
+            super(CommandClient, self).add_event(event_name, coroutine_function)
 
     async def access_check(self, command_obj: Command, message: messages.Message) -> bool:
         """
@@ -441,7 +459,6 @@ class CommandClient(client.Client, CommandModule):
         for module in (self, *self.modules.values()):
             for name, function in module.get_module_event_listeners():
                 if name in discord_event_types.EventType.__members__.values():
-                    self.logger.warning(name)
                     self.add_event(name, function)
         super().bind_listeners()
 

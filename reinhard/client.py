@@ -17,9 +17,7 @@ logging.getLogger().setLevel(logging.DEBUG)
 
 
 class BotClient(command_client.CommandClient):
-    def __init__(
-        self, bot_config: config.Config, *, modules: typing.List[str] = None,
-    ):
+    def __init__(self, bot_config: config.Config, *, modules: typing.List[str] = None,) -> None:
         super().__init__(
             prefixes=bot_config.prefixes, modules=modules, options=bot_config.options,
         )
@@ -29,18 +27,20 @@ class BotClient(command_client.CommandClient):
         self.sql_scripts = sql.CachedScripts(pattern=r"[.*schema.sql]|[*prefix.sql]")
 
     @command_client.command
-    async def about(self, message: models.messages.Message, _):
+    async def about(self, message: models.messages.Message, _) -> None:
         return "TODO: This"
 
     @command_client.command(level=5)
     async def error(self, message: models.messages.Message, args) -> None:
         raise Exception("This is an exception, get used to it.")
 
-    async def error_handler(self, e: BaseException, message: models.messages.Message) -> None:
+    async def on_error(self, e: BaseException, message: models.messages.Message) -> None:
         await self._fabric.http_adapter.create_message(
             message.channel,
             embed=models.embeds.Embed(
-                title=f"An {type(e).__name__} occurred", color=15746887, description=f"```python\n{str(e)[:1950]}```",
+                title=f"An unexpected {type(e).__name__} occurred",
+                color=15746887,
+                description=f"```python\n{str(e)[:1950]}```",
             ),
         )
 
@@ -75,6 +75,6 @@ class BotClient(command_client.CommandClient):
     async def start(self, *args, **kwargs) -> None:
         self.sql_pool = await asyncpg.create_pool(**self.config.database.to_dict())
         async with self.sql_pool.acquire() as conn:
-            await sql.initialise_schema(self.sql_scripts, conn)  # TODO: separate schemas and folders?
+            await sql.initialise_schema(self.sql_scripts, conn)
 
         await super().start(*args, **kwargs)

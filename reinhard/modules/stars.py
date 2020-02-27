@@ -2,6 +2,7 @@ from __future__ import annotations
 import typing
 
 
+import asyncpg
 from hikari.net import errors
 from hikari.orm.models import embeds as _embeds
 
@@ -12,8 +13,6 @@ from reinhard import sql
 
 
 if typing.TYPE_CHECKING:
-    import asyncpg
-
     from hikari.orm import models
 
 
@@ -29,6 +28,7 @@ class StarboardModule(command_client.CommandModule):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.sql_scripts = sql.CachedScripts(pattern=".*star.*")
+        self.add_event(command_client.CommandEvents.ERROR, self.command_client.on_error)
 
     @staticmethod
     async def get_starboard_channel(
@@ -81,7 +81,6 @@ class StarboardModule(command_client.CommandModule):
                 await conn.execute(
                     self.sql_scripts.create_post_star, message.id, message.channel.id, reactor.id,
                 )
-                # self.command_client.sql_pool.commit()
             return post_star is None
 
     async def consume_star_decrement(
@@ -132,7 +131,6 @@ class StarboardModule(command_client.CommandModule):
         await message.channel.send(content=f"Set starboard channel to {target_channel.name}.")
 
     @command_client.command
-    @util.return_error_str((errors.NotFoundHTTPError, errors.BadRequestHTTPError),)
     async def star(self, message: models.messages.Message, args: str) -> None:
         target_message = self.command_client._fabric.state_registry.get_mandatory_message_by_id(
             message_id=util.get_snowflake(args.split(" ", 1)[0]), channel_id=message.channel.id,
@@ -153,6 +151,7 @@ class StarboardModule(command_client.CommandModule):
         await message.channel.send(content=response)
 
     @command_client.command
+    @util.return_error_str((asyncpg.exceptions.DataError,))
     async def star_info(self, message: models.messages.Message, args: str) -> None:
         if not args:
             raise command_client.CommandError("Message ID required.")

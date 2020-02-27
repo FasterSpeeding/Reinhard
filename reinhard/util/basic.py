@@ -14,7 +14,7 @@ def get_snowflake(content: str) -> int:
     if content.isdigit():
         sf = content
     else:
-        matches = re.findall(r"<[(?:@!?)#&](\d+)>", content)
+        matches = re.findall(r"<[(?:@!?)#&](\d+)>", content) # TODO: doesn't support role mentions
         if not matches:
             raise command_client.CommandError("Invalid mention or ID supplied.")
         sf = matches[0]
@@ -34,10 +34,10 @@ class ReturnErrorStr:
         self.errors: typing.Tuple[BaseException] = errors
         self.error_responses: typing.Optional[typing.MutableMapping[BaseException, str]] = errors_responses
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         ...
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         if exc_type in self.errors:
             raise command_client.CommandError(
                 (self.error_responses or containers.EMPTY_DICT).get(exc_type)
@@ -56,7 +56,8 @@ def return_error_str(
                 return await func(*args, **kwargs)
             except errors as exc:
                 raise command_client.CommandError(
-                    (errors_responses or containers.EMPTY_DICT).get(type(exc)) or str(getattr(exc, "message", exc))
+                    (errors_responses or containers.EMPTY_DICT).get(type(exc))
+                    or str(getattr(exc, "message", None) or exc)
                 )
 
         return wrapper
