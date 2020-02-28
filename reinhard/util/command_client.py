@@ -1,6 +1,8 @@
 from __future__ import annotations
+
 import abc
 import asyncio
+import contextlib
 import dataclasses
 import enum
 import importlib
@@ -39,6 +41,8 @@ CHARACTERS_TO_SANITIZE = {"@": ""}
 
 class CommandEvents(enum.Enum):
     ERROR = "error"
+    LOAD = "load"
+    UNLOAD = "unload"
 
     def __str__(self) -> str:
         return self.value
@@ -50,7 +54,11 @@ def sanitize_content(content: str) -> str:
 
 class Executable(abc.ABC):
     @abc.abstractmethod
-    async def execute(self, message: messages.Message, content: str) -> bool:
+    async def execute(self, ctx: Context, args: str) -> bool:
+        ...
+
+    @abc.abstractmethod
+    def check(self, content) -> typing.Optional[str]:
         ...
 
 
@@ -59,7 +67,7 @@ class TriggerTypes(enum.Enum):
     MENTION = enum.auto()  # TODO: trigger commands with a mention
 
 
-class PermissionError(errors.HikariError):
+class PermissionError(errors.HikariError):  # TODO: don't shadow
     __slots__ = ("missing_permissions",)
 
     missing_permissions: permissions.Permission
@@ -73,26 +81,26 @@ class PermissionError(errors.HikariError):
 
 
 class Context:
-    __slots__ = ("fabric", "command", "message", "module")
+    __slots__ = ("command_trigger", "fabric", "message", "trigger", "trigger_type")  # , "command"
+
+    #: The command alias that triggered this command.
+    #:
+    #: :type: :class:`str`
+    command_trigger: str
 
     fabric: fabric.Fabric
 
     #: The message that triggered this command.
     #:
-    #: :type: :class: `hikari.orm.models.messages.Message`
+    #: :type: :class:`hikari.orm.models.messages.Message`
     message: messages.Message
-
-    #: The module this command was triggered by.
-    #:
-    #: :type: :class:`CommandModule`
-    module: CommandModule
 
     #: The string prefix or mention that triggered this command.
     #:
     #: :type: :class:`str`
     trigger: str
 
-    #: The type of trigger that triggered this command.
+    #: The mention or prefix that triggered this event.
     #:
     #: :type: :class:`TriggerTypes`
     trigger_type: TriggerTypes
@@ -101,13 +109,15 @@ class Context:
         self,
         fabric_obj: fabric.Fabric,
         message: messages.Message,
-        module: CommandModule,
         trigger: str,
         trigger_type: TriggerTypes,
+        command_trigger: str,
     ) -> None:
         self.fabric = fabric_obj
         self.message = message
-        self.module = module
+        self.trigger = trigger
+        self.trigger_type = trigger_type
+        self.command_trigger = command_trigger
 
     @property
     def http(self) -> base_http_adapter.BaseHTTPAdapter:
@@ -125,7 +135,7 @@ class Context:
         files: type_hints.NotRequired[typing.Collection[media.AbstractFile]] = unspecified.UNSPECIFIED,
         embed: type_hints.NotRequired[embeds.Embed] = unspecified.UNSPECIFIED,
         soft_send: bool = False,  # TODO: what was this?
-        sanitize: bool = True,
+        sanitize: bool = False,
     ) -> messages.Message:
         """Used to handle response length and permission checks for command responses."""
         # TODO: automatically sanitise somewhere?
@@ -133,7 +143,7 @@ class Context:
             files = files or containers.EMPTY_SEQUENCE
             files.append(media.InMemoryFile("message.txt", bytes(content, "utf-8")))
             content = "This response is too large to send, see attached file."
-        elif content is not unspecified.UNSPECIFIED:
+        elif content is not unspecified.UNSPECIFIED and sanitize:
             content = sanitize_content(content)
 
         # TODO: this needs to be easier to do on hikari's level.
@@ -141,7 +151,7 @@ class Context:
         #     raise PermissionError(ATTACH_FILE_PERMISSIONS if files else SEND_MESSAGE_PERMISSIONS)
 
         return await self.fabric.http_adapter.create_message(
-            self.message.channel, content=content, tts=tts, embed=embed, files=files
+            self.message.channel_id, content=content, tts=tts, embed=embed, files=files
         )
 
 
@@ -169,7 +179,7 @@ class CommandError(Exception):
         return self.response
 
 
-class Command:
+class Command(Executable):
     __slots__ = ("_func", "_module", "level", "triggers")
 
     _func: aio.CoroutineFunctionT
@@ -205,10 +215,15 @@ class Command:
     def __repr__(self) -> str:
         return f"Command({'|'.join(self.triggers)})"
 
-    def bind_module(self, module: CommandModule) -> None:  # TODO: depricate
+    def bind_module(self, module: CommandModule) -> None:  # TODO: deprecate
         self._module = module
 
-    async def execute(self, message: messages.Message, args: str) -> typing.Optional[str]:
+    def check(self, content) -> typing.Optional[str]:
+        for trigger in self.triggers:
+            if content.startswith(trigger):
+                return trigger
+
+    async def execute(self, ctx: Context, args: str) -> bool:
         """
         Used to execute a command, catches any :class:`CommandErrors` and calls the module's error handler on error.
 
@@ -222,14 +237,14 @@ class Command:
             An optional :class:`str` response to be sent in chat.
         """
         try:
-            return await self._func(self._module, message, self.parse_args(args))
-        except CommandError as e:
-            # '@contextlib.suppress(PermissionError):
-            # reply
-            return str(e)
-        except Exception as e:
-            await self._module.dispatch_command_event(CommandEvents.ERROR, e, message)  # TODO: move
-            raise e
+            await self._func(self._module, ctx, self.parse_args(args))
+        except CommandError as exc:
+            with contextlib.suppress(PermissionError):
+                await ctx.reply(content=str(exc))
+        except Exception as exc:
+            await self._module.dispatch_command_event(CommandEvents.ERROR, ctx, exc)  # TODO: move
+            raise exc
+        return True
 
     def generate_trigger(self) -> str:
         """Get a trigger for this command based on it's function's name."""
@@ -241,7 +256,7 @@ class Command:
         return self._func.__name__
 
     def parse_args(self, args: str) -> typing.List[typing.Union[int, str]]:
-        return args  # TODO: actually parse
+        return args.split(" ")  # TODO: actually parse
 
 
 def command(__arg=..., cls=Command, **kwargs):
@@ -252,15 +267,19 @@ def command(__arg=..., cls=Command, **kwargs):
     return decorator if __arg is ... else decorator(__arg)
 
 
+class CommandGroup(Executable):
+    ...
+
+
 class CommandModule:
-    __slots__ = ("_event_dispatcher", "command_client", "logger", "module_commands")
+    __slots__ = ("_event_dispatcher", "client", "logger", "module_commands")
 
     _event_dispatcher: aio.EventDelegate
 
     #: The command client this module is loaded in.
     #:
     #: :type: :class:`CommandClient` or :class:`None`
-    command_client: typing.Optional[CommandClient]
+    client: typing.Optional[CommandClient]
 
     #: The class wide logger.
     #:
@@ -278,7 +297,8 @@ class CommandModule:
         self.logger = loggers.get_named_logger(self)
         self.bind_commands()
         self.bind_listeners()
-        self.command_client = command_client
+        self.client = command_client
+        self.dispatch_command_event(CommandEvents.LOAD, self)  # TODO: unload
 
     def add_event(
         self, event_name: typing.Union[str, CommandEvents], coroutine_function: aio.CoroutineFunctionT
@@ -314,10 +334,7 @@ class CommandModule:
                         f"Possible overlapping trigger '%s' found in %s module.", trigger, self.__class__.__name__,
                     )
             self.logger.debug(
-                "Binded command %s%s in %s module.",
-                function.__name__,
-                inspect.signature(function),
-                self.__class__.__name__,
+                "Binded command %s in %s module.", function.name, self.__class__.__name__,
             )
             self.module_commands.append(function)
         self.module_commands.sort(key=lambda comm: comm.name, reverse=True)
@@ -345,9 +362,8 @@ class CommandModule:
             command was found else a :class:`typing.Tuple` of :class:`None` and :class:`None`.
         """
         for command_obj in self.module_commands:
-            for trigger in command_obj.triggers:
-                if content.startswith(trigger):
-                    return command_obj, trigger
+            if trigger := command_obj.check(content):
+                return command_obj, trigger
         return None, None
 
     def get_module_event_listeners(self) -> typing.Generator[typing.Tuple[str, aio.CoroutineFunctionT]]:
@@ -394,7 +410,7 @@ class CommandModule:
             raise ValueError("Invalid command passed for this module.") from None
 
 
-class CommandClient(client.Client, CommandModule):
+class CommandClient(CommandModule, client.Client):
     """
     The central client that all command modules will be binded to. This extends :class:`hikari.client.Client` and
     handles registering event listeners attached to the loaded modules and the listener(s) required for commands.
@@ -425,19 +441,19 @@ class CommandClient(client.Client, CommandModule):
         modules: typing.List[str] = None,
         options: typing.Optional[CommandClientOptions] = None,
     ) -> None:
-        super().__init__(options=options or CommandClientOptions())
         self.modules = {}
         self.load_modules(*(modules or containers.EMPTY_SEQUENCE))
-        self.bind_commands()
-        self.bind_listeners()
         self.prefixes = prefixes
+        super().__init__(self)
+        if options:
+            self._client_options = options
         # TODO: built in help command.
 
     def add_event(self, event_name: str, coroutine_function: aio.CoroutineFunctionT) -> None:
         if event_name in discord_event_types.EventType.__members__.values():
-            super(client.Client, self).add_event(event_name, coroutine_function)
+            client.Client.add_event(self, event_name, coroutine_function)
         else:
-            super(CommandClient, self).add_event(event_name, coroutine_function)
+            super().add_event(event_name, coroutine_function)
 
     async def access_check(self, command_obj: Command, message: messages.Message) -> bool:
         """
@@ -475,10 +491,7 @@ class CommandClient(client.Client, CommandModule):
             A :class:`str` representation of the triggering prefix if found, else :class:`None`
         """
         trigger_prefix = None
-        # message.channel shouldn't ever be unresolved.
-        for prefix in await self._get_prefixes(
-            (message.channel if message.channel.is_resolved else await message.channel).guild_id
-        ):
+        for prefix in await self._get_prefixes(message.guild_id):
             if message.content.startswith(prefix):
                 trigger_prefix = prefix
                 break
@@ -546,32 +559,25 @@ class CommandClient(client.Client, CommandModule):
     async def on_message_create(self, message: messages.Message) -> None:
         """Handles command triggering based on message creation."""
         prefix = await self.check_prefix(message)  # TODO: maybe one day we won't have to await this.
-        if not prefix:
+        mention = None  # TODO: mention at end of message?
+        if prefix or mention:
+            command_args = message.content[len(prefix or mention) :]
+        else:
             return
 
-        command_args = message.content[len(prefix) :]
-        command_obj, trigger = self.get_global_command(command_args)
+        command_obj, command_trigger = self.get_global_command(command_args)
         if not command_obj or not await self.access_check(command_obj, message):
             return
 
-        command_args = command_args[len(trigger) + 1 :]
-        # TODO: for now this is also a bit basic...
-        result = await command_obj.execute(message, command_args)
-        if isinstance(result, str):
-            await self.respond(message, result)
-
-    async def respond(self, message: messages.Message, content: str) -> None:  # TODO: deprecate and rely on ctx.
-        """Used to handle response length and permission checks for command responses."""
-        # TODO: send message perm check, currently not easy to do with hikari.
-        # TODO: automatically sanitise somewhere?
-        files = unspecified.UNSPECIFIED
-        if len(content) > 2000:
-            files = [
-                media.InMemoryFile("message.txt", bytes(content, "utf-8")),
-            ]
-            content = "This response is too large to send, see attached file."
-
-        await self._fabric.http_adapter.create_message(message.channel, content=content, files=files)
+        command_args = command_args[len(command_trigger) + 1 :]
+        ctx = Context(
+            self._fabric,
+            message,
+            prefix or mention,
+            TriggerTypes.PREFIX if prefix else TriggerTypes.MENTION,
+            command_trigger,
+        )
+        await command_obj.execute(ctx, command_args)
 
 
 __all__ = [

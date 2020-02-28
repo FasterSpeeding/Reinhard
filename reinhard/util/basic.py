@@ -14,7 +14,7 @@ def get_snowflake(content: str) -> int:
     if content.isdigit():
         sf = content
     else:
-        matches = re.findall(r"<[(?:@!?)#&](\d+)>", content) # TODO: doesn't support role mentions
+        matches = re.findall(r"<[(?:@!?)#&](\d+)>", content)  # TODO: doesn't support role mentions
         if not matches:
             raise command_client.CommandError("Invalid mention or ID supplied.")
         sf = matches[0]

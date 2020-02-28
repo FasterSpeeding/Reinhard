@@ -28,7 +28,7 @@ class StarboardModule(command_client.CommandModule):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.sql_scripts = sql.CachedScripts(pattern=".*star.*")
-        self.add_event(command_client.CommandEvents.ERROR, self.command_client.on_error)
+        self.add_event(command_client.CommandEvents.ERROR, self.client.on_error)
 
     @staticmethod
     async def get_starboard_channel(
@@ -51,7 +51,7 @@ class StarboardModule(command_client.CommandModule):
         if user.is_bot or reaction.emoji != UNICODE_STAR:
             return
 
-        message_obj = self.command_client._fabric.state_registry.get_mandatory_message_by_id(
+        message_obj = self.client._fabric.state_registry.get_mandatory_message_by_id(
             message_id=reaction.message_id, channel_id=reaction.channel_id
         )
         # This shouldn't ever fail.
@@ -68,7 +68,7 @@ class StarboardModule(command_client.CommandModule):
         await self.consume_star_decrement(reaction.message_id, user)
 
     async def consume_star_increment(self, message: models.messages.Message, reactor: models.users.BaseUser) -> bool:
-        async with self.command_client.sql_pool.acquire() as conn:
+        async with self.client.sql_pool.acquire() as conn:
             starboard_entry = await self.get_starboard_entry(message, conn)
             if starboard_entry is None:
                 await conn.execute(
@@ -86,7 +86,7 @@ class StarboardModule(command_client.CommandModule):
     async def consume_star_decrement(
         self, message: models.messages.MessageLikeT, reactor: models.users.BaseUser
     ) -> bool:
-        async with self.command_client.sql_pool.acquire() as conn:
+        async with self.client.sql_pool.acquire() as conn:
             original_star = await conn.fetchrow(
                 "SELECT * FROM PostStars WHERE message_id = $1 and starer_id = $2;", int(message), reactor.id,
             )
@@ -100,15 +100,15 @@ class StarboardModule(command_client.CommandModule):
             return False
 
     @command_client.command(trigger="set starboard", aliases=["register starboard"])
-    async def set_starboard(self, message: models.messages.Message, args: str) -> None:
-        target_channel = self.command_client._fabric.state_registry.get_mandatory_channel_by_id(
-            util.get_snowflake(args.split(" ", 1)[0]) or message.channel_id
+    async def set_starboard(self, ctx: command_client.Context, args: str) -> None:
+        target_channel = ctx.fabric.state_registry.get_mandatory_channel_by_id(
+            util.get_snowflake(args[0]) or ctx.message.channel_id
         )
         if not target_channel.is_resolved:
             with util.ReturnErrorStr((errors.NotFoundHTTPError, errors.BadRequestHTTPError)):
                 target_channel = await target_channel
 
-        channel = message.channel
+        channel = ctx.message.channel
         if not channel:
             with util.ReturnErrorStr((errors.NotFoundHTTPError,)):
                 channel = await channel
@@ -117,7 +117,7 @@ class StarboardModule(command_client.CommandModule):
         if getattr(target_channel, "guild_id", None) != channel.guild_id:
             raise command_client.CommandError("Unknown channel ID supplied.")
 
-        async with self.command_client.sql_pool.acquire() as conn:
+        async with self.client.sql_pool.acquire() as conn:
             starboard_channel = await self.get_starboard_channel(target_channel.guild, conn)
             if starboard_channel is None:
                 await conn.execute(self.sql_scripts.create_starboard_channel, channel.guild_id, target_channel.id)
@@ -128,40 +128,40 @@ class StarboardModule(command_client.CommandModule):
                     target_channel.id,
                 )
         # TODO: edge case unresolved error
-        await message.channel.send(content=f"Set starboard channel to {target_channel.name}.")
+        await ctx.reply(content=f"Set starboard channel to {target_channel.name}.")
 
     @command_client.command
-    async def star(self, message: models.messages.Message, args: str) -> None:
-        target_message = self.command_client._fabric.state_registry.get_mandatory_message_by_id(
-            message_id=util.get_snowflake(args.split(" ", 1)[0]), channel_id=message.channel.id,
+    async def star(self, ctx: command_client.Context, args: str) -> None:
+        target_message = ctx.fabric.state_registry.get_mandatory_message_by_id(
+            message_id=util.get_snowflake(args[0]), channel_id=ctx.message.channel_id,
         )
         if not target_message.is_resolved:
             with util.ReturnErrorStr((errors.NotFoundHTTPError, errors.BadRequestHTTPError)):
                 target_message = await target_message
 
-        if target_message.author == message.author:
+        if target_message.author == ctx.message.author:
             raise command_client.CommandError("You cannot star your own message.")
 
-        if await self.consume_star_increment(target_message, message.author):
+        if await self.consume_star_increment(target_message, ctx.message.author):
             response = "Added star to message."
         else:
-            await self.consume_star_decrement(target_message, message.author)
+            await self.consume_star_decrement(target_message, ctx.message.author)
             response = "Removed star from message."
         # TODO: edge case unresolved error
-        await message.channel.send(content=response)
+        await ctx.reply(content=response)
 
     @command_client.command
     @util.return_error_str((asyncpg.exceptions.DataError,))
-    async def star_info(self, message: models.messages.Message, args: str) -> None:
+    async def star_info(self, ctx: command_client.Context, args: str) -> None:
         if not args:
             raise command_client.CommandError("Message ID required.")
-        message_id = util.get_snowflake(args.split(" ", 1)[0])
-        async with self.command_client.sql_pool.acquire() as conn:
+        message_id = util.get_snowflake(args[0])
+        async with self.client.sql_pool.acquire() as conn:
             starboard_entry = await conn.fetchrow("SELECT * FROM StarboardEntries WHERE message_id = $1;", message_id)
             if starboard_entry is None:
-                await message.channel.send(content="Starboard entry not found.")
+                await ctx.reply(content="Starboard entry not found.")
             else:
-                await message.channel.send(embed=await self.generate_star_embed(message, conn))
+                await ctx.reply(embed=await self.generate_star_embed(ctx.message, conn))
 
     async def generate_star_embed(
         self, message: models.messages.MessageLikeT, conn: asyncpg.connection

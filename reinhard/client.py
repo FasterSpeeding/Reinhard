@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import contextlib
 import logging
 import time
 import typing
@@ -27,44 +29,44 @@ class BotClient(command_client.CommandClient):
         self.sql_scripts = sql.CachedScripts(pattern=r"[.*schema.sql]|[*prefix.sql]")
 
     @command_client.command
-    async def about(self, message: models.messages.Message, _) -> None:
-        return "TODO: This"
+    async def about(self, ctx: command_client.Context, _) -> None:
+        await ctx.reply(content="TODO: This")
 
     @command_client.command(level=5)
-    async def error(self, message: models.messages.Message, args) -> None:
+    async def error(self, ctx: command_client.Context, _) -> None:
         raise Exception("This is an exception, get used to it.")
 
-    async def on_error(self, e: BaseException, message: models.messages.Message) -> None:
-        await self._fabric.http_adapter.create_message(
-            message.channel,
-            embed=models.embeds.Embed(
-                title=f"An unexpected {type(e).__name__} occurred",
-                color=15746887,
-                description=f"```python\n{str(e)[:1950]}```",
-            ),
-        )
+    async def on_error(self, ctx: command_client.Context, e: BaseException) -> None:
+        with contextlib.suppress(command_client.PermissionError):
+            await ctx.reply(
+                embed=models.embeds.Embed(
+                    title=f"An unexpected {type(e).__name__} occurred",
+                    color=15746887,
+                    description=f"```python\n{str(e)[:1950]}```",
+                ),
+            )
 
     @command_client.command(level=5)
-    async def echo(self, _, args) -> typing.Optional[str]:
-        return args
+    async def echo(self, ctx: command_client.Context, args) -> typing.Optional[str]:
+        await ctx.reply(content=" ".join(args))
 
     @command_client.command(level=5)
-    async def eval(self, message: models.messages.Message, args):
-        args.strip(" ").strip("```")
+    async def eval(self, ctx: command_client.Context, args) -> None:
+        " ".join(args).strip("```")
 
-    async def get_guild_prefix(self, guild_id: int):
+    async def get_guild_prefix(self, guild_id: int) -> typing.Optional[str]:
         async with self.sql_pool.acquire() as conn:
             data = await conn.fetchrow(self.sql_scripts.find_guild_prefix, guild_id)
             return data["prefix"] if data is not None else data
 
     @command_client.command
-    async def ping(self, message: models.messages.Message, _) -> None:
+    async def ping(self, ctx: command_client.Context, _) -> None:
         message_sent = time.perf_counter()
-        message_obj = await self._fabric.http_adapter.create_message(message.channel, content="Nyaa!")
+        message_obj = await ctx.reply(content="Nyaa!")
         api_latency = round((time.perf_counter() - message_sent) * 1000)
         gateway_latency = round(self.heartbeat_latencies[0] * 1000)
 
-        await self._fabric.http_adapter.update_message(
+        await ctx.fabric.http_adapter.update_message(
             message_obj, content=f"Pong! :ping_pong:\nAPI: {api_latency}\nGateway:{gateway_latency}",
         )
 
