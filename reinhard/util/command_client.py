@@ -54,11 +54,11 @@ def sanitize_content(content: str) -> str:
 
 class Executable(abc.ABC):
     @abc.abstractmethod
-    async def execute(self, ctx: Context, args: str) -> bool:
+    async def execute(self, ctx: Context) -> bool:
         ...
 
     @abc.abstractmethod
-    def check(self, content) -> typing.Optional[str]:
+    async def check(self, ctx: Context) -> bool:
         ...
 
 
@@ -81,12 +81,11 @@ class PermissionError(errors.HikariError):  # TODO: don't shadow
 
 
 class Context:
-    __slots__ = ("command_trigger", "fabric", "message", "trigger", "trigger_type")  # , "command"
+    __slots__ = ("command", "content", "fabric", "message", "trigger", "trigger_type", "triggering_name")
 
-    #: The command alias that triggered this command.
-    #:
-    #: :type: :class:`str`
-    command_trigger: str
+    command: Command
+
+    content: str
 
     fabric: fabric.Fabric
 
@@ -105,23 +104,31 @@ class Context:
     #: :type: :class:`TriggerTypes`
     trigger_type: TriggerTypes
 
+    #: The command alias that triggered this command.
+    #:
+    #: :type: :class:`str`
+    triggering_name: str
+
     def __init__(
         self,
         fabric_obj: fabric.Fabric,
+        content: str,
         message: messages.Message,
         trigger: str,
         trigger_type: TriggerTypes,
-        command_trigger: str,
     ) -> None:
         self.fabric = fabric_obj
+        self.content = content
         self.message = message
         self.trigger = trigger
         self.trigger_type = trigger_type
-        self.command_trigger = command_trigger
 
     @property
     def http(self) -> base_http_adapter.BaseHTTPAdapter:
         return self.fabric.http_adapter
+
+    def prune_content(self, length: int):
+        self.content = self.content[length:]
 
     @property
     def state(self) -> base_registry.BaseRegistry:
@@ -138,7 +145,6 @@ class Context:
         sanitize: bool = False,
     ) -> messages.Message:
         """Used to handle response length and permission checks for command responses."""
-        # TODO: automatically sanitise somewhere?
         if content is not unspecified.UNSPECIFIED and len(content) > 2000:
             files = files or containers.EMPTY_SEQUENCE
             files.append(media.InMemoryFile("message.txt", bytes(content, "utf-8")))
@@ -153,6 +159,12 @@ class Context:
         return await self.fabric.http_adapter.create_message(
             self.message.channel_id, content=content, tts=tts, embed=embed, files=files
         )
+
+    def set_command_trigger(self, trigger: str):
+        self.triggering_name = trigger
+
+    def set_command(self, command_obj: Command):
+        self.command = command_obj
 
 
 @dataclasses.dataclass()
@@ -180,7 +192,9 @@ class CommandError(Exception):
 
 
 class Command(Executable):
-    __slots__ = ("_func", "_module", "level", "triggers")
+    __slots__ = ("_checks", "_func", "_module", "level", "meta", "triggers")
+
+    _checks: typing.Sequence[CheckLikeT]
 
     _func: aio.CoroutineFunctionT
 
@@ -190,6 +204,8 @@ class Command(Executable):
     #:
     #: :type: :class:`int`
     level: int
+
+    meta: typing.Optional[typing.MutableMapping[typing.Any, typing.Any]]
 
     #: The triggers used to activate this command in chat along with a prefix.
     #:
@@ -203,10 +219,13 @@ class Command(Executable):
         *,
         aliases: typing.Optional[typing.List[str]] = None,
         level: int = 0,
+        meta: typing.Optional[typing.MutableMapping[typing.Any, typing.Any]] = None,
         module: typing.Optional[CommandModule] = None,
     ) -> None:
+        self._checks = [self.check_prefix_from_context]
         self._func = func
         self.level = level
+        self.meta = meta
         self._module = module
         if not trigger:
             trigger = self.generate_trigger()
@@ -218,12 +237,43 @@ class Command(Executable):
     def bind_module(self, module: CommandModule) -> None:  # TODO: deprecate
         self._module = module
 
-    def check(self, content) -> typing.Optional[str]:
+    def deregister_check(self, check: CheckLikeT) -> None:
+        try:
+            self._checks.remove(check)
+        except ValueError:
+            raise ValueError("Command Check not found.")
+
+    def register_check(self, check: CheckLikeT) -> None:
+        self._checks.append(check)
+
+    async def check(self, ctx: Context) -> bool:
+        result: bool = False
+        for check in self._checks:
+            try:
+                if asyncio.iscoroutinefunction(check):
+                    result = await check(ctx)
+                else:
+                    result = check(ctx)
+            except Exception:
+                result = False
+            else:
+                if not result:
+                    break
+        return result
+
+    def check_prefix(self, content: str) -> str:
         for trigger in self.triggers:
             if content.startswith(trigger):
                 return trigger
 
-    async def execute(self, ctx: Context, args: str) -> bool:
+    def check_prefix_from_context(self, ctx: Context) -> bool:
+        for trigger in self.triggers:
+            if ctx.content.startswith(trigger):
+                ctx.set_command_trigger(trigger)
+                return True
+        return False
+
+    async def execute(self, ctx: Context) -> bool:
         """
         Used to execute a command, catches any :class:`CommandErrors` and calls the module's error handler on error.
 
@@ -237,7 +287,7 @@ class Command(Executable):
             An optional :class:`str` response to be sent in chat.
         """
         try:
-            await self._func(self._module, ctx, self.parse_args(args))
+            await self._func(self._module, ctx, self.parse_args(ctx.content))
         except CommandError as exc:
             with contextlib.suppress(PermissionError):
                 await ctx.reply(content=str(exc))
@@ -259,7 +309,7 @@ class Command(Executable):
         return args.split(" ")  # TODO: actually parse
 
 
-def command(__arg=..., cls=Command, **kwargs):
+def command(__arg=..., cls=Command, group: typing.Optional[str] = None, **kwargs):  # TODO: handle group...
     # TODO @functools.wraps(coro_fn)
     def decorator(coro_fn):
         return cls(coro_fn, **kwargs)
@@ -272,9 +322,11 @@ class CommandGroup(Executable):
 
 
 class CommandModule:
-    __slots__ = ("_event_dispatcher", "client", "logger", "module_commands")
+    __slots__ = ("_event_dispatcher", "_fabric", "client", "logger", "module_commands")
 
     _event_dispatcher: aio.EventDelegate
+
+    _fabric: fabric.Fabric
 
     #: The command client this module is loaded in.
     #:
@@ -291,14 +343,17 @@ class CommandModule:
     #: :type: :class:`typing.Sequence` of :class:`Command`
     module_commands: typing.List[Command]
 
-    def __init__(self, command_client: CommandClient) -> None:
+    def __init__(self, command_client: typing.Optional[CommandClient] = None, bind: bool = True) -> None:
         super().__init__()
+        if command_client:
+            self._fabric = command_client._fabric
         self._event_dispatcher = aio.EventDelegate()
         self.logger = loggers.get_named_logger(self)
-        self.bind_commands()
-        self.bind_listeners()
+        if bind:
+            self.bind_commands()
+            self.bind_listeners()
         self.client = command_client
-        self.dispatch_command_event(CommandEvents.LOAD, self)  # TODO: unload
+        self.dispatch_command_event(CommandEvents.LOAD, self)  # TODO: unload and do this somewhere better
 
     def add_event(
         self, event_name: typing.Union[str, CommandEvents], coroutine_function: aio.CoroutineFunctionT
@@ -329,7 +384,7 @@ class CommandModule:
         for name, function in inspect.getmembers(self, predicate=lambda func: isinstance(func, Command)):
             function.bind_module(self)
             for trigger in function.triggers:
-                if self.get_command(trigger)[0] is not None:
+                if list(self.get_command_from_name(trigger)):
                     self.logger.warning(
                         f"Possible overlapping trigger '%s' found in %s module.", trigger, self.__class__.__name__,
                     )
@@ -344,11 +399,16 @@ class CommandModule:
             if name not in discord_event_types.EventType.__members__.values():
                 self.add_event(name, function)
 
-    async def dispatch_command_event(self, event: typing.Union[CommandEvents, str], *args) -> None:
+    def dispatch_command_event(self, event: typing.Union[CommandEvents, str], *args) -> None:
         self.logger.debug("Dispatching %s command event in %s module.", str(event), self.__class__.__name__)
-        await self._event_dispatcher.dispatch(str(event), *args)
+        return self._event_dispatcher.dispatch(str(event), *args)
 
-    def get_command(self, content: str) -> typing.Union[typing.Tuple[Command, str], typing.Tuple[None, None]]:
+    async def get_command_from_context(self, ctx: Context) -> typing.AsyncIterator[Command]:
+        for command_obj in self.module_commands:
+            if await command_obj.check(ctx):
+                yield command_obj
+
+    def get_command_from_name(self, content: str) -> typing.Iterator[typing.Tuple[Command, str]]:
         """
         Get a command based on a message's content (minus prefix) from the loaded commands if any command triggers are
         found in the content.
@@ -362,9 +422,8 @@ class CommandModule:
             command was found else a :class:`typing.Tuple` of :class:`None` and :class:`None`.
         """
         for command_obj in self.module_commands:
-            if trigger := command_obj.check(content):
-                return command_obj, trigger
-        return None, None
+            if prefix := command_obj.check_prefix(content):
+                yield command_obj, prefix
 
     def get_module_event_listeners(self) -> typing.Generator[typing.Tuple[str, aio.CoroutineFunctionT]]:
         """Get a generator of the event listeners attached to this module."""
@@ -392,7 +451,7 @@ class CommandModule:
         """
         command_obj = Command(func=func, module=self, trigger=trigger, aliases=list(aliases))
         for trigger in command_obj.triggers:
-            if self.get_command(trigger) is not None:
+            if list(self.get_command_from_name(trigger)):
                 self.logger.warning(
                     f"Possible overlapping trigger '%s' found in %s module.", trigger, self.__class__.__name__,
                 )
@@ -400,9 +459,12 @@ class CommandModule:
 
     def unregister_command(self, command_obj: typing.Union[Command, str]) -> None:
         if isinstance(command_obj, str):
-            command_obj = self.get_command(command_obj)
+            try:
+                command_obj, prefix = next(self.get_command_from_name(command_obj))
+            except StopIteration:
+                raise ValueError(f"`{command_obj}` command not found.") from None
         elif not isinstance(command_obj, Command):
-            raise ValueError("Command must be string command trigger or a 'Command' object.")
+            raise ValueError("Command must be string command trigger or a 'Command' object.") from None
 
         try:
             self.module_commands.remove(command_obj)
@@ -441,10 +503,12 @@ class CommandClient(CommandModule, client.Client):
         modules: typing.List[str] = None,
         options: typing.Optional[CommandClientOptions] = None,
     ) -> None:
+        super().__init__(bind=False)
         self.modules = {}
         self.load_modules(*(modules or containers.EMPTY_SEQUENCE))
+        self.bind_commands()
+        self.bind_listeners()
         self.prefixes = prefixes
-        super().__init__(self)
         if options:
             self._client_options = options
         # TODO: built in help command.
@@ -497,7 +561,7 @@ class CommandClient(CommandModule, client.Client):
                 break
         return trigger_prefix
 
-    def get_global_command(self, content: str) -> typing.Union[typing.Tuple[Command, str], typing.Tuple[None, None]]:
+    async def get_global_command_from_context(self, ctx: Context) -> typing.AsyncIterator[Command]:
         """
         Used to get a command from on a messages's content (checks all loaded modules).
 
@@ -510,10 +574,13 @@ class CommandClient(CommandModule, client.Client):
             the command was found found, else a :class:`typing.Tuple` of :class:`None` and :class:`None`.
         """
         for module in (self, *self.modules.values()):
-            command_obj, trigger = module.get_command(content)
-            if command_obj:
-                return command_obj, trigger
-        return None, None
+            async for command_obj in module.get_command_from_context(ctx):
+                yield command_obj
+
+    def get_global_command_from_name(self, content: str) -> typing.Iterator[typing.Tuple[Command, str]]:
+        yield from self.get_command_from_name(content)
+        for module in self.modules.values():
+            yield from module.get_command_from_name(content)
 
     async def _get_prefixes(self, guild: typing.Optional[guilds.GuildLikeT]) -> typing.List[str]:
         """
@@ -551,7 +618,7 @@ class CommandClient(CommandModule, client.Client):
             for attr in dir(module):
                 value = getattr(module, attr)
                 if inspect.isclass(value) and issubclass(value, CommandModule) and value is not CommandModule:
-                    self.modules[value.__class__.__name__] = value(self)
+                    self.modules[value.__class__.__name__] = value(self)  # TODO: setup or something smarter
                     found = True
             if not found:
                 raise ValueError(f"No valid 'CommandModule' derived class found in '{module_path}'.")
@@ -565,19 +632,31 @@ class CommandClient(CommandModule, client.Client):
         else:
             return
 
-        command_obj, command_trigger = self.get_global_command(command_args)
-        if not command_obj or not await self.access_check(command_obj, message):
-            return
-
-        command_args = command_args[len(command_trigger) + 1 :]
         ctx = Context(
             self._fabric,
+            command_args,
             message,
             prefix or mention,
             TriggerTypes.PREFIX if prefix else TriggerTypes.MENTION,
-            command_trigger,
         )
-        await command_obj.execute(ctx, command_args)
+        async for command_obj in self.get_global_command_from_context(ctx):
+            if await self.access_check(command_obj, message):
+                ctx.set_command(command_obj)
+                break
+            else:
+                command_obj = None
+        else:
+            command_obj = None
+
+        if command_obj is None:
+            return
+
+        ctx.prune_content(len(ctx.triggering_name) + 1)
+
+        await command_obj.execute(ctx)
+
+
+CheckLikeT = typing.Callable[[Context], typing.Union[bool, typing.Coroutine[typing.Any, typing.Any, bool]]]
 
 
 __all__ = [

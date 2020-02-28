@@ -51,7 +51,7 @@ class StarboardModule(command_client.CommandModule):
         if user.is_bot or reaction.emoji != UNICODE_STAR:
             return
 
-        message_obj = self.client._fabric.state_registry.get_mandatory_message_by_id(
+        message_obj = self._fabric.state_registry.get_mandatory_message_by_id(
             message_id=reaction.message_id, channel_id=reaction.channel_id
         )
         # This shouldn't ever fail.
