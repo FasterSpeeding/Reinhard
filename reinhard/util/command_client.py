@@ -630,9 +630,9 @@ class CommandClient(CommandCluster, client.Client):
         for module_path in modules:
             module = importlib.import_module(module_path)
             exports = getattr(module, "exports", None)  # TODO: __all__?
-            if exports is None:
-                raise ValueError(f"No valid `exports` iterable found in '{module_path}'.")
-            for item in exports:
+            # if exports is None:
+            #    raise ValueError(f"No valid `exports` iterable found in '{module_path}'.")
+            for item in exports or containers.EMPTY_SEQUENCE:
                 if isinstance(item, str):
                     item = getattr(module, item)
 
@@ -643,7 +643,11 @@ class CommandClient(CommandCluster, client.Client):
                 elif callable(item):
                     item(self)
                 else:
-                    raise ValueError(f"Invalid export `{item.__class__.__name__}` found in `{module_path}.exports`")
+                    self.logger.warning(
+                        f"Invalid export `%s` found in `%s.exports`", item.__class__.__name__, module_path
+                    )
+            else:
+                self.logger.warning(f"No exports found in %s", module_path)
 
     async def on_message_create(self, message: messages.Message) -> None:
         """Handles command triggering based on message creation."""

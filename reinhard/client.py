@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import contextlib
-import logging
 import time
 import typing
 
@@ -14,8 +13,6 @@ import asyncpg
 from reinhard.util import command_client
 from reinhard import config
 from reinhard import sql
-
-logging.getLogger().setLevel(logging.DEBUG)
 
 
 class BotClient(command_client.CommandClient):
