@@ -25,7 +25,7 @@ def script_getter_factory(key: str):  # Could just make this retrieve the file.
 
 
 class CachedScripts:
-    """A module used for loading and calling sql scripts from a folder."""
+    """A class used for loading and calling sql scripts from a folder."""
 
     scripts: typing.MutableMapping[str, str]
 
@@ -40,7 +40,7 @@ class CachedScripts:
 
         Args:
             file_path:
-                The string path of the module to load.
+                The string path of the file to load.
         """
         assertions.assert_that(file_path.lower().endswith(".sql"), "File must be of type 'sql'")
         with open(file_path, "r") as file:

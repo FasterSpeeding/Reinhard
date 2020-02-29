@@ -8,6 +8,7 @@ import enum
 import importlib
 import inspect
 import logging
+import types
 import typing
 
 
@@ -192,13 +193,13 @@ class CommandError(Exception):
 
 
 class Command(Executable):
-    __slots__ = ("_checks", "_func", "_module", "level", "meta", "triggers")
+    __slots__ = ("_checks", "_cluster", "_func", "level", "meta", "triggers")
 
-    _checks: typing.Sequence[CheckLikeT]
+    _checks: typing.List[CheckLikeT]
+
+    _cluster: typing.Optional[CommandCluster]
 
     _func: aio.CoroutineFunctionT
-
-    _module: typing.Optional[CommandModule]
 
     #: The user access level that'll be required to execute this command, defaults to 0.
     #:
@@ -220,13 +221,16 @@ class Command(Executable):
         aliases: typing.Optional[typing.List[str]] = None,
         level: int = 0,
         meta: typing.Optional[typing.MutableMapping[typing.Any, typing.Any]] = None,
-        module: typing.Optional[CommandModule] = None,
+        cluster: typing.Optional[CommandCluster] = None,
     ) -> None:
         self._checks = [self.check_prefix_from_context]
         self._func = func
         self.level = level
         self.meta = meta
-        self._module = module
+        if cluster:
+            self.bind_cluster(cluster)
+        else:
+            self._cluster = None
         if not trigger:
             trigger = self.generate_trigger()
         self.triggers = tuple(trig for trig in (trigger, *(aliases or containers.EMPTY_COLLECTION)) if trig is not None)
@@ -234,8 +238,9 @@ class Command(Executable):
     def __repr__(self) -> str:
         return f"Command({'|'.join(self.triggers)})"
 
-    def bind_module(self, module: CommandModule) -> None:  # TODO: deprecate
-        self._module = module
+    def bind_cluster(self, cluster: CommandCluster) -> None:
+        self._func = types.MethodType(self._func, cluster)  # TODO: separate function?
+        self._cluster = cluster
 
     def deregister_check(self, check: CheckLikeT) -> None:
         try:
@@ -275,7 +280,7 @@ class Command(Executable):
 
     async def execute(self, ctx: Context) -> bool:
         """
-        Used to execute a command, catches any :class:`CommandErrors` and calls the module's error handler on error.
+        Used to execute a command, catches any :class:`CommandErrors` and calls the cluster's error handler on error.
 
         Args:
             message:
@@ -287,12 +292,13 @@ class Command(Executable):
             An optional :class:`str` response to be sent in chat.
         """
         try:
-            await self._func(self._module, ctx, self.parse_args(ctx.content))
+            await self._func(ctx, self.parse_args(ctx.content))
         except CommandError as exc:
             with contextlib.suppress(PermissionError):
                 await ctx.reply(content=str(exc))
         except Exception as exc:
-            await self._module.dispatch_command_event(CommandEvents.ERROR, ctx, exc)  # TODO: move
+            if self._cluster:
+                await self._cluster.dispatch_cluster_event(CommandEvents.ERROR, ctx, exc)  # TODO: move
             raise exc
         return True
 
@@ -321,14 +327,15 @@ class CommandGroup(Executable):
     ...
 
 
-class CommandModule:
-    __slots__ = ("_event_dispatcher", "_fabric", "client", "logger", "module_commands")
+# TODO: CommandCollection, CommandModule, CommandInterface, CommandNode, CommandDigest, CommandLot, CommandCluster
+class CommandCluster:
+    __slots__ = ("_event_dispatcher", "_fabric", "client", "logger", "cluster_commands")
 
     _event_dispatcher: aio.EventDelegate
 
     _fabric: fabric.Fabric
 
-    #: The command client this module is loaded in.
+    #: The command client this cluster is loaded in.
     #:
     #: :type: :class:`CommandClient` or :class:`None`
     client: typing.Optional[CommandClient]
@@ -338,10 +345,10 @@ class CommandModule:
     #: :type: :class:`logging.Logger`
     logger: logging.Logger
 
-    #: A list of the commands that are loaded in this module.
+    #: A list of the commands that are loaded in this cluster.
     #:
     #: :type: :class:`typing.Sequence` of :class:`Command`
-    module_commands: typing.List[Command]
+    cluster_commands: typing.List[Command]
 
     def __init__(self, command_client: typing.Optional[CommandClient] = None, bind: bool = True) -> None:
         super().__init__()
@@ -353,13 +360,13 @@ class CommandModule:
             self.bind_commands()
             self.bind_listeners()
         self.client = command_client
-        self.dispatch_command_event(CommandEvents.LOAD, self)  # TODO: unload and do this somewhere better
+        self.dispatch_cluster_event(CommandEvents.LOAD, self)  # TODO: unload and do this somewhere better
 
     def add_event(
         self, event_name: typing.Union[str, CommandEvents], coroutine_function: aio.CoroutineFunctionT
     ) -> None:
         self.logger.debug(
-            "Subscribing %s%s to %s event in %s module.",
+            "Subscribing %s%s to %s event in %s cluster.",
             coroutine_function.__name__,
             inspect.signature(coroutine_function),
             event_name,
@@ -369,42 +376,42 @@ class CommandModule:
 
     def bind_commands(self) -> None:
         """
-        Loads any commands that are attached to this class into `module_commands`.
+        Loads any commands that are attached to this class into `cluster_commands`.
 
         Raises:
             ValueError:
-                if the commands for this module have already been binded or if any duplicate triggers are found while
+                if the commands for this cluster have already been binded or if any duplicate triggers are found while
                 loading commands.
         """
         assertions.assert_that(
-            not getattr(self, "module_commands", None),
-            f"Cannot bind commands in module '{self.__class__.__name__}' when commands have already been binded.",
+            not getattr(self, "cluster_commands", None),
+            f"Cannot bind commands in cluster '{self.__class__.__name__}' when commands have already been binded.",
         )
-        self.module_commands = []
-        for name, function in inspect.getmembers(self, predicate=lambda func: isinstance(func, Command)):
-            function.bind_module(self)
-            for trigger in function.triggers:
+        self.cluster_commands = []
+        for name, command_obj in inspect.getmembers(self, predicate=lambda attr: isinstance(attr, Command)):
+            command_obj.bind_cluster(self)
+            for trigger in command_obj.triggers:
                 if list(self.get_command_from_name(trigger)):
                     self.logger.warning(
-                        f"Possible overlapping trigger '%s' found in %s module.", trigger, self.__class__.__name__,
+                        f"Possible overlapping trigger '%s' found in %s cluster.", trigger, self.__class__.__name__,
                     )
             self.logger.debug(
-                "Binded command %s in %s module.", function.name, self.__class__.__name__,
+                "Binded command %s in %s cluster.", command_obj.name, self.__class__.__name__,
             )
-            self.module_commands.append(function)
-        self.module_commands.sort(key=lambda comm: comm.name, reverse=True)
+            self.cluster_commands.append(command_obj)
+        self.cluster_commands.sort(key=lambda comm: comm.name, reverse=True)
 
     def bind_listeners(self) -> None:
-        for name, function in self.get_module_event_listeners():
+        for name, function in self.get_cluster_event_listeners():
             if name not in discord_event_types.EventType.__members__.values():
                 self.add_event(name, function)
 
-    def dispatch_command_event(self, event: typing.Union[CommandEvents, str], *args) -> None:
-        self.logger.debug("Dispatching %s command event in %s module.", str(event), self.__class__.__name__)
+    def dispatch_cluster_event(self, event: typing.Union[CommandEvents, str], *args) -> asyncio.Future:
+        self.logger.debug("Dispatching %s command event in %s cluster.", str(event), self.__class__.__name__)
         return self._event_dispatcher.dispatch(str(event), *args)
 
     async def get_command_from_context(self, ctx: Context) -> typing.AsyncIterator[Command]:
-        for command_obj in self.module_commands:
+        for command_obj in self.cluster_commands:
             if await command_obj.check(ctx):
                 yield command_obj
 
@@ -421,21 +428,27 @@ class CommandModule:
             A :class:`typing.Tuple` of :class:`Command` object and the :class:`str` trigger that was matched if the
             command was found else a :class:`typing.Tuple` of :class:`None` and :class:`None`.
         """
-        for command_obj in self.module_commands:
+        for command_obj in self.cluster_commands:
             if prefix := command_obj.check_prefix(content):
                 yield command_obj, prefix
 
-    def get_module_event_listeners(self) -> typing.Generator[typing.Tuple[str, aio.CoroutineFunctionT]]:
-        """Get a generator of the event listeners attached to this module."""
+    def get_cluster_event_listeners(self) -> typing.Generator[typing.Tuple[str, aio.CoroutineFunctionT]]:
+        """Get a generator of the event listeners attached to this cluster."""
         return (
             (name[3:], function)
             for name, function in inspect.getmembers(self, predicate=asyncio.iscoroutinefunction)
             if name.startswith("on_")
         )
 
-    def register_command(self, func: aio.CoroutineFunctionT, trigger: str = None, *aliases: str) -> None:
+    def register_command(
+        self,
+        func: typing.Union[aio.CoroutineFunctionT, Command],
+        trigger: str = None,
+        binded: bool = None,
+        *aliases: str,
+    ) -> None:
         """
-        Register a command in this module.
+        Register a command in this cluster.
 
         Args:
             func:
@@ -449,13 +462,16 @@ class CommandModule:
             ValueError:
                 If any of the triggers for this command are found on a loaded command.
         """
-        command_obj = Command(func=func, module=self, trigger=trigger, aliases=list(aliases))
+        if isinstance(func, Command):
+            command_obj = func
+        else:
+            command_obj = Command(func=func, cluster=self if binded else None, trigger=trigger, aliases=list(aliases))
         for trigger in command_obj.triggers:
             if list(self.get_command_from_name(trigger)):
                 self.logger.warning(
-                    f"Possible overlapping trigger '%s' found in %s module.", trigger, self.__class__.__name__,
+                    f"Possible overlapping trigger '%s' found in %s cluster.", trigger, self.__class__.__name__,
                 )
-        self.module_commands.append(command_obj)
+        self.cluster_commands.append(command_obj)
 
     def unregister_command(self, command_obj: typing.Union[Command, str]) -> None:
         if isinstance(command_obj, str):
@@ -467,29 +483,29 @@ class CommandModule:
             raise ValueError("Command must be string command trigger or a 'Command' object.") from None
 
         try:
-            self.module_commands.remove(command_obj)
+            self.cluster_commands.remove(command_obj)
         except ValueError:
-            raise ValueError("Invalid command passed for this module.") from None
+            raise ValueError("Invalid command passed for this cluster.") from None
 
 
-class CommandClient(CommandModule, client.Client):
+class CommandClient(CommandCluster, client.Client):
     """
-    The central client that all command modules will be binded to. This extends :class:`hikari.client.Client` and
-    handles registering event listeners attached to the loaded modules and the listener(s) required for commands.
+    The central client that all command clusters will be binded to. This extends :class:`hikari.client.Client` and
+    handles registering event listeners attached to the loaded clusters and the listener(s) required for commands.
 
     Note:
-        This inherits from :class:`CommandModule` and can act as an independent Command Module for small bots.
+        This inherits from :class:`CommandCluster` and can act as an independent Command Cluster for small bots.
     """
 
-    __slots__ = ("get_guild_prefix", "modules", "prefixes")
+    __slots__ = ("clusters", "get_guild_prefix", "prefixes")
+
+    #: The command clusters that are loaded in this client.
+    #:
+    #: :type: :class:`typing.MutableMapping` of :class:`str` to :class:`CommandCluster`
+    clusters: typing.MutableMapping[str, CommandCluster]
 
     get_guild_prefix: typing.Union[aio.CoroutineFunctionT, None]  # TODO: or normal method.
     # TODO: rename this to something singular
-
-    #: The command modules that are loaded in this client.
-    #:
-    #: :type: :class:`typing.MutableMapping` of :class:`str` to :class:`CommandModule`
-    modules: typing.MutableMapping[str, CommandModule]
 
     #: An array of this bot's global prefixes.
     #:
@@ -504,14 +520,13 @@ class CommandClient(CommandModule, client.Client):
         options: typing.Optional[CommandClientOptions] = None,
     ) -> None:
         super().__init__(bind=False)
-        self.modules = {}
-        self.load_modules(*(modules or containers.EMPTY_SEQUENCE))
+        self.clusters = {}
+        self.load_from_modules(*(modules or containers.EMPTY_SEQUENCE))
         self.bind_commands()
         self.bind_listeners()
         self.prefixes = prefixes
         if options:
             self._client_options = options
-        # TODO: built in help command.
 
     def add_event(self, event_name: str, coroutine_function: aio.CoroutineFunctionT) -> None:
         if event_name in discord_event_types.EventType.__members__.values():
@@ -535,9 +550,9 @@ class CommandClient(CommandModule, client.Client):
         return self._client_options.access_levels.get(message.author.id, 0) >= command_obj.level  # TODO: sql filter.
 
     def bind_listeners(self) -> None:
-        """Used to add event listeners from all loaded command modules to hikari's internal event listener."""
-        for module in (self, *self.modules.values()):
-            for name, function in module.get_module_event_listeners():
+        """Used to add event listeners from all loaded command clusters to hikari's internal event listener."""
+        for cluster in (self, *self.clusters.values()):
+            for name, function in cluster.get_cluster_event_listeners():
                 if name in discord_event_types.EventType.__members__.values():
                     self.add_event(name, function)
         super().bind_listeners()
@@ -563,7 +578,7 @@ class CommandClient(CommandModule, client.Client):
 
     async def get_global_command_from_context(self, ctx: Context) -> typing.AsyncIterator[Command]:
         """
-        Used to get a command from on a messages's content (checks all loaded modules).
+        Used to get a command from on a messages's content (checks all loaded clusters).
 
         Args:
             content:
@@ -573,14 +588,14 @@ class CommandClient(CommandModule, client.Client):
             A :class:`typing.Tuple` of the :class:`Command` object and the :class:`str` trigger that was matched if
             the command was found found, else a :class:`typing.Tuple` of :class:`None` and :class:`None`.
         """
-        for module in (self, *self.modules.values()):
-            async for command_obj in module.get_command_from_context(ctx):
+        for cluster in (self, *self.clusters.values()):
+            async for command_obj in cluster.get_command_from_context(ctx):
                 yield command_obj
 
     def get_global_command_from_name(self, content: str) -> typing.Iterator[typing.Tuple[Command, str]]:
         yield from self.get_command_from_name(content)
-        for module in self.modules.values():
-            yield from module.get_command_from_name(content)
+        for cluster in self.clusters.values():
+            yield from cluster.get_command_from_name(content)
 
     async def _get_prefixes(self, guild: typing.Optional[guilds.GuildLikeT]) -> typing.List[str]:
         """
@@ -604,24 +619,31 @@ class CommandClient(CommandModule, client.Client):
 
         return [guild_prefix, *self.prefixes] if guild_prefix else self.prefixes
 
-    def load_modules(self, *modules: str) -> None:
+    def load_from_modules(self, *modules: str) -> None:
         """
         Used to load modules based on string paths.
 
         Args:
             *modules:
-                The :class:`str` paths of modules to load (in the format of `root.dir.module`)
+                The :class:`str` paths of modules to load from (in the format of `root.dir.cluster`)
         """
         for module_path in modules:
-            found = False
             module = importlib.import_module(module_path)
-            for attr in dir(module):
-                value = getattr(module, attr)
-                if inspect.isclass(value) and issubclass(value, CommandModule) and value is not CommandModule:
-                    self.modules[value.__class__.__name__] = value(self)  # TODO: setup or something smarter
-                    found = True
-            if not found:
-                raise ValueError(f"No valid 'CommandModule' derived class found in '{module_path}'.")
+            exports = getattr(module, "exports", None)  # TODO: __all__?
+            if exports is None:
+                raise ValueError(f"No valid `exports` iterable found in '{module_path}'.")
+            for item in exports:
+                if isinstance(item, str):
+                    item = getattr(module, item)
+
+                if inspect.isclass(item) and issubclass(item, CommandCluster):
+                    self.clusters[item.__class__.__name__] = item(self)  # TODO: setup or something smarter
+                elif inspect.isclass(item) and isinstance(item, Command):  # TODO: command base or executable?
+                    self.register_command(item)
+                elif callable(item):
+                    item(self)
+                else:
+                    raise ValueError(f"Invalid export `{item.__class__.__name__}` found in `{module_path}.exports`")
 
     async def on_message_create(self, message: messages.Message) -> None:
         """Handles command triggering based on message creation."""
@@ -665,5 +687,5 @@ __all__ = [
     "CommandClient",
     "CommandClientOptions",
     "CommandError",
-    "CommandModule",
+    "CommandCluster",
 ]

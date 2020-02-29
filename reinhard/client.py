@@ -19,7 +19,7 @@ logging.getLogger().setLevel(logging.DEBUG)
 
 
 class BotClient(command_client.CommandClient):
-    def __init__(self, bot_config: config.Config, *, modules: typing.List[str] = None,) -> None:
+    def __init__(self, bot_config: config.Config, *, modules: typing.List[str] = None) -> None:
         super().__init__(
             prefixes=bot_config.prefixes, modules=modules, options=bot_config.options,
         )

@@ -24,7 +24,7 @@ if typing.TYPE_CHECKING:
 UNICODE_STAR = "\N{WHITE MEDIUM STAR}"
 
 
-class StarboardModule(command_client.CommandModule):
+class StarboardCluster(command_client.CommandCluster):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.sql_scripts = sql.CachedScripts(pattern=".*star.*")
@@ -139,7 +139,7 @@ class StarboardModule(command_client.CommandModule):
             with util.ReturnErrorStr((errors.NotFoundHTTPError, errors.BadRequestHTTPError)):
                 target_message = await target_message
 
-        if target_message.author == ctx.message.author:
+        if target_message.author.id == ctx.message.author.id:  # TODO: hikari bug?
             raise command_client.CommandError("You cannot star your own message.")
 
         if await self.consume_star_increment(target_message, ctx.message.author):
@@ -168,3 +168,6 @@ class StarboardModule(command_client.CommandModule):
     ) -> models.embeds.Embed:
         star_count = await self.get_star_count(message, conn)
         return _embeds.Embed()
+
+
+exports = {"StarboardCluster"}
