@@ -16,17 +16,17 @@ if typing.TYPE_CHECKING:
     from hikari.orm import models
 
 
-class StarboardCluster(command_client.CommandCluster):
+class ModerationCluster(command_client.CommandCluster):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.sql_scripts = sql.CachedScripts(pattern=".*star.*")
-        self.add_event(command_client.CommandEvents.ERROR, self.client.on_error)
+        self.add_cluster_event(command_client.CommandEvents.ERROR, self.client.on_error)
         for command in self.cluster_commands:
             command.register_check(self.permission_check)
 
     def permission_check(self, ctx: command_client.Context) -> bool:
         required_perms = ctx.command.meta["perms"]
-        return False
+        return False  # TODO: this
 
     @command_client.command(meta={"perms": _permissions.BAN_MEMBERS})
     async def ban(self, ctx: command_client.Context, args: str) -> None:
@@ -38,3 +38,6 @@ class StarboardCluster(command_client.CommandCluster):
 
     async def mute(self, ctx: command_client.Context, args: str) -> None:
         ...  # TODO: channel mute vs global and temp vers perm.
+
+
+exports = [ModerationCluster]

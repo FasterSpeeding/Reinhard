@@ -240,6 +240,7 @@ class Command(Executable):
 
     def bind_cluster(self, cluster: CommandCluster) -> None:
         self._func = types.MethodType(self._func, cluster)  # TODO: separate function?
+        setattr(cluster, self._func.__name__, self._func)
         self._cluster = cluster
 
     def deregister_check(self, check: CheckLikeT) -> None:
@@ -253,6 +254,7 @@ class Command(Executable):
 
     async def check(self, ctx: Context) -> bool:
         result: bool = False
+        ctx.set_command(self)  # TODO: is this the best way to do this?
         for check in self._checks:
             try:
                 if asyncio.iscoroutinefunction(check):
@@ -316,7 +318,6 @@ class Command(Executable):
 
 
 def command(__arg=..., cls=Command, group: typing.Optional[str] = None, **kwargs):  # TODO: handle group...
-    # TODO @functools.wraps(coro_fn)
     def decorator(coro_fn):
         return cls(coro_fn, **kwargs)
 
@@ -356,13 +357,14 @@ class CommandCluster:
             self._fabric = command_client._fabric
         self._event_dispatcher = aio.EventDelegate()
         self.logger = loggers.get_named_logger(self)
+        self.cluster_commands = []
         if bind:
             self.bind_commands()
             self.bind_listeners()
         self.client = command_client
         self.dispatch_cluster_event(CommandEvents.LOAD, self)  # TODO: unload and do this somewhere better
 
-    def add_event(
+    def add_cluster_event(
         self, event_name: typing.Union[str, CommandEvents], coroutine_function: aio.CoroutineFunctionT
     ) -> None:
         self.logger.debug(
@@ -384,10 +386,9 @@ class CommandCluster:
                 loading commands.
         """
         assertions.assert_that(
-            not getattr(self, "cluster_commands", None),
+            not self.cluster_commands,
             f"Cannot bind commands in cluster '{self.__class__.__name__}' when commands have already been binded.",
         )
-        self.cluster_commands = []
         for name, command_obj in inspect.getmembers(self, predicate=lambda attr: isinstance(attr, Command)):
             command_obj.bind_cluster(self)
             for trigger in command_obj.triggers:
@@ -404,7 +405,7 @@ class CommandCluster:
     def bind_listeners(self) -> None:
         for name, function in self.get_cluster_event_listeners():
             if name not in discord_event_types.EventType.__members__.values():
-                self.add_event(name, function)
+                self.add_cluster_event(name, function)
 
     def dispatch_cluster_event(self, event: typing.Union[CommandEvents, str], *args) -> asyncio.Future:
         self.logger.debug("Dispatching %s command event in %s cluster.", str(event), self.__class__.__name__)
@@ -444,7 +445,7 @@ class CommandCluster:
         self,
         func: typing.Union[aio.CoroutineFunctionT, Command],
         trigger: str = None,
-        binded: bool = None,
+        bind: bool = None,
         *aliases: str,
     ) -> None:
         """
@@ -464,8 +465,10 @@ class CommandCluster:
         """
         if isinstance(func, Command):
             command_obj = func
+            if bind:
+                command_obj.bind_cluster(self)
         else:
-            command_obj = Command(func=func, cluster=self if binded else None, trigger=trigger, aliases=list(aliases))
+            command_obj = Command(func=func, cluster=self if bind else None, trigger=trigger, aliases=list(aliases))
         for trigger in command_obj.triggers:
             if list(self.get_command_from_name(trigger)):
                 self.logger.warning(
@@ -473,15 +476,7 @@ class CommandCluster:
                 )
         self.cluster_commands.append(command_obj)
 
-    def unregister_command(self, command_obj: typing.Union[Command, str]) -> None:
-        if isinstance(command_obj, str):
-            try:
-                command_obj, prefix = next(self.get_command_from_name(command_obj))
-            except StopIteration:
-                raise ValueError(f"`{command_obj}` command not found.") from None
-        elif not isinstance(command_obj, Command):
-            raise ValueError("Command must be string command trigger or a 'Command' object.") from None
-
+    def unregister_command(self, command_obj: Command) -> None:
         try:
             self.cluster_commands.remove(command_obj)
         except ValueError:
@@ -521,8 +516,8 @@ class CommandClient(CommandCluster, client.Client):
     ) -> None:
         super().__init__(bind=False)
         self.clusters = {}
-        self.load_from_modules(*(modules or containers.EMPTY_SEQUENCE))
         self.bind_commands()
+        self.load_from_modules(*(modules or containers.EMPTY_SEQUENCE))
         self.bind_listeners()
         self.prefixes = prefixes
         if options:
@@ -532,7 +527,7 @@ class CommandClient(CommandCluster, client.Client):
         if event_name in discord_event_types.EventType.__members__.values():
             client.Client.add_event(self, event_name, coroutine_function)
         else:
-            super().add_event(event_name, coroutine_function)
+            self.add_cluster_event(event_name, coroutine_function)
 
     async def access_check(self, command_obj: Command, message: messages.Message) -> bool:
         """
@@ -629,25 +624,20 @@ class CommandClient(CommandCluster, client.Client):
         """
         for module_path in modules:
             module = importlib.import_module(module_path)
-            exports = getattr(module, "exports", None)  # TODO: __all__?
-            # if exports is None:
-            #    raise ValueError(f"No valid `exports` iterable found in '{module_path}'.")
-            for item in exports or containers.EMPTY_SEQUENCE:
-                if isinstance(item, str):
-                    item = getattr(module, item)
-
-                if inspect.isclass(item) and issubclass(item, CommandCluster):
-                    self.clusters[item.__class__.__name__] = item(self)  # TODO: setup or something smarter
-                elif inspect.isclass(item) and isinstance(item, Command):  # TODO: command base or executable?
+            exports = getattr(module, "exports", containers.EMPTY_SEQUENCE)  # TODO: __all__?
+            for item in exports:
+                if inspect.isclass(item) and issubclass(item, CommandCluster):  # TODO: command cluster base?
+                    self.clusters[item.__class__.__name__] = item(self)
+                elif isinstance(item, Command):  # TODO: command base or executable?
                     self.register_command(item)
                 elif callable(item):
                     item(self)
                 else:
                     self.logger.warning(
-                        f"Invalid export `%s` found in `%s.exports`", item.__class__.__name__, module_path
+                        "Invalid export `%s` found in `%s.exports`", item.__class__.__name__, module_path
                     )
             else:
-                self.logger.warning(f"No exports found in %s", module_path)
+                self.logger.warning("No exports found in %s", module_path)
 
     async def on_message_create(self, message: messages.Message) -> None:
         """Handles command triggering based on message creation."""
@@ -667,7 +657,6 @@ class CommandClient(CommandCluster, client.Client):
         )
         async for command_obj in self.get_global_command_from_context(ctx):
             if await self.access_check(command_obj, message):
-                ctx.set_command(command_obj)
                 break
             else:
                 command_obj = None

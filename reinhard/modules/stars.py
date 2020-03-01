@@ -28,7 +28,7 @@ class StarboardCluster(command_client.CommandCluster):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.sql_scripts = sql.CachedScripts(pattern=".*star.*")
-        self.add_event(command_client.CommandEvents.ERROR, self.client.on_error)
+        self.add_cluster_event(command_client.CommandEvents.ERROR, self.client.on_error)
 
     @staticmethod
     async def get_starboard_channel(
@@ -110,7 +110,7 @@ class StarboardCluster(command_client.CommandCluster):
 
         channel = ctx.message.channel
         if not channel:
-            with util.ReturnErrorStr((errors.NotFoundHTTPError,)):
+            with util.ReturnErrorStr((errors.NotFoundHTTPError)):
                 channel = await channel
 
         # Should flag both DM channels and channels from other guilds.
@@ -170,4 +170,4 @@ class StarboardCluster(command_client.CommandCluster):
         return _embeds.Embed()
 
 
-exports = {"StarboardCluster"}
+exports = [StarboardCluster]

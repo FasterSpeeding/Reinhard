@@ -56,6 +56,15 @@ class BotClient(command_client.CommandClient):
             data = await conn.fetchrow(self.sql_scripts.find_guild_prefix, guild_id)
             return data["prefix"] if data is not None else data
 
+    def generate_help_embed(self) -> models.embeds.Embed:
+        for cluster in (self, *self.clusters.values()):
+            for command in cluster.cluster_commands:
+                ...
+
+    @command_client.command
+    async def help(self, ctx: command_client.Context, args) -> None:
+        await ctx.reply(content="TODO")
+
     @command_client.command
     async def ping(self, ctx: command_client.Context, _) -> None:
         message_sent = time.perf_counter()
