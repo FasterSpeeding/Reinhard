@@ -40,4 +40,4 @@ class ModerationCluster(command_client.CommandCluster):
         ...  # TODO: channel mute vs global and temp vers perm.
 
 
-exports = [ModerationCluster]
+exports = ["ModerationCluster"]

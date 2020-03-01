@@ -614,6 +614,17 @@ class CommandClient(CommandCluster, client.Client):
 
         return [guild_prefix, *self.prefixes] if guild_prefix else self.prefixes
 
+    def _consume_client_loadable(self, loadable: typing.Any) -> bool:
+        if inspect.isclass(loadable) and issubclass(loadable, CommandCluster):  # TODO: command cluster base?
+            self.clusters[loadable.__class__.__name__] = loadable(self)
+        elif isinstance(loadable, Command):  # TODO: command base or executable?
+            self.register_command(loadable)
+        elif callable(loadable):
+            loadable(self)
+        else:
+            return False
+        return True
+
     def load_from_modules(self, *modules: str) -> None:
         """
         Used to load modules based on string paths.
@@ -626,13 +637,12 @@ class CommandClient(CommandCluster, client.Client):
             module = importlib.import_module(module_path)
             exports = getattr(module, "exports", containers.EMPTY_SEQUENCE)  # TODO: __all__?
             for item in exports:
-                if inspect.isclass(item) and issubclass(item, CommandCluster):  # TODO: command cluster base?
-                    self.clusters[item.__class__.__name__] = item(self)
-                elif isinstance(item, Command):  # TODO: command base or executable?
-                    self.register_command(item)
-                elif callable(item):
-                    item(self)
-                else:
+                try:
+                    item = getattr(module, item)
+                except AttributeError as exc:
+                    raise RuntimeError(f"`{item}` export not found in `{module_path}` module.") from exc
+
+                if not self._consume_client_loadable(item):
                     self.logger.warning(
                         "Invalid export `%s` found in `%s.exports`", item.__class__.__name__, module_path
                     )

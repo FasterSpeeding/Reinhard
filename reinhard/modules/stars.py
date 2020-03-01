@@ -170,4 +170,4 @@ class StarboardCluster(command_client.CommandCluster):
         return _embeds.Embed()
 
 
-exports = [StarboardCluster]
+exports = ["StarboardCluster"]
