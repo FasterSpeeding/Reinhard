@@ -19,7 +19,7 @@ def script_getter_factory(key: str):  # Could just make this retrieve the file.
         try:
             return self.scripts[key]
         except KeyError:
-            raise AttributeError(f"Unable to get not loaded script '{key}'.") from None
+            raise AttributeError(f"Unable to get unloaded script '{key}'.") from None
 
     return property(script_getter)
 

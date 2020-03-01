@@ -21,6 +21,9 @@ if typing.TYPE_CHECKING:
 #  TODO: handle sql errors?
 #  TODO: starboard minimum count
 
+
+exports = ["StarboardCluster"]
+
 UNICODE_STAR = "\N{WHITE MEDIUM STAR}"
 
 
@@ -110,7 +113,7 @@ class StarboardCluster(command_client.CommandCluster):
 
         channel = ctx.message.channel
         if not channel:
-            with util.ReturnErrorStr((errors.NotFoundHTTPError)):
+            with util.ReturnErrorStr((errors.NotFoundHTTPError,)):
                 channel = await channel
 
         # Should flag both DM channels and channels from other guilds.
@@ -168,6 +171,3 @@ class StarboardCluster(command_client.CommandCluster):
     ) -> models.embeds.Embed:
         star_count = await self.get_star_count(message, conn)
         return _embeds.Embed()
-
-
-exports = ["StarboardCluster"]

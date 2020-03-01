@@ -13,7 +13,9 @@ from reinhard import config
 CONFIG_PARSERS = {"yaml": yaml.safe_load, "json": json.load}
 
 
-def parse_config(config_path: typing.Optional[str] = None, config_marshaler: typing.Callable = config.Config.from_dict):
+def parse_config(
+    config_path: typing.Optional[str] = None, config_marshaler: typing.Callable = config.ExtendedOptions.from_dict
+):
     if config_path is None:
         return config_marshaler({})
 
@@ -43,10 +45,10 @@ def main():
     config_obj = parse_config(config_path)
 
     logging.basicConfig(
-        level=config_obj.log_level,
+        level=config_obj.bot.log_level,
         format="%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    bot_client = client.BotClient(config_obj, modules=["reinhard.modules.stars"])
-    bot_client.run(token=config_obj.token)
+    bot_client = client.BotClient(config_obj)
+    bot_client.run(token=config_obj.bot.token)

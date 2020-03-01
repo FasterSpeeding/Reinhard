@@ -16,6 +16,9 @@ if typing.TYPE_CHECKING:
     from hikari.orm import models
 
 
+exports = ["ModerationCluster"]
+
+
 class ModerationCluster(command_client.CommandCluster):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -38,6 +41,3 @@ class ModerationCluster(command_client.CommandCluster):
 
     async def mute(self, ctx: command_client.Context, args: str) -> None:
         ...  # TODO: channel mute vs global and temp vers perm.
-
-
-exports = ["ModerationCluster"]

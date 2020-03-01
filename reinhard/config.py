@@ -19,13 +19,17 @@ class DatabaseConfig(bases.MarshalMixin):
 
 
 @dataclasses.dataclass()
-class Config(bases.MarshalMixin):
-    database: DatabaseConfig
+class BotConfig(bases.MarshalMixin):
     token: str = dataclasses.field(repr=False)
     log_level: str = "INFO"
-    prefixes: typing.List[str] = dataclasses.field(default_factory=lambda: ["."])
-    options: command_client.CommandClientOptions = dataclasses.field(default_factory=dict)
 
-    def __post_init__(self):
+
+@dataclasses.dataclass()
+class ExtendedOptions(command_client.CommandClientOptions):
+    bot: BotConfig = dataclasses.field(default_factory=BotConfig)
+    database: DatabaseConfig = dataclasses.field(default_factory=DatabaseConfig)
+    prefixes: typing.List[str] = dataclasses.field(default_factory=lambda: ["."])
+
+    def __post_init__(self) -> None:
+        self.bot = BotConfig.from_dict(self.bot)
         self.database = DatabaseConfig.from_dict(self.database)
-        self.options = command_client.CommandClientOptions.from_dict(self.options)
