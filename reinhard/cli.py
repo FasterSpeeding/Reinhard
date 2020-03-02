@@ -14,7 +14,8 @@ CONFIG_PARSERS = {"yaml": yaml.safe_load, "json": json.load}
 
 
 def parse_config(
-    config_path: typing.Optional[str] = None, config_marshaler: typing.Callable = config.ExtendedOptions.from_dict
+    config_path: typing.Optional[str] = None,
+    config_marshaler: typing.Callable[[dict], typing.Any] = config.ExtendedOptions.from_dict,
 ):
     if config_path is None:
         return config_marshaler({})
@@ -42,7 +43,7 @@ def main():
             # FileNotFoundError
             config_path = None
 
-    config_obj = parse_config(config_path)
+    config_obj: config.ExtendedOptions = parse_config(config_path)
 
     logging.basicConfig(
         level=config_obj.bot.log_level,

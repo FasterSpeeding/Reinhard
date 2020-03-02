@@ -22,6 +22,8 @@ class BotClient(command_client.ReinhardCommandClient):
         self.sql_pool: typing.Optional[asyncpg.pool.Pool] = None
         self.sql_scripts = sql.CachedScripts(pattern=r"[.*schema.sql]|[*prefix.sql]")
 
+    config: config.ExtendedOptions
+
     @command_client.command
     async def about(self, ctx: command_client.Context, _) -> None:
         await ctx.reply(content="TODO: This")
@@ -41,7 +43,7 @@ class BotClient(command_client.ReinhardCommandClient):
             )
 
     @command_client.command(level=5)
-    async def echo(self, ctx: command_client.Context, args) -> typing.Optional[str]:
+    async def echo(self, ctx: command_client.Context, args) -> None:
         await ctx.reply(content=" ".join(args))
 
     @command_client.command(level=5)
