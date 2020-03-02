@@ -33,6 +33,10 @@ from hikari.orm.models import permissions
 from hikari.orm import client
 from hikari import errors
 
+
+from reinhard.util import arg_parser
+
+
 if typing.TYPE_CHECKING:
     from hikari.internal_utilities import type_hints
     from hikari.orm.http import base_http_adapter
@@ -263,13 +267,15 @@ class AbstractCommand(Executable, abc.ABC):
 
 
 class Command(AbstractCommand):
-    __slots__ = ("_checks", "_cluster", "_func", "level", "meta", "triggers")
+    __slots__ = ("_checks", "_cluster", "_func", "level", "meta", "parser", "triggers")
 
     _checks: typing.List[CheckLikeT]
 
     _cluster: typing.Optional[AbstractCommandCluster]
 
     _func: aio.CoroutineFunctionT
+
+    parser: arg_parser.AbstractCommandParser
 
     def __init__(
         self,
@@ -285,6 +291,7 @@ class Command(AbstractCommand):
         self._func = func
         self.level = level
         self.meta = meta
+        self.parser = arg_parser.CommandParser(self._func)
         if cluster:
             self.bind_cluster(cluster)
         else:
@@ -340,7 +347,8 @@ class Command(AbstractCommand):
 
     async def execute(self, ctx: Context) -> None:
         try:
-            await self._func(ctx, self.parse_args(ctx.content))
+            args, kwargs = await self.parser.parse(ctx)
+            await self._func(*args, **kwargs)
         except CommandError as exc:
             with contextlib.suppress(PermissionError):
                 await ctx.reply(content=str(exc))
@@ -358,8 +366,8 @@ class Command(AbstractCommand):
         """Get the name of this command."""
         return self._func.__name__
 
-    def parse_args(self, args: str) -> typing.List[typing.Union[int, str]]:
-        return args.split(" ")  # TODO: actually parse
+    # async def parse_args(self, args: str) -> typing.Tuple[typing.List[typing.Any], typing.MutableMapping[str, typing.Any]]:
+    #    return args.split(" ")  # TODO: actually parse
 
 
 def command(
