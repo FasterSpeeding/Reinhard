@@ -10,17 +10,6 @@ from hikari.internal_utilities import aio
 from hikari.internal_utilities import containers
 
 
-def get_snowflake(content: str) -> int:
-    if content.isdigit():
-        sf = content
-    else:
-        matches = re.findall(r"<[(?:@!?)#&](\d+)>", content)  # TODO: doesn't support role mentions
-        if not matches:
-            raise command_client.CommandError("Invalid mention or ID supplied.")
-        sf = matches[0]
-    return int(sf)
-
-
 class ReturnErrorStr:
     __slots__ = ("errors", "error_responses", "final_error")
 

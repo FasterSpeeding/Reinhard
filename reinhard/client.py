@@ -25,11 +25,11 @@ class BotClient(command_client.ReinhardCommandClient):
     config: config.ExtendedOptions
 
     @command_client.command
-    async def about(self, ctx: command_client.Context, _) -> None:
+    async def about(self, ctx: command_client.Context) -> None:
         await ctx.reply(content="TODO: This")
 
     @command_client.command(level=5)
-    async def error(self, ctx: command_client.Context, _) -> None:
+    async def error(self, ctx: command_client.Context) -> None:
         raise Exception("This is an exception, get used to it.")
 
     async def on_error(self, ctx: command_client.Context, e: BaseException) -> None:
@@ -42,12 +42,12 @@ class BotClient(command_client.ReinhardCommandClient):
                 ),
             )
 
-    @command_client.command(level=5)
-    async def echo(self, ctx: command_client.Context, args) -> None:
-        await ctx.reply(content=" ".join(args))
+    @command_client.command(level=5, greedy=True)
+    async def echo(self, ctx: command_client.Context, args: str) -> None:
+        await ctx.reply(content=args)
 
-    @command_client.command(level=5)
-    async def eval(self, ctx: command_client.Context, args) -> None:
+    @command_client.command(level=5, greedy=True)
+    async def eval(self, ctx: command_client.Context, args: str) -> None:
         " ".join(args).strip("```")
 
     async def get_guild_prefix(self, guild_id: int) -> typing.Optional[str]:
@@ -61,11 +61,11 @@ class BotClient(command_client.ReinhardCommandClient):
                 ...
 
     @command_client.command
-    async def help(self, ctx: command_client.Context, args) -> None:
+    async def help(self, ctx: command_client.Context) -> None:
         await ctx.reply(content="TODO")
 
     @command_client.command
-    async def ping(self, ctx: command_client.Context, _) -> None:
+    async def ping(self, ctx: command_client.Context) -> None:
         message_sent = time.perf_counter()
         message_obj = await ctx.reply(content="Nyaa!")
         api_latency = round((time.perf_counter() - message_sent) * 1000)

@@ -286,12 +286,13 @@ class Command(AbstractCommand):
         level: int = 0,
         meta: typing.Optional[typing.MutableMapping[typing.Any, typing.Any]] = None,
         cluster: typing.Optional[AbstractCommandCluster] = None,
+        greedy: bool = False,
     ) -> None:
         self._checks = [self.check_prefix_from_context]
         self._func = func
         self.level = level
         self.meta = meta
-        self.parser = arg_parser.CommandParser(self._func)
+        self.parser = arg_parser.CommandParser(self._func, greedy=greedy)
         if cluster:
             self.bind_cluster(cluster)
         else:
@@ -304,9 +305,13 @@ class Command(AbstractCommand):
         return f"Command({'|'.join(self.triggers)})"
 
     def bind_cluster(self, cluster: AbstractCommandCluster) -> None:
-        self._func = types.MethodType(self._func, cluster)  # TODO: separate function?
+        # This ensures that `self` will automatically be passed through.
+        self._func = types.MethodType(self._func, cluster)
+        # This allows for calling the raw function as an attribute of the cluster.
         setattr(cluster, self._func.__name__, self._func)
         self._cluster = cluster
+        # Now that we know self will automatically be passed, we need to trim the parameters again.
+        self.parser.trim_parameters(1)
 
     def deregister_check(self, check: CheckLikeT) -> None:
         try:
@@ -348,7 +353,7 @@ class Command(AbstractCommand):
     async def execute(self, ctx: Context) -> None:
         try:
             args, kwargs = await self.parser.parse(ctx)
-            await self._func(*args, **kwargs)
+            await self._func(ctx, *args, **kwargs)
         except CommandError as exc:
             with contextlib.suppress(PermissionError):
                 await ctx.reply(content=str(exc))
@@ -365,9 +370,6 @@ class Command(AbstractCommand):
     def name(self) -> str:
         """Get the name of this command."""
         return self._func.__name__
-
-    # async def parse_args(self, args: str) -> typing.Tuple[typing.List[typing.Any], typing.MutableMapping[str, typing.Any]]:
-    #    return args.split(" ")  # TODO: actually parse
 
 
 def command(
@@ -461,7 +463,7 @@ class CommandCluster(AbstractCommandCluster):
 
     _event_dispatcher: aio.EventDelegate
 
-    _fabric: fabric.Fabric
+    _fabric: typing.Optional[fabric.Fabric]
 
     #: The command client this cluster is loaded in.
     #:
@@ -482,15 +484,14 @@ class CommandCluster(AbstractCommandCluster):
         self, command_client: typing.Optional[AbstractCommandClient] = None, bind: bool = True, **kwargs
     ) -> None:
         super().__init__(**kwargs)
-        if command_client:
-            self._fabric = command_client._fabric
+        self.client = command_client
+        self._fabric = command_client._fabric if command_client else None
         self._event_dispatcher = aio.EventDelegate()
         self.logger = loggers.get_named_logger(self)
         self.cluster_commands = []
         if bind:
             self.bind_commands()
             self.bind_listeners()
-        self.client = command_client
         self.dispatch_cluster_event(CommandEvents.LOAD, self)  # TODO: unload and do this somewhere better
 
     def add_cluster_event(
@@ -507,8 +508,7 @@ class CommandCluster(AbstractCommandCluster):
 
     def bind_client(self, command_client: AbstractCommandClient) -> None:
         self.client = command_client
-        if not self._fabric:
-            self._fabric = command_client._fabric
+        self._fabric = command_client._fabric
 
     def bind_commands(self) -> None:
         """
@@ -651,7 +651,6 @@ class CommandClient(AbstractCommandClient, CommandCluster, client.Client):
     clusters: typing.MutableMapping[str, AbstractCommandCluster]
 
     get_guild_prefix: typing.Union[aio.CoroutineFunctionT, None]  # TODO: or normal method.
-    # TODO: rename this to something singular
 
     def __init__(
         self,

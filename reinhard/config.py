@@ -31,5 +31,6 @@ class ExtendedOptions(command_client.CommandClientOptions):
     prefixes: typing.List[str] = dataclasses.field(default_factory=lambda: ["."])
 
     def __post_init__(self) -> None:
+        self.access_levels = {int(key): value for key, value in self.access_levels.items()}
         self.bot = BotConfig.from_dict(self.bot)
         self.database = DatabaseConfig.from_dict(self.database)

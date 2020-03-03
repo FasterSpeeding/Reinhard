@@ -103,10 +103,8 @@ class StarboardCluster(command_client.CommandCluster):
             return False
 
     @command_client.command(trigger="set starboard", aliases=["register starboard"])
-    async def set_starboard(self, ctx: command_client.Context, args: str) -> None:
-        target_channel = ctx.fabric.state_registry.get_mandatory_channel_by_id(
-            util.get_snowflake(args[0]) or ctx.message.channel_id
-        )
+    async def set_starboard(self, ctx: command_client.Context, channel_id: snowflake = None) -> None:
+        target_channel = ctx.fabric.state_registry.get_mandatory_channel_by_id(channel_id or ctx.message.channel_id)
         if not target_channel.is_resolved:
             with util.ReturnErrorStr((errors.NotFoundHTTPError, errors.BadRequestHTTPError)):
                 target_channel = await target_channel
@@ -130,13 +128,12 @@ class StarboardCluster(command_client.CommandCluster):
                     channel.guild_id,
                     target_channel.id,
                 )
-        # TODO: edge case unresolved error
         await ctx.reply(content=f"Set starboard channel to {target_channel.name}.")
 
     @command_client.command
-    async def star(self, ctx: command_client.Context, args: str) -> None:
+    async def star(self, ctx: command_client.Context, message_id: snowflake) -> None:
         target_message = ctx.fabric.state_registry.get_mandatory_message_by_id(
-            message_id=util.get_snowflake(args[0]), channel_id=ctx.message.channel_id,
+            message_id=message_id, channel_id=ctx.message.channel_id,
         )
         if not target_message.is_resolved:
             with util.ReturnErrorStr((errors.NotFoundHTTPError, errors.BadRequestHTTPError)):
@@ -150,15 +147,11 @@ class StarboardCluster(command_client.CommandCluster):
         else:
             await self.consume_star_decrement(target_message, ctx.message.author)
             response = "Removed star from message."
-        # TODO: edge case unresolved error
         await ctx.reply(content=response)
 
     @command_client.command
     @util.return_error_str((asyncpg.exceptions.DataError,))
-    async def star_info(self, ctx: command_client.Context, args: str) -> None:
-        if not args:
-            raise command_client.CommandError("Message ID required.")
-        message_id = util.get_snowflake(args[0])
+    async def star_info(self, ctx: command_client.Context, message_id: snowflake) -> None:
         async with self.client.sql_pool.acquire() as conn:
             starboard_entry = await conn.fetchrow("SELECT * FROM StarboardEntries WHERE message_id = $1;", message_id)
             if starboard_entry is None:
