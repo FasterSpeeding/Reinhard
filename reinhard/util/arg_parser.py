@@ -143,7 +143,7 @@ class CommandParser(AbstractCommandParser):
         self.signature = inspect.signature(func)
         self.parameters = self.signature.parameters.copy()
         for key, value in self.parameters.items():
-            # If a value is a string than it is a future reference and will need to be retrieved.
+            # If a value is a string than it is a future reference and will need to be resolved.
             if isinstance(value.annotation, str):
                 self.parameters[key] = value.replace(
                     annotation=self._try_resolve_forward_reference(func, value.annotation)
