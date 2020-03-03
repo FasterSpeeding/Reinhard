@@ -52,8 +52,8 @@ class BotClient(command_client.ReinhardCommandClient):
 
     async def get_guild_prefix(self, guild_id: int) -> typing.Optional[str]:
         async with self.sql_pool.acquire() as conn:
-            data = await conn.fetchrow(self.sql_scripts.find_guild_prefix, guild_id)
-            return data["prefix"] if data is not None else data
+            if data := await conn.fetchrow(self.sql_scripts.find_guild_prefix, guild_id):
+                return data["prefix"]
 
     def generate_help_embed(self) -> models.embeds.Embed:
         for cluster in (self, *self.clusters.values()):

@@ -21,8 +21,7 @@ def parse_config(
         return config_marshaler({})
 
     file_type = config_path.split(".")[-1].lower()
-    parser = CONFIG_PARSERS.get(file_type)
-    if parser is None:
+    if (parser := CONFIG_PARSERS.get(file_type)) is None:
         raise TypeError(f"Unsupported file type received `{config_path.split('.')[-1]}`")
 
     if config_path is not None:
@@ -31,12 +30,9 @@ def parse_config(
 
 
 def main():
-    config_path = os.getenv("REINHARD_CONFIG_FILE")
-
-    if config_path is None:
+    if (config_path := os.getenv("REINHARD_CONFIG_FILE")) is None:
         for file_type in CONFIG_PARSERS.keys():
-            config_path = f"config.{file_type}"
-            if os.path.exists(config_path):
+            if os.path.exists(config_path := f"config.{file_type}"):
                 break
         else:
             logging.getLogger(__name__).warning("Config file not found, initiating without a config.")

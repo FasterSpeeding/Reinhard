@@ -91,7 +91,7 @@ class AbstractConverter(abc.ABC):
 
 class AbstractCommandParser(abc.ABC):
     @abc.abstractmethod
-    async def parse(self, content: str) -> typing.MutableMapping[str, typing.Any]:
+    async def parse(self, ctx: command_client.Context) -> typing.MutableMapping[str, typing.Any]:
         ...
 
     @abc.abstractmethod
@@ -110,19 +110,25 @@ class AbstractCommandParser(abc.ABC):
         """
 
 
+SNOWFLAKE_REG = re.compile(r"<[(?:@!?)#&](\d+)>")
+# TODO: doesn't support role mentions
+
+
 def get_snowflake(content: str) -> int:
     if content.isdigit():
         sf = content
     else:
-        matches = re.findall(r"<[(?:@!?)#&](\d+)>", content)  # TODO: doesn't support role mentions
-        if not matches:
+        if matches := SNOWFLAKE_REG.findall(content):
+            sf = matches[0]
+        else:
             raise command_client.CommandError("Invalid mention or ID supplied.")
-        sf = matches[0]
     return int(sf)
 
 
 GLOBAL_CONVERTERS = {"int": int, "str": str, "snowflake": get_snowflake, "float": float, "bool": bool}
 # TODO: handle snowflake properly
+
+TYPE_ENCAPSULATION_REG = re.compile(r"(?<=\[).+?(?=\])")
 
 
 class CommandParser(AbstractCommandParser):
@@ -149,12 +155,11 @@ class CommandParser(AbstractCommandParser):
     def _try_resolve_forward_reference(func: aio.CoroutineFunctionT, reference: str) -> typing.Optional[typing.Any]:
         # OWO YIKES but PEP-563 forced me to do it sir.
         # This regex matches any instances where a type may be wrapped by typing (e.g. typing.Optional[str]).
-        if match := re.search(r"(?<=\[).+?(?=\])", reference, re.IGNORECASE):
+        if match := TYPE_ENCAPSULATION_REG.search(reference):
             reference = match.group()
-        # If it's a builtin it shouldn't ever be a path.
-        converter = GLOBAL_CONVERTERS.get(reference)
 
-        if converter is None:
+        # If it's a builtin it shouldn't ever be a path.
+        if (converter := GLOBAL_CONVERTERS.get(reference)) is None:
             # Handle both paths and top level attributes.
             path = iter(reference.split("."))
             converter = func.__globals__.get(next(path))
@@ -173,7 +178,6 @@ class CommandParser(AbstractCommandParser):
             return parameter.annotation(value)
 
     def trim_parameters(self, to_trim: int):
-        print(f"{self.parameters} {to_trim}")
         while to_trim != 0:
             try:
                 self.parameters.popitem(last=False)

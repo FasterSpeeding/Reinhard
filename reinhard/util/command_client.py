@@ -485,7 +485,8 @@ class CommandCluster(AbstractCommandCluster):
     ) -> None:
         super().__init__(**kwargs)
         self.client = command_client
-        self._fabric = command_client._fabric if command_client else None
+        if command_client:
+            self._fabric = command_client._fabric
         self._event_dispatcher = aio.EventDelegate()
         self.logger = loggers.get_named_logger(self)
         self.cluster_commands = []

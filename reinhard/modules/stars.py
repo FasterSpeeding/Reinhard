@@ -72,8 +72,7 @@ class StarboardCluster(command_client.CommandCluster):
 
     async def consume_star_increment(self, message: models.messages.Message, reactor: models.users.BaseUser) -> bool:
         async with self.client.sql_pool.acquire() as conn:
-            starboard_entry = await self.get_starboard_entry(message, conn)
-            if starboard_entry is None:
+            if await self.get_starboard_entry(message, conn) is None:
                 await conn.execute(
                     self.sql_scripts.create_starboard_entry, message.id, message.channel.id, reactor.id, 0
                 )
@@ -109,8 +108,7 @@ class StarboardCluster(command_client.CommandCluster):
             with util.ReturnErrorStr((errors.NotFoundHTTPError, errors.BadRequestHTTPError)):
                 target_channel = await target_channel
 
-        channel = ctx.message.channel
-        if not channel:
+        if not (channel := ctx.message.channel).is_resolved:
             with util.ReturnErrorStr((errors.NotFoundHTTPError,)):
                 channel = await channel
 
@@ -119,8 +117,7 @@ class StarboardCluster(command_client.CommandCluster):
             raise command_client.CommandError("Unknown channel ID supplied.")
 
         async with self.client.sql_pool.acquire() as conn:
-            starboard_channel = await self.get_starboard_channel(target_channel.guild, conn)
-            if starboard_channel is None:
+            if (starboard_channel := await self.get_starboard_channel(target_channel.guild, conn)) is None:
                 await conn.execute(self.sql_scripts.create_starboard_channel, channel.guild_id, target_channel.id)
             elif starboard_channel["channel_id"] != target_channel.id:  # TODO: disable updating the posts on old ones.
                 await conn.execute(
@@ -153,14 +150,13 @@ class StarboardCluster(command_client.CommandCluster):
     @util.return_error_str((asyncpg.exceptions.DataError,))
     async def star_info(self, ctx: command_client.Context, message_id: snowflake) -> None:
         async with self.client.sql_pool.acquire() as conn:
-            starboard_entry = await conn.fetchrow("SELECT * FROM StarboardEntries WHERE message_id = $1;", message_id)
-            if starboard_entry is None:
-                await ctx.reply(content="Starboard entry not found.")
+            if embed := await self.generate_star_embed(ctx.message, conn):
+                await ctx.reply(embed=embed)
             else:
-                await ctx.reply(embed=await self.generate_star_embed(ctx.message, conn))
+                await ctx.reply(content="Starboard entry not found.")
 
     async def generate_star_embed(
         self, message: models.messages.MessageLikeT, conn: asyncpg.connection
     ) -> models.embeds.Embed:
-        star_count = await self.get_star_count(message, conn)
-        return _embeds.Embed()
+        if star_count := await self.get_star_count(message, conn):
+            return _embeds.Embed()
