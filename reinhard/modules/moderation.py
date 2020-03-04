@@ -29,15 +29,16 @@ class ModerationCluster(command_client.CommandCluster):
 
     def permission_check(self, ctx: command_client.Context) -> bool:
         required_perms = ctx.command.meta["perms"]
-        return False  # TODO: this
+        return ctx.message.author.id == 115590097100865541  # TODO: this
 
     @command_client.command(meta={"perms": _permissions.BAN_MEMBERS})
     async def ban(self, ctx: command_client.Context, args: str) -> None:
         ...
 
     @command_client.command(meta={"perms": _permissions.KICK_MEMBERS})
-    async def kick(self, ctx: command_client.Context, args: str) -> None:
-        ...
+    async def kick(self, ctx: command_client.Context, *users: snowflake) -> None:
+        await ctx.reply(content=str(users))
 
+    @command_client.command(meta={"perms": _permissions.MUTE_MEMBERS})
     async def mute(self, ctx: command_client.Context, args: str) -> None:
         ...  # TODO: channel mute vs global and temp vers perm.

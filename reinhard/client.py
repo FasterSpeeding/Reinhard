@@ -17,7 +17,11 @@ from reinhard import sql
 
 class BotClient(command_client.ReinhardCommandClient):
     def __init__(self, options: config.ExtendedOptions, *, modules: typing.List[str] = None) -> None:
-        super().__init__(modules=["reinhard.modules.stars"] if modules is None else modules, options=options)
+        if modules is None:
+            modules = [f"reinhard.modules.{module}" for module in ("stars", "moderation")]
+        super().__init__(
+            modules=modules, options=options,
+        )
         self.logger = loggers.get_named_logger(self)
         self.sql_pool: typing.Optional[asyncpg.pool.Pool] = None
         self.sql_scripts = sql.CachedScripts(pattern=r"[.*schema.sql]|[*prefix.sql]")

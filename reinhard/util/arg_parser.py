@@ -130,6 +130,12 @@ GLOBAL_CONVERTERS = {"int": int, "str": str, "snowflake": get_snowflake, "float"
 
 TYPE_ENCAPSULATION_REG = re.compile(r"(?<=\[).+?(?=\])")
 
+POSITIONAL_TYPES = (
+    inspect.Parameter.VAR_POSITIONAL,
+    inspect.Parameter.POSITIONAL_ONLY,
+    inspect.Parameter.POSITIONAL_OR_KEYWORD,
+)
+
 
 class CommandParser(AbstractCommandParser):
     __slots__ = ("greedy", "signature", "parameters")
@@ -142,12 +148,17 @@ class CommandParser(AbstractCommandParser):
         self.greedy = greedy
         self.signature = inspect.signature(func)
         self.parameters = self.signature.parameters.copy()
+        var_position = False
         for key, value in self.parameters.items():
             # If a value is a string than it is a future reference and will need to be resolved.
             if isinstance(value.annotation, str):
                 self.parameters[key] = value.replace(
+                    # TODO sane default
                     annotation=self._try_resolve_forward_reference(func, value.annotation)
                 )
+            assertions.assert_that(value.kind is not value.VAR_KEYWORD, "**kwargs are not supported by this parser.")
+            assertions.assert_that(not var_position, "Keyword arguments after *args are not supported by this parser.")
+            var_position = value.kind is value.VAR_POSITIONAL
         # Remove the `context` arg for now, `self` should be trimmed during binding.
         self.trim_parameters(1)
 
@@ -165,6 +176,8 @@ class CommandParser(AbstractCommandParser):
             converter = func.__globals__.get(next(path))
             for attr in path:
                 converter = getattr(converter, attr)
+            # TODO: this is for testing purposes and may be removed or replaced with a warning + str default.
+            assertions.assert_that(converter is not None, f"Couldn't find converter for {reference}")
         return converter
 
     @staticmethod
@@ -177,7 +190,7 @@ class CommandParser(AbstractCommandParser):
         else:
             return parameter.annotation(value)
 
-    def trim_parameters(self, to_trim: int):
+    def trim_parameters(self, to_trim: int) -> None:
         while to_trim != 0:
             try:
                 self.parameters.popitem(last=False)
@@ -186,26 +199,41 @@ class CommandParser(AbstractCommandParser):
             else:
                 to_trim -= 1
 
+    @staticmethod
+    def _get_next_argument(arguments: typing.Iterator[str]) -> typing.Optional[str]:
+        try:
+            return next(arguments)
+        except StopIteration:
+            return None
+
     async def parse(
         self, ctx: command_client.Context
     ) -> typing.Tuple[typing.List[typing.Any], typing.MutableMapping[str, typing.Any]]:
         args: typing.List[typing.Any] = []
         kwargs: typing.MutableMapping[str, typing.Any] = {}
         arguments = basic_arg_parsers(ctx.content, ceiling=len(self.parameters) if self.greedy else None)
-        # values_to_skip = 0
         for parameter in self.parameters.values():
+            # Just a typing hack, may be removed in the future.
             parameter: inspect.Parameter
-            try:
-                value = next(arguments)
-            except StopIteration:
-                if parameter.default is parameter.empty:
-                    raise command_client.CommandError(f"Missing required argument `{parameter.name}`")
-                else:
-                    break
-            else:
+            if (
+                not (value := self._get_next_argument(arguments))
+                and parameter.default is parameter.empty
+                # VAR_POSITIONAL parameters should default to an empty tuple anyway.
+                and parameter.kind is not parameter.VAR_POSITIONAL
+            ):
+                raise command_client.CommandError(f"Missing required argument `{parameter.name}`")
+            elif not value:
+                break
+
+            while True:
                 result = await self._convert(ctx.fabric, value, parameter)
-                if parameter.kind is parameter.POSITIONAL_ONLY:
+                if parameter.kind in POSITIONAL_TYPES:
                     args.append(result)
                 else:
                     kwargs[parameter.name] = result
+
+                # If we reach a VAR_POSITIONAL parameter we want to want to
+                # consume the remaining arguments as positional arguments.
+                if parameter.kind is not parameter.VAR_POSITIONAL or not (value := self._get_next_argument(arguments)):
+                    break
         return args, kwargs
