@@ -4,8 +4,9 @@ import typing
 
 import asyncpg
 from hikari.net import errors
+from hikari.orm.models import channels as _channels
 from hikari.orm.models import embeds as _embeds
-
+from hikari.orm.models import messages as _messages
 
 from reinhard.util import command_client
 from reinhard.util import basic as util
@@ -102,38 +103,36 @@ class StarboardCluster(command_client.CommandCluster):
             return False
 
     @command_client.command(trigger="set starboard", aliases=["register starboard"])
-    async def set_starboard(self, ctx: command_client.Context, channel_id: snowflake = None) -> None:
-        target_channel = ctx.fabric.state_registry.get_mandatory_channel_by_id(channel_id or ctx.message.channel_id)
-        if not target_channel.is_resolved:
-            with util.ReturnErrorStr((errors.NotFoundHTTPError, errors.BadRequestHTTPError)):
-                target_channel = await target_channel
+    @util.command_error_relay((errors.NotFoundHTTPError, errors.BadRequestHTTPError, errors.ForbiddenHTTPError))
+    async def set_starboard(
+        self, ctx: command_client.Context, target_channel: typing.Optional[_channels.Channel] = None
+    ) -> None:
+        if not (target_channel := target_channel or ctx.message.channel).is_resolved:
+            target_channel = await target_channel
 
-        if not (channel := ctx.message.channel).is_resolved:
-            with util.ReturnErrorStr((errors.NotFoundHTTPError,)):
+        if target_channel.id != ctx.message.channel.id:  # TODO: probably need the ids right now
+            if not (channel := ctx.message.channel).is_resolved:
                 channel = await channel
 
-        # Should flag both DM channels and channels from other guilds.
-        if getattr(target_channel, "guild_id", None) != channel.guild_id:
-            raise command_client.CommandError("Unknown channel ID supplied.")
+            # Should flag both DM channels and channels from other guilds.
+            if getattr(target_channel, "guild_id", None) != channel.guild_id:
+                raise command_client.CommandError("Unknown channel ID supplied.")
 
         async with self.client.sql_pool.acquire() as conn:
             if (starboard_channel := await self.get_starboard_channel(target_channel.guild, conn)) is None:
-                await conn.execute(self.sql_scripts.create_starboard_channel, channel.guild_id, target_channel.id)
+                await conn.execute(self.sql_scripts.create_starboard_channel, target_channel.guild_id, target_channel.id)
             elif starboard_channel["channel_id"] != target_channel.id:  # TODO: disable updating the posts on old ones.
                 await conn.execute(
                     "UPDATE StarboardChannels SET channel_id = $2 WHERE guild_id = $1;",
-                    channel.guild_id,
+                    target_channel.guild_id,
                     target_channel.id,
                 )
         await ctx.reply(content=f"Set starboard channel to {target_channel.name}.")
 
     @command_client.command
-    async def star(self, ctx: command_client.Context, message_id: snowflake) -> None:
-        target_message = ctx.fabric.state_registry.get_mandatory_message_by_id(
-            message_id=message_id, channel_id=ctx.message.channel_id,
-        )
+    async def star(self, ctx: command_client.Context, target_message: _messages.Message) -> None:
         if not target_message.is_resolved:
-            with util.ReturnErrorStr((errors.NotFoundHTTPError, errors.BadRequestHTTPError)):
+            with util.CommandErrorRelay((errors.NotFoundHTTPError, errors.BadRequestHTTPError)):
                 target_message = await target_message
 
         if target_message.author.id == ctx.message.author.id:  # TODO: hikari bug?
@@ -147,10 +146,12 @@ class StarboardCluster(command_client.CommandCluster):
         await ctx.reply(content=response)
 
     @command_client.command
-    @util.return_error_str((asyncpg.exceptions.DataError,))
-    async def star_info(self, ctx: command_client.Context, message_id: snowflake) -> None:
+    @util.command_error_relay((asyncpg.exceptions.DataError,))
+    async def star_info(
+        self, ctx: command_client.Context, target_message: typing.Optional[_messages.Message] = None
+    ) -> None:
         async with self.client.sql_pool.acquire() as conn:
-            if embed := await self.generate_star_embed(ctx.message, conn):
+            if embed := await self.generate_star_embed(target_message or ctx.message, conn):
                 await ctx.reply(embed=embed)
             else:
                 await ctx.reply(content="Starboard entry not found.")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import contextlib
 import inspect
 import re
 import typing
@@ -8,6 +9,13 @@ import typing
 
 from hikari.internal_utilities import assertions
 from hikari.internal_utilities import containers
+from hikari.orm.models import bases
+from hikari.orm.models import channels
+from hikari.orm.models import members
+from hikari.orm.models import messages
+from hikari.orm.models import users
+
+#'from hikari.orm.models
 
 
 from reinhard.util import command_client
@@ -62,25 +70,35 @@ def basic_arg_parsers(content: str, ceiling: typing.Optional[int]) -> typing.Ite
 
 class AbstractConverter(abc.ABC):
     _converter_implementations: typing.List[typing.Tuple[type(AbstractConverter), typing.Tuple[typing.Type]]] = []
+    inheritable: bool
 
     def __init_subclass__(cls, **kwargs):
         types = kwargs.pop("types", containers.EMPTY_SEQUENCE)
+        inheritable = kwargs.pop("inheritable", False)
         super().__init_subclass__(**kwargs)
         for base_type in types:
             assertions.assert_that(
                 not cls.get_converter_from_type(base_type), f"Type {base_type} already registered.",
             )
-        cls._converter_implementations.append((cls, tuple(types)))
+        cls.inheritable = inheritable
+        cls._converter_implementations.append((cls(), tuple(types)))
 
     @abc.abstractmethod
-    async def convert(self, fabric_obj: fabric.Fabric, argument: str) -> typing.Any:
+    async def convert(self, ctx: command_client.Context, argument: str) -> typing.Any:
         ...
 
     @classmethod
     def get_converter_from_type(cls, argument_type: typing.Type) -> typing.Optional[AbstractConverter]:
         for converter in cls._converter_implementations:
-            if argument_type in converter[1]:
-                return converter[0]
+            if not converter[0].inheritable and argument_type not in converter[1]:
+                continue
+            elif (
+                converter[0].inheritable
+                and inspect.isclass(argument_type)
+                and not issubclass(argument_type, converter[1])
+            ):
+                continue
+            return converter[0]
 
     @classmethod
     def get_converter_from_name(cls, name: str) -> typing.Optional[AbstractConverter]:
@@ -92,8 +110,52 @@ class AbstractConverter(abc.ABC):
 class BaseIDConverter(AbstractConverter, abc.ABC):
     _id_regex: re.Pattern
 
+    def _match_id(self, value) -> typing.Optional[int]:
+        if result := self._id_regex.findall(value):
+            return result[0]
+
+
+class ChannelConverter(BaseIDConverter, types=(channels.Channel,), inheritable=True):
     def __init__(self):
-        self._id_regex = re.compile(r"/<@!?(\d+)>/")
+        self._id_regex = re.compile(r"<#(\d+)>")
+
+    def convert(self, ctx: command_client.Context, argument: str) -> channels.Channel:
+        if match := self._match_id(argument):
+            return ctx.fabric.state_registry.get_mandatory_channel_by_id(match)
+
+
+class SnowflakeConverter(BaseIDConverter, types=(bases.SnowflakeMixin,)):
+    def __init__(self) -> None:
+        self._id_regex = re.compile(r"<[(?:@!?)#&](\d+)>")
+
+    def convert(self, ctx: command_client.Context, argument: str) -> int:
+        if match := self._match_id(argument):
+            return int(match)
+        raise command_client.CommandError("Invalid mention or ID supplied.")
+
+
+class UserConverter(BaseIDConverter, types=(users.User,)):
+    def __init__(self) -> None:
+        self._id_regex = re.compile(r"<@!?(\d+)>")
+
+    def convert(self, ctx: command_client.Context, argument: str) -> users.BaseUser:
+        if match := self._match_id(argument):
+            return ctx.fabric.state_registry.get_mandatory_user_by_id(match)
+
+
+class MemberConverter(UserConverter, types=(members.Member,)):
+    def convert(self, ctx: command_client.Context, argument: str) -> members.Member:
+        if not ctx.message.guild:
+            raise command_client.CommandError("Cannot get a member from a DM channel.")  # TODO: better error
+
+        if match := self._match_id(argument):
+            return ctx.fabric.state_registry.get_mandatory_member_by_id(match, ctx.message.guild_id)
+
+
+class MessageConverter(SnowflakeConverter, types=(messages.Message,)):
+    def convert(self, ctx: command_client.Context, argument: str) -> messages.Message:
+        message_id = super().convert(ctx, argument)
+        return ctx.fabric.state_registry.get_mandatory_message_by_id(message_id, ctx.message.channel_id)
 
 
 class AbstractCommandParser(abc.ABC):
@@ -117,26 +179,11 @@ class AbstractCommandParser(abc.ABC):
         """
 
 
-SNOWFLAKE_REG = re.compile(r"<[(?:@!?)#&](\d+)>")
-# TODO: doesn't support role mentions
-
-
-def get_snowflake(content: str) -> int:
-    if content.isdigit():
-        sf = content
-    else:
-        if matches := SNOWFLAKE_REG.findall(content):
-            sf = matches[0]
-        else:
-            raise command_client.CommandError("Invalid mention or ID supplied.")
-    return int(sf)
-
-
-GLOBAL_CONVERTERS = {"int": int, "str": str, "snowflake": get_snowflake, "float": float, "bool": bool}
+GLOBAL_CONVERTERS = {"int": int, "str": str, "float": float, "bool": bool}
 # TODO: handle snowflake properly
 
-TYPING_WRAPPED_REG = re.compile(r"(?<=\[).+?(?=\])")
-TYPING_WRAPPER_REG = re.compile(r"(?<=typing\.).+?(?=\[)")
+TYPING_WRAPPER_REG = re.compile(r".+?\[.+?(?=\])")
+SUPPORTED_TYPING_WRAPPERS = (typing.Union,)
 
 POSITIONAL_TYPES = (
     inspect.Parameter.VAR_POSITIONAL,
@@ -161,8 +208,12 @@ class CommandParser(AbstractCommandParser):
             # If a value is a string than it is a future reference and will need to be resolved.
             if isinstance(value.annotation, str):
                 self.parameters[key] = value.replace(
-                    # TODO sane default
-                    annotation=self._try_resolve_forward_reference(func, value.annotation)
+                    # TODO: sane default
+                    annotation=self._try_resolve_typable_forward_reference(func, value.annotation)
+                )
+            if origin := getattr(self.parameters[key].annotation, "__origin__", None):
+                assertions.assert_that(
+                    origin in SUPPORTED_TYPING_WRAPPERS, f"Typing wrapper `{origin}` is not supported by this parser."
                 )
             assertions.assert_that(value.kind is not value.VAR_KEYWORD, "**kwargs are not supported by this parser.")
             assertions.assert_that(not var_position, "Keyword arguments after *args are not supported by this parser.")
@@ -171,48 +222,55 @@ class CommandParser(AbstractCommandParser):
         self.trim_parameters(1)
 
     @staticmethod
-    def _idk_what_to_call_this(func: aio.CoroutineFunctionT, reference: str) -> typing.Optional[typing.Any]:
+    def _try_resolve_forward_reference(func: aio.CoroutineFunctionT, reference: str) -> typing.Optional[typing.Any]:
         # If it's a builtin it shouldn't ever be a path.
         if (converter := GLOBAL_CONVERTERS.get(reference)) is None:
             # Handle both paths and top level attributes.
             path = iter(reference.split("."))
             converter = func.__globals__.get(next(path))
             # TODO: this is for testing purposes and may be removed or replaced with a warning + str/sane default.
-            assertions.assert_that(converter is not None, f"Couldn't find converter for {reference}")
+            assertions.assert_that(converter is not None, f"Couldn't resolve reference `{reference}`.")
             for attr in path:
                 converter = getattr(converter, attr)
         return converter
 
-    def _try_resolve_forward_reference(self, func: aio.CoroutineFunctionT, reference: str) -> typing.Optional[typing.Any]:
+    def _try_resolve_typable_forward_reference(
+        self, func: aio.CoroutineFunctionT, reference: str
+    ) -> typing.Optional[typing.Any]:
         # OWO YIKES but PEP-563 forced me to do it sir.
         # This regex matches any instances where a type may be wrapped by typing (e.g. typing.Optional[str]).
-        if (match := TYPING_WRAPPED_REG.search(reference)) and (wrapper := TYPING_WRAPPER_REG.search(reference)):
-            match = match.group()
-            wrapper = wrapper.group()
-            if wrapper == "Union":
-                types = match.split(", ")
-            elif wrapper == "Optional":
-                wrapper = "Union"
-                types = [match, None]
-            else:
-                raise NotImplementedError(f"typing.{wrapper} isn't a support typing wrapper.")
-
-            types = [self._idk_what_to_call_this(func, arg) for arg in types if arg is not None]
-            # TODO: handle None properly
-            return getattr(typing, wrapper)[types]
-            # TODO: it'd probably be sane to handle typing here
-        return self._idk_what_to_call_this(func, reference)
+        if match := TYPING_WRAPPER_REG.search(reference):
+            wrapper, types = match.group().split("[")
+            wrapper = self._try_resolve_forward_reference(func, wrapper)
+            types = tuple(self._try_resolve_forward_reference(func, arg) for arg in types.split(", "))
+            if wrapper is typing.Optional:
+                types = types[0]
+            return wrapper[types]
+        return self._try_resolve_forward_reference(func, reference)
 
     @staticmethod
-    async def _convert(fabric_obj: fabric.Fabric, value: str, parameter: inspect.Parameter) -> typing.Any:
+    async def _convert_value(ctx: command_client.Context, value: str, annotation) -> typing.Any:
+        if converter := AbstractConverter.get_converter_from_type(annotation):
+            return await converter.convert(ctx, value)
+        try:
+            return annotation(value)
+        except ValueError as e:
+            raise command_client.CommandError(f"Invalid value provided: {e}")
+
+    async def _convert(self, ctx: command_client.Context, value: str, parameter: inspect.Parameter) -> typing.Any:
         if parameter.annotation is parameter.empty:
             return value
-        # TODO: handle typing.Union
-        # typing.Union has both .__orign__ and .__args__
-        if converter := AbstractConverter.get_converter_from_type(parameter.annotation):
-            return await converter.convert(fabric_obj, value)
-        else:
-            return parameter.annotation(value)
+
+        if getattr(parameter.annotation, "__origin__", None) is typing.Union:
+            for potential_type in parameter.annotation.__args__:
+                if potential_type is None:
+                    continue
+
+                with contextlib.suppress(command_client.CommandError):
+                    return await self._convert_value(ctx, value, potential_type)
+                # TODO: sane default?
+            raise command_client.CommandError(f"Invalid value for argument `{parameter.name}`.")
+        return await self._convert_value(ctx, value, parameter.annotation)
 
     def trim_parameters(self, to_trim: int) -> None:
         while to_trim != 0:
@@ -250,7 +308,7 @@ class CommandParser(AbstractCommandParser):
                 break
 
             while True:
-                result = await self._convert(ctx.fabric, value, parameter)
+                result = await self._convert(ctx, value, parameter)
                 if parameter.kind in POSITIONAL_TYPES:
                     args.append(result)
                 else:

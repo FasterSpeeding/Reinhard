@@ -1,19 +1,13 @@
 from __future__ import annotations
 import typing
 
-
-from hikari.net import errors
-from hikari.orm.models import embeds as _embeds
+from hikari.orm.models import members as _members
 from hikari.orm.models import permissions as _permissions
+from hikari.orm.models import users as _users
 
 
 from reinhard.util import command_client
-from reinhard.util import basic as util
 from reinhard import sql
-
-
-if typing.TYPE_CHECKING:
-    from hikari.orm import models
 
 
 exports = ["ModerationCluster"]
@@ -32,13 +26,13 @@ class ModerationCluster(command_client.CommandCluster):
         return ctx.message.author.id == 115590097100865541  # TODO: this
 
     @command_client.command(meta={"perms": _permissions.BAN_MEMBERS})
-    async def ban(self, ctx: command_client.Context, args: str) -> None:
-        ...
+    async def ban(self, ctx: command_client.Context, *members: typing.Union[_members.Member, _users.User]) -> None:
+        await ctx.reply(content=str(members))
 
     @command_client.command(meta={"perms": _permissions.KICK_MEMBERS})
-    async def kick(self, ctx: command_client.Context, *users: snowflake) -> None:
+    async def kick(self, ctx: command_client.Context, *users: _members.Member) -> None:
         await ctx.reply(content=str(users))
 
     @command_client.command(meta={"perms": _permissions.MUTE_MEMBERS})
-    async def mute(self, ctx: command_client.Context, args: str) -> None:
+    async def mute(self, ctx: command_client.Context, *members: _members.Member) -> None:
         ...  # TODO: channel mute vs global and temp vers perm.

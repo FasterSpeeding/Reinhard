@@ -822,7 +822,8 @@ class ReinhardCommandClient(CommandClient):
                     self.logger.warning(
                         "Invalid export `%s` found in `%s.exports`", item.__class__.__name__, module_path
                     )
-            else:
+
+            if not exports:
                 self.logger.warning("No exports found in %s", module_path)
 
 

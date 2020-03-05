@@ -10,7 +10,7 @@ from hikari.internal_utilities import aio
 from hikari.internal_utilities import containers
 
 
-class ReturnErrorStr:
+class CommandErrorRelay:
     __slots__ = ("errors", "error_responses", "final_error")
 
     def __init__(
@@ -34,7 +34,7 @@ class ReturnErrorStr:
             )  # f"{exc_type.__name__}: {exc_val}"
 
 
-def return_error_str(
+def command_error_relay(
     errors: typing.Union[BaseException, typing.Tuple[BaseException]],
     errors_responses: typing.Optional[typing.MutableMapping[BaseException, str]] = None,
 ):
