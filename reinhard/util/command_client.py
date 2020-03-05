@@ -150,7 +150,7 @@ class Context:
     ) -> messages.Message:
         """Used to handle response length and permission checks for command responses."""
         if content is not unspecified.UNSPECIFIED and len(content) > 2000:
-            files = files or containers.EMPTY_SEQUENCE
+            files = files or []
             files.append(media.InMemoryFile("message.txt", bytes(content, "utf-8")))
             content = "This response is too large to send, see attached file."
         elif content is not unspecified.UNSPECIFIED and sanitize:

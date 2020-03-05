@@ -89,6 +89,13 @@ class AbstractConverter(abc.ABC):
                 return converter[0]
 
 
+class BaseIDConverter(AbstractConverter, abc.ABC):
+    _id_regex: re.Pattern
+
+    def __init__(self):
+        self._id_regex = re.compile(r"/<@!?(\d+)>/")
+
+
 class AbstractCommandParser(abc.ABC):
     @abc.abstractmethod
     async def parse(self, ctx: command_client.Context) -> typing.MutableMapping[str, typing.Any]:
@@ -128,7 +135,8 @@ def get_snowflake(content: str) -> int:
 GLOBAL_CONVERTERS = {"int": int, "str": str, "snowflake": get_snowflake, "float": float, "bool": bool}
 # TODO: handle snowflake properly
 
-TYPE_ENCAPSULATION_REG = re.compile(r"(?<=\[).+?(?=\])")
+TYPING_WRAPPED_REG = re.compile(r"(?<=\[).+?(?=\])")
+TYPING_WRAPPER_REG = re.compile(r"(?<=typing\.).+?(?=\[)")
 
 POSITIONAL_TYPES = (
     inspect.Parameter.VAR_POSITIONAL,
@@ -163,28 +171,44 @@ class CommandParser(AbstractCommandParser):
         self.trim_parameters(1)
 
     @staticmethod
-    def _try_resolve_forward_reference(func: aio.CoroutineFunctionT, reference: str) -> typing.Optional[typing.Any]:
-        # OWO YIKES but PEP-563 forced me to do it sir.
-        # This regex matches any instances where a type may be wrapped by typing (e.g. typing.Optional[str]).
-        if match := TYPE_ENCAPSULATION_REG.search(reference):
-            reference = match.group()
-
+    def _idk_what_to_call_this(func: aio.CoroutineFunctionT, reference: str) -> typing.Optional[typing.Any]:
         # If it's a builtin it shouldn't ever be a path.
         if (converter := GLOBAL_CONVERTERS.get(reference)) is None:
             # Handle both paths and top level attributes.
             path = iter(reference.split("."))
             converter = func.__globals__.get(next(path))
+            # TODO: this is for testing purposes and may be removed or replaced with a warning + str/sane default.
+            assertions.assert_that(converter is not None, f"Couldn't find converter for {reference}")
             for attr in path:
                 converter = getattr(converter, attr)
-            # TODO: this is for testing purposes and may be removed or replaced with a warning + str default.
-            assertions.assert_that(converter is not None, f"Couldn't find converter for {reference}")
         return converter
+
+    def _try_resolve_forward_reference(self, func: aio.CoroutineFunctionT, reference: str) -> typing.Optional[typing.Any]:
+        # OWO YIKES but PEP-563 forced me to do it sir.
+        # This regex matches any instances where a type may be wrapped by typing (e.g. typing.Optional[str]).
+        if (match := TYPING_WRAPPED_REG.search(reference)) and (wrapper := TYPING_WRAPPER_REG.search(reference)):
+            match = match.group()
+            wrapper = wrapper.group()
+            if wrapper == "Union":
+                types = match.split(", ")
+            elif wrapper == "Optional":
+                wrapper = "Union"
+                types = [match, None]
+            else:
+                raise NotImplementedError(f"typing.{wrapper} isn't a support typing wrapper.")
+
+            types = [self._idk_what_to_call_this(func, arg) for arg in types if arg is not None]
+            # TODO: handle None properly
+            return getattr(typing, wrapper)[types]
+            # TODO: it'd probably be sane to handle typing here
+        return self._idk_what_to_call_this(func, reference)
 
     @staticmethod
     async def _convert(fabric_obj: fabric.Fabric, value: str, parameter: inspect.Parameter) -> typing.Any:
         if parameter.annotation is parameter.empty:
             return value
-        # TODO: typing.Optional?
+        # TODO: handle typing.Union
+        # typing.Union has both .__orign__ and .__args__
         if converter := AbstractConverter.get_converter_from_type(parameter.annotation):
             return await converter.convert(fabric_obj, value)
         else:
