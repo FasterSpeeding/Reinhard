@@ -148,10 +148,11 @@ class StarboardCluster(command_client.CommandCluster):
     @command_client.command
     @util.command_error_relay((asyncpg.exceptions.DataError,))
     async def star_info(
-        self, ctx: command_client.Context, target_message: typing.Optional[_messages.Message] = None
+        self, ctx: command_client.Context, target_message: _messages.Message
     ) -> None:
+        # TODO: guild check.
         async with self.client.sql_pool.acquire() as conn:
-            if embed := await self.generate_star_embed(target_message or ctx.message, conn):
+            if embed := await self.generate_star_embed(target_message, conn):
                 await ctx.reply(embed=embed)
             else:
                 await ctx.reply(content="Starboard entry not found.")

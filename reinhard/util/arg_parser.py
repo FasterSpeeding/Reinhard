@@ -182,7 +182,6 @@ class AbstractCommandParser(abc.ABC):
 GLOBAL_CONVERTERS = {"int": int, "str": str, "float": float, "bool": bool}
 # TODO: handle snowflake properly
 
-TYPING_WRAPPER_REG = re.compile(r".+?\[.+?(?=\])")
 SUPPORTED_TYPING_WRAPPERS = (typing.Union,)
 
 POSITIONAL_TYPES = (
@@ -204,14 +203,16 @@ class CommandParser(AbstractCommandParser):
         self.signature = inspect.signature(func)
         self.parameters = self.signature.parameters.copy()
         var_position = False
+        resolved_type_hints = None
         for key, value in self.parameters.items():
             # If a value is a string than it is a future reference and will need to be resolved.
             if isinstance(value.annotation, str):
+                if not resolved_type_hints:
+                    resolved_type_hints = typing.get_type_hints(func)
                 self.parameters[key] = value.replace(
-                    # TODO: sane default
-                    annotation=self._try_resolve_typable_forward_reference(func, value.annotation)
+                    annotation=resolved_type_hints[value.name]
                 )
-            if origin := getattr(self.parameters[key].annotation, "__origin__", None):
+            if origin := typing.get_origin(self.parameters[key].annotation):
                 assertions.assert_that(
                     origin in SUPPORTED_TYPING_WRAPPERS, f"Typing wrapper `{origin}` is not supported by this parser."
                 )
@@ -220,33 +221,6 @@ class CommandParser(AbstractCommandParser):
             var_position = value.kind is value.VAR_POSITIONAL
         # Remove the `context` arg for now, `self` should be trimmed during binding.
         self.trim_parameters(1)
-
-    @staticmethod
-    def _try_resolve_forward_reference(func: aio.CoroutineFunctionT, reference: str) -> typing.Optional[typing.Any]:
-        # If it's a builtin it shouldn't ever be a path.
-        if (converter := GLOBAL_CONVERTERS.get(reference)) is None:
-            # Handle both paths and top level attributes.
-            path = iter(reference.split("."))
-            converter = func.__globals__.get(next(path))
-            # TODO: this is for testing purposes and may be removed or replaced with a warning + str/sane default.
-            assertions.assert_that(converter is not None, f"Couldn't resolve reference `{reference}`.")
-            for attr in path:
-                converter = getattr(converter, attr)
-        return converter
-
-    def _try_resolve_typable_forward_reference(
-        self, func: aio.CoroutineFunctionT, reference: str
-    ) -> typing.Optional[typing.Any]:
-        # OWO YIKES but PEP-563 forced me to do it sir.
-        # This regex matches any instances where a type may be wrapped by typing (e.g. typing.Optional[str]).
-        if match := TYPING_WRAPPER_REG.search(reference):
-            wrapper, types = match.group().split("[")
-            wrapper = self._try_resolve_forward_reference(func, wrapper)
-            types = tuple(self._try_resolve_forward_reference(func, arg) for arg in types.split(", "))
-            if wrapper is typing.Optional:
-                types = types[0]
-            return wrapper[types]
-        return self._try_resolve_forward_reference(func, reference)
 
     @staticmethod
     async def _convert_value(ctx: command_client.Context, value: str, annotation) -> typing.Any:
