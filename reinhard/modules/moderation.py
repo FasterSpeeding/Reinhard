@@ -22,7 +22,7 @@ class ModerationCluster(command_client.CommandCluster):
         for command in self.cluster_commands:
             command.register_check(self.permission_check)
 
-    def role_position_check(self, author: _members.Member, target_member: _members.Member) -> None:
+    async def role_position_check(self, author: _members.Member, target_member: _members.Member) -> None:
         if not (own_member := self._fabric.state_registry.get_mandatory_member_by_id(self._fabric.state_registry.me.id, target_member.guild.id)).is_resolved:
             own_member = await own_member
         if target_member.roles[0].position >= own_member.roles[0].position:
@@ -37,7 +37,7 @@ class ModerationCluster(command_client.CommandCluster):
     @staticmethod
     async def permission_check(ctx: command_client.Context) -> bool:
         required_perms = ctx.command.meta.get("perms", 0)
-        current_perms = await util.get_permissions(ctx)
+        current_perms = await ctx.fetch_permissions()
 
         return (current_perms & _permissions.Permission.ADMINISTRATOR == _permissions.Permission.ADMINISTRATOR) or (
             current_perms & required_perms

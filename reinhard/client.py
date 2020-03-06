@@ -37,7 +37,7 @@ class BotClient(command_client.ReinhardCommandClient):
         raise Exception("This is an exception, get used to it.")
 
     async def on_error(self, ctx: command_client.Context, e: BaseException) -> None:
-        with contextlib.suppress(command_client.PermissionError):
+        with contextlib.suppress(command_client.HikariPermissionError):
             await ctx.reply(
                 embed=models.embeds.Embed(
                     title=f"An unexpected {type(e).__name__} occurred",

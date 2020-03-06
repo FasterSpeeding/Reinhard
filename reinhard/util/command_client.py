@@ -40,8 +40,10 @@ from reinhard.util import arg_parser
 if typing.TYPE_CHECKING:
     from hikari.internal_utilities import type_hints
     from hikari.orm.http import base_http_adapter
+    from hikari.orm.models import channels
     from hikari.orm.models import embeds
     from hikari.orm.models import guilds
+    from hikari.orm.models import members
     from hikari.orm.models import messages
     from hikari.orm.state import base_registry
     from hikari.orm import fabric
@@ -71,7 +73,22 @@ class TriggerTypes(enum.Enum):
     MENTION = enum.auto()  # TODO: trigger commands with a mention
 
 
-class PermissionError(errors.HikariError):  # TODO: don't shadow
+def get_permissions(guild: guilds.Guild, channel: channels.GuildChannel, member: members.Member) -> permissions.Permission:
+    if channel.guild_id and member.id != guild.owner_id:
+        permission_value = guild.roles[guild.id].permissions
+
+        for role in member.roles:
+            permission_value += role.permissions
+
+        if overwrite := channel.permission_overwrites[member.id]:
+            permission_value += overwrite.allow
+            permission_value -= overwrite.deny
+    else:
+        permission_value = permissions.Permission.ADMINISTRATOR
+    return permission_value
+
+
+class HikariPermissionError(errors.HikariError):  # TODO: better name
     __slots__ = ("missing_permissions",)
 
     missing_permissions: permissions.Permission
@@ -127,6 +144,19 @@ class Context:
         self.trigger = trigger
         self.trigger_type = trigger_type
 
+    async def fetch_permissions(self, member: typing.Optional[members.MemberLikeT] = None) -> permissions.Permission:
+        if not (channel := self.message.channel):
+            channel = await self.fabric.http_adapter.fetch_channel(self.message.channel_id)
+        if not (guild := channel.guild):
+            guild = await self.fabric.http_adapter.fetch_guild(self.message.guild)
+
+        member = member or self.message.author
+        if not isinstance(member, members.Member):
+            member = guild.members.get(int(member)) or await self.fabric.http_adapter.fetch_member(
+                member, guild
+            )
+        return get_permissions(guild, channel, member)
+
     @property
     def http(self) -> base_http_adapter.BaseHTTPAdapter:
         return self.fabric.http_adapter
@@ -148,7 +178,7 @@ class Context:
         soft_send: bool = False,  # TODO: what was this?
         sanitize: bool = False,
     ) -> messages.Message:
-        """Used to handle response length and permission checks for command responses."""
+        """Used to handle response length and permission checks for command responses."""        
         if content is not unspecified.UNSPECIFIED and len(content) > 2000:
             files = files or []
             files.append(media.InMemoryFile("message.txt", bytes(content, "utf-8")))
@@ -156,9 +186,10 @@ class Context:
         elif content is not unspecified.UNSPECIFIED and sanitize:
             content = sanitize_content(content)
 
-        # TODO: this needs to be easier to do on hikari's level.
-        # if not files and not SEND_MESSAGE_PERMISSIONS or files and ATTACH_FILE_PERMISSIONS:
-        #     raise PermissionError(ATTACH_FILE_PERMISSIONS if files else SEND_MESSAGE_PERMISSIONS)
+        current_permissions = await self.fetch_permissions()
+        required_permissions = ATTACH_FILE_PERMISSIONS if files else SEND_MESSAGE_PERMISSIONS
+        if (required_permissions & current_permissions) != current_permissions:
+            raise HikariPermissionError(required_permissions, current_permissions)
 
         return await self.fabric.http_adapter.create_message(
             self.message.channel_id, content=content, tts=tts, embed=embed, files=files
@@ -359,7 +390,7 @@ class Command(AbstractCommand):
             args, kwargs = await self.parser.parse(ctx)
             await self._func(ctx, *args, **kwargs)
         except CommandError as exc:
-            with contextlib.suppress(PermissionError):
+            with contextlib.suppress(HikariPermissionError):
                 await ctx.reply(content=str(exc))
         except Exception as exc:
             if self._cluster:
@@ -529,12 +560,7 @@ class CommandCluster(AbstractCommandCluster):
             f"Cannot bind commands in cluster '{self.__class__.__name__}' when commands have already been binded.",
         )
         for name, command_obj in inspect.getmembers(self, predicate=lambda attr: isinstance(attr, AbstractCommand)):
-            command_obj.bind_cluster(self)
-            for trigger in command_obj.triggers:
-                if list(self.get_command_from_name(trigger)):
-                    self.logger.warning(
-                        "Possible overlapping trigger '%s' found in %s cluster.", trigger, self.__class__.__name__,
-                    )
+            self.register_command(command_obj, bind=True)
             self.logger.debug(
                 "Binded command %s in %s cluster.", command_obj.name, self.__class__.__name__,
             )

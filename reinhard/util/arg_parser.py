@@ -201,21 +201,7 @@ class CommandParser(AbstractCommandParser):
         self.greedy = greedy
         self.signature = inspect.signature(func)
         self.parameters = self.signature.parameters.copy()
-        var_position = False
-        resolved_type_hints = None
-        for key, value in self.parameters.items():
-            # If a value is a string than it is a future reference and will need to be resolved.
-            if isinstance(value.annotation, str):
-                if not resolved_type_hints:
-                    resolved_type_hints = typing.get_type_hints(func)
-                self.parameters[key] = value.replace(annotation=resolved_type_hints[value.name])
-            if origin := typing.get_origin(self.parameters[key].annotation):
-                assertions.assert_that(
-                    origin in SUPPORTED_TYPING_WRAPPERS, f"Typing wrapper `{origin}` is not supported by this parser."
-                )
-            assertions.assert_that(value.kind is not value.VAR_KEYWORD, "**kwargs are not supported by this parser.")
-            assertions.assert_that(not var_position, "Keyword arguments after *args are not supported by this parser.")
-            var_position = value.kind is value.VAR_POSITIONAL
+        self._resolve_and_validate_parameters(func)
         # Remove the `context` arg for now, `self` should be trimmed during binding.
         self.trim_parameters(1)
 
@@ -225,14 +211,14 @@ class CommandParser(AbstractCommandParser):
             return await converter.convert(ctx, value)
         try:
             return annotation(value)
-        except ValueError as e:
+        except (TypeError, ValueError) as e:
             raise command_client.CommandError(f"Invalid value provided: {e}")
 
     async def _convert(self, ctx: command_client.Context, value: str, parameter: inspect.Parameter) -> typing.Any:
         if parameter.annotation is parameter.empty:
             return value
 
-        if getattr(parameter.annotation, "__origin__", None) is typing.Union:
+        if typing.get_origin(parameter.annotation) is typing.Union:
             for potential_type in parameter.annotation.__args__:
                 if potential_type is None:
                     continue
@@ -242,6 +228,31 @@ class CommandParser(AbstractCommandParser):
                 # TODO: sane default?
             raise command_client.CommandError(f"Invalid value for argument `{parameter.name}`.")
         return await self._convert_value(ctx, value, parameter.annotation)
+
+    def _resolve_and_validate_parameters(self, func: aio.CoroutineFunctionT) -> None:
+        var_position = False
+        resolved_type_hints = None
+        for key, value in self.parameters.items():
+            # If a value is a string than it is a future reference and will need to be resolved.
+            if isinstance(value.annotation, str):
+                if not resolved_type_hints:
+                    # TODO: typing.get_type_hints isn't following wrapped scopes.
+                    globals = getattr(func, "__wrapped__", None)
+                    while hasattr(globals, "__wrapped__"):
+                        globals = globals.__wrapped__
+                    if globals:
+                        globals = globals.__globals__
+                    else:
+                        globals = func.__globals__
+                    resolved_type_hints = typing.get_type_hints(func, globals)
+                self.parameters[key] = value.replace(annotation=resolved_type_hints[value.name])
+            if origin := typing.get_origin(self.parameters[key].annotation):
+                assertions.assert_that(
+                    origin in SUPPORTED_TYPING_WRAPPERS, f"Typing wrapper `{origin}` is not supported by this parser."
+                )
+            assertions.assert_that(value.kind is not value.VAR_KEYWORD, "**kwargs are not supported by this parser.")
+            assertions.assert_that(not var_position, "Keyword arguments after *args are not supported by this parser.")
+            var_position = value.kind is value.VAR_POSITIONAL
 
     def trim_parameters(self, to_trim: int) -> None:
         while to_trim != 0:
