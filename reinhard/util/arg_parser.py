@@ -180,7 +180,6 @@ class AbstractCommandParser(abc.ABC):
 
 
 GLOBAL_CONVERTERS = {"int": int, "str": str, "float": float, "bool": bool}
-# TODO: handle snowflake properly
 
 SUPPORTED_TYPING_WRAPPERS = (typing.Union,)
 
@@ -209,9 +208,7 @@ class CommandParser(AbstractCommandParser):
             if isinstance(value.annotation, str):
                 if not resolved_type_hints:
                     resolved_type_hints = typing.get_type_hints(func)
-                self.parameters[key] = value.replace(
-                    annotation=resolved_type_hints[value.name]
-                )
+                self.parameters[key] = value.replace(annotation=resolved_type_hints[value.name])
             if origin := typing.get_origin(self.parameters[key].annotation):
                 assertions.assert_that(
                     origin in SUPPORTED_TYPING_WRAPPERS, f"Typing wrapper `{origin}` is not supported by this parser."

@@ -275,6 +275,8 @@ class Command(AbstractCommand):
 
     _func: aio.CoroutineFunctionT
 
+    logger: logging.Logger
+
     parser: arg_parser.AbstractCommandParser
 
     def __init__(
@@ -288,6 +290,7 @@ class Command(AbstractCommand):
         cluster: typing.Optional[AbstractCommandCluster] = None,
         greedy: bool = False,
     ) -> None:
+        self.logger = loggers.get_named_logger(self)
         self._checks = [self.check_prefix_from_context]
         self._func = func
         self.level = level
@@ -331,7 +334,8 @@ class Command(AbstractCommand):
                     result = await check(ctx)
                 else:
                     result = check(ctx)
-            except Exception:
+            except Exception as exc:
+                self.logger.warning("Command check `%s` raised exception in `%s` command: %s", check, self.name, exc)
                 result = False
             else:
                 if not result:
@@ -529,7 +533,7 @@ class CommandCluster(AbstractCommandCluster):
             for trigger in command_obj.triggers:
                 if list(self.get_command_from_name(trigger)):
                     self.logger.warning(
-                        f"Possible overlapping trigger '%s' found in %s cluster.", trigger, self.__class__.__name__,
+                        "Possible overlapping trigger '%s' found in %s cluster.", trigger, self.__class__.__name__,
                     )
             self.logger.debug(
                 "Binded command %s in %s cluster.", command_obj.name, self.__class__.__name__,
@@ -580,7 +584,7 @@ class CommandCluster(AbstractCommandCluster):
         for trigger in command_obj.triggers:
             if list(self.get_command_from_name(trigger)):
                 self.logger.warning(
-                    f"Possible overlapping trigger '%s' found in %s cluster.", trigger, self.__class__.__name__,
+                    "Possible overlapping trigger '%s' found in %s cluster.", trigger, self.__class__.__name__,
                 )
         self.cluster_commands.append(command_obj)
 

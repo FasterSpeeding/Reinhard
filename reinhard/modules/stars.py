@@ -120,7 +120,9 @@ class StarboardCluster(command_client.CommandCluster):
 
         async with self.client.sql_pool.acquire() as conn:
             if (starboard_channel := await self.get_starboard_channel(target_channel.guild, conn)) is None:
-                await conn.execute(self.sql_scripts.create_starboard_channel, target_channel.guild_id, target_channel.id)
+                await conn.execute(
+                    self.sql_scripts.create_starboard_channel, target_channel.guild_id, target_channel.id
+                )
             elif starboard_channel["channel_id"] != target_channel.id:  # TODO: disable updating the posts on old ones.
                 await conn.execute(
                     "UPDATE StarboardChannels SET channel_id = $2 WHERE guild_id = $1;",
@@ -147,9 +149,7 @@ class StarboardCluster(command_client.CommandCluster):
 
     @command_client.command
     @util.command_error_relay((asyncpg.exceptions.DataError,))
-    async def star_info(
-        self, ctx: command_client.Context, target_message: _messages.Message
-    ) -> None:
+    async def star_info(self, ctx: command_client.Context, target_message: _messages.Message) -> None:
         # TODO: guild check.
         async with self.client.sql_pool.acquire() as conn:
             if embed := await self.generate_star_embed(target_message, conn):
