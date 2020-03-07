@@ -17,6 +17,7 @@ import enum
 import importlib
 import inspect
 import logging
+import traceback
 import types
 import typing
 
@@ -29,6 +30,7 @@ from hikari.internal_utilities import unspecified
 from hikari.orm.gateway import event_types as discord_event_types
 from hikari.orm.models import bases
 from hikari.orm.models import media
+from hikari.orm.models import members
 from hikari.orm.models import permissions
 from hikari.orm import client
 from hikari import errors
@@ -43,14 +45,12 @@ if typing.TYPE_CHECKING:
     from hikari.orm.models import channels
     from hikari.orm.models import embeds
     from hikari.orm.models import guilds
-    from hikari.orm.models import members
     from hikari.orm.models import messages
     from hikari.orm.state import base_registry
     from hikari.orm import fabric
 
 SEND_MESSAGE_PERMISSIONS = permissions.VIEW_CHANNEL | permissions.SEND_MESSAGES
 ATTACH_FILE_PERMISSIONS = SEND_MESSAGE_PERMISSIONS | permissions.ATTACH_FILES
-CHARACTERS_TO_SANITIZE = {"@": ""}
 
 # TODO: use command hooks instead of specific stuff like get_guild_prefixes?
 
@@ -73,18 +73,21 @@ class TriggerTypes(enum.Enum):
     MENTION = enum.auto()  # TODO: trigger commands with a mention
 
 
-def get_permissions(guild: guilds.Guild, channel: channels.GuildChannel, member: members.Member) -> permissions.Permission:
-    if channel.guild_id and member.id != guild.owner_id:
-        permission_value = guild.roles[guild.id].permissions
+def get_guild_channel_permissions(
+    guild: guilds.Guild, channel: channels.GuildChannel, member: members.Member
+) -> permissions.Permission:
+    if member.id == guild.owner_id:
+        return permissions.Permission.ADMINISTRATOR
 
-        for role in member.roles:
-            permission_value += role.permissions
+    permission_value = guild.roles[guild.id].permissions
+    for role_id in member.roles:
+        permission_value |= guild.roles[role_id].permissions
 
-        if overwrite := channel.permission_overwrites[member.id]:
-            permission_value += overwrite.allow
-            permission_value -= overwrite.deny
-    else:
-        permission_value = permissions.Permission.ADMINISTRATOR
+    for role_id in (guild.id, *member.roles, member.id):
+        if overwrite := channel.permission_overwrites.get(role_id):
+            permission_value |= overwrite.allow
+            permission_value &= ~overwrite.deny
+
     return permission_value
 
 
@@ -147,15 +150,15 @@ class Context:
     async def fetch_permissions(self, member: typing.Optional[members.MemberLikeT] = None) -> permissions.Permission:
         if not (channel := self.message.channel):
             channel = await self.fabric.http_adapter.fetch_channel(self.message.channel_id)
+        if channel.is_dm:
+            return permissions.ADMINISTRATOR
         if not (guild := channel.guild):
             guild = await self.fabric.http_adapter.fetch_guild(self.message.guild)
 
         member = member or self.message.author
-        if not isinstance(member, members.Member):
-            member = guild.members.get(int(member)) or await self.fabric.http_adapter.fetch_member(
-                member, guild
-            )
-        return get_permissions(guild, channel, member)
+        if guild and not isinstance(member, members.Member):
+            member = guild.members.get(int(member)) or await self.fabric.http_adapter.fetch_member(member, guild)
+        return get_guild_channel_permissions(guild, channel, member)
 
     @property
     def http(self) -> base_http_adapter.BaseHTTPAdapter:
@@ -178,7 +181,7 @@ class Context:
         soft_send: bool = False,  # TODO: what was this?
         sanitize: bool = False,
     ) -> messages.Message:
-        """Used to handle response length and permission checks for command responses."""        
+        """Used to handle response length and permission checks for command responses."""
         if content is not unspecified.UNSPECIFIED and len(content) > 2000:
             files = files or []
             files.append(media.InMemoryFile("message.txt", bytes(content, "utf-8")))
@@ -186,10 +189,10 @@ class Context:
         elif content is not unspecified.UNSPECIFIED and sanitize:
             content = sanitize_content(content)
 
-        current_permissions = await self.fetch_permissions()
+        current_permissions = await self.fetch_permissions(self.fabric.state_registry.me)
         required_permissions = ATTACH_FILE_PERMISSIONS if files else SEND_MESSAGE_PERMISSIONS
-        if (required_permissions & current_permissions) != current_permissions:
-            raise HikariPermissionError(required_permissions, current_permissions)
+        # if (current_permissions & required_permissions) != required_permissions:
+        #    raise HikariPermissionError(required_permissions, current_permissions)
 
         return await self.fabric.http_adapter.create_message(
             self.message.channel_id, content=content, tts=tts, embed=embed, files=files
@@ -225,6 +228,10 @@ class CommandError(Exception):
 
     def __str__(self) -> str:
         return self.response
+
+
+class CheckFail(Exception):
+    ...  # TODO: this?
 
 
 class Executable(abc.ABC):
@@ -366,9 +373,10 @@ class Command(AbstractCommand):
                 else:
                     result = check(ctx)
             except Exception as exc:
+                traceback.print_exc()
                 self.logger.warning("Command check `%s` raised exception in `%s` command: %s", check, self.name, exc)
                 result = False
-            else:
+            finally:
                 if not result:
                     break
         return result
@@ -804,8 +812,6 @@ class CommandClient(AbstractCommandClient, CommandCluster, client.Client):
         async for command_obj in self.get_global_command_from_context(ctx):
             if await self.access_check(command_obj, message):
                 break
-            else:
-                command_obj = None
         else:
             command_obj = None
 

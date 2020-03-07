@@ -6,7 +6,6 @@ import inspect
 import re
 import typing
 
-
 from hikari.internal_utilities import assertions
 from hikari.internal_utilities import containers
 from hikari.orm.models import bases
@@ -15,16 +14,11 @@ from hikari.orm.models import members
 from hikari.orm.models import messages
 from hikari.orm.models import users
 
-#'from hikari.orm.models
-
 
 from reinhard.util import command_client
 
-
 if typing.TYPE_CHECKING:
     from hikari.internal_utilities import aio
-    from hikari.orm import fabric
-
 
 QUOTE_SEPARATORS = ('"', "'")
 
@@ -66,6 +60,10 @@ def basic_arg_parsers(content: str, ceiling: typing.Optional[int]) -> typing.Ite
         while i < len(spaces_found_while_quoting):
             yield content[spaces_found_while_quoting[i - 1] + 1 : spaces_found_while_quoting[i]]
             spaces_found_while_quoting.pop(i - 1)
+
+
+class ConversionError(ValueError):
+    ...  # TODO: this
 
 
 class AbstractConverter(abc.ABC):
@@ -110,16 +108,19 @@ class AbstractConverter(abc.ABC):
 class BaseIDConverter(AbstractConverter, abc.ABC):
     _id_regex: re.Pattern
 
-    def _match_id(self, value) -> typing.Optional[int]:
+    def _match_id(self, value: str) -> typing.Optional[int]:
+        if value.isdigit():
+            return int(value)
         if result := self._id_regex.findall(value):
             return result[0]
+        raise command_client.CommandError("Invalid mention or ID passed.")
 
 
 class ChannelConverter(BaseIDConverter, types=(channels.Channel,), inheritable=True):
     def __init__(self):
         self._id_regex = re.compile(r"<#(\d+)>")
 
-    def convert(self, ctx: command_client.Context, argument: str) -> channels.Channel:
+    async def convert(self, ctx: command_client.Context, argument: str) -> channels.Channel:
         if match := self._match_id(argument):
             return ctx.fabric.state_registry.get_mandatory_channel_by_id(match)
 
@@ -128,7 +129,7 @@ class SnowflakeConverter(BaseIDConverter, types=(bases.SnowflakeMixin,)):
     def __init__(self) -> None:
         self._id_regex = re.compile(r"<[(?:@!?)#&](\d+)>")
 
-    def convert(self, ctx: command_client.Context, argument: str) -> int:
+    async def convert(self, ctx: command_client.Context, argument: str) -> int:
         if match := self._match_id(argument):
             return int(match)
         raise command_client.CommandError("Invalid mention or ID supplied.")
@@ -138,22 +139,22 @@ class UserConverter(BaseIDConverter, types=(users.User,)):
     def __init__(self) -> None:
         self._id_regex = re.compile(r"<@!?(\d+)>")
 
-    def convert(self, ctx: command_client.Context, argument: str) -> users.BaseUser:
+    async def convert(self, ctx: command_client.Context, argument: str) -> users.BaseUser:
         if match := self._match_id(argument):
             return ctx.fabric.state_registry.get_mandatory_user_by_id(match)
 
 
 class MemberConverter(UserConverter, types=(members.Member,)):
-    def convert(self, ctx: command_client.Context, argument: str) -> members.Member:
+    async def convert(self, ctx: command_client.Context, argument: str) -> members.Member:
         if not ctx.message.guild:
-            raise command_client.CommandError("Cannot get a member from a DM channel.")  # TODO: better error
+            raise ConversionError("Cannot get a member from a DM channel.")  # TODO: better error
 
         if match := self._match_id(argument):
             return ctx.fabric.state_registry.get_mandatory_member_by_id(match, ctx.message.guild_id)
 
 
 class MessageConverter(SnowflakeConverter, types=(messages.Message,)):
-    def convert(self, ctx: command_client.Context, argument: str) -> messages.Message:
+    async def convert(self, ctx: command_client.Context, argument: str) -> messages.Message:
         message_id = super().convert(ctx, argument)
         return ctx.fabric.state_registry.get_mandatory_message_by_id(message_id, ctx.message.channel_id)
 
@@ -225,7 +226,7 @@ class CommandParser(AbstractCommandParser):
 
                 with contextlib.suppress(command_client.CommandError):
                     return await self._convert_value(ctx, value, potential_type)
-                # TODO: sane default?
+                # TODO: sane default? and handle errors better?
             raise command_client.CommandError(f"Invalid value for argument `{parameter.name}`.")
         return await self._convert_value(ctx, value, parameter.annotation)
 
@@ -236,15 +237,12 @@ class CommandParser(AbstractCommandParser):
             # If a value is a string than it is a future reference and will need to be resolved.
             if isinstance(value.annotation, str):
                 if not resolved_type_hints:
-                    # TODO: typing.get_type_hints isn't following wrapped scopes.
-                    globals = getattr(func, "__wrapped__", None)
-                    while hasattr(globals, "__wrapped__"):
-                        globals = globals.__wrapped__
-                    if globals:
-                        globals = globals.__globals__
-                    else:
-                        globals = func.__globals__
-                    resolved_type_hints = typing.get_type_hints(func, globals)
+                    #    # TODO: typing.get_type_hints isn't always following wrapped scopes.
+                    #    nsobj = func
+                    #    while hasattr(nsobj, "__wrapped__"):
+                    #        nsobj = nsobj.__wrapped__
+                    #    scope = nsobj.__globals__
+                    resolved_type_hints = typing.get_type_hints(func)  # , scope)
                 self.parameters[key] = value.replace(annotation=resolved_type_hints[value.name])
             if origin := typing.get_origin(self.parameters[key].annotation):
                 assertions.assert_that(
