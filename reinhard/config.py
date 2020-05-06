@@ -1,36 +1,34 @@
 from __future__ import annotations
-import dataclasses
 
-
-from hikari.orm.models import bases
+import attr
 import typing
 
+from hikari.internal import marshaller
+from hikari import bases
 
 from reinhard.util import command_client
 
 
-@dataclasses.dataclass()
-class DatabaseConfig(bases.MarshalMixin):
-    password: str = dataclasses.field(repr=False)
-    host: str = dataclasses.field(default="localhost", repr=False)
-    user: str = dataclasses.field(default="postgres", repr=False)
-    database: str = dataclasses.field(default="postgres", repr=False)
-    port: int = dataclasses.field(default=5432, repr=False)
+@marshaller.marshallable()
+@attr.s(slots=True, kw_only=True)
+class DatabaseConfig(marshaller.Deserializable):
+    password: str = marshaller.attrib(repr=False, deserializer=str)
+    database: str = marshaller.attrib(repr=False, deserializer=str, if_undefined=lambda: "postgres", default="postgres")
+    host: str = marshaller.attrib(repr=False, deserializer=str, if_undefined=lambda: "localhost", default="localhost")
+    port: int = marshaller.attrib(repr=False, serializer=int, if_undefined=lambda: 5432, factory=lambda: 5432)
+    user: str = marshaller.attrib(repr=False, deserializer=str, if_undefined=lambda: "postgres", default="postgres")
 
 
-@dataclasses.dataclass()
-class BotConfig(bases.MarshalMixin):
-    token: str = dataclasses.field(repr=False)
-    log_level: str = "INFO"
-
-
-@dataclasses.dataclass()
+@marshaller.marshallable()
+@attr.s(slots=True, kw_only=True)
 class ExtendedOptions(command_client.CommandClientOptions):
-    bot: BotConfig = dataclasses.field(default_factory=BotConfig)
-    database: DatabaseConfig = dataclasses.field(default_factory=DatabaseConfig)
-    prefixes: typing.List[str] = dataclasses.field(default_factory=lambda: ["."])
-
-    def __post_init__(self) -> None:
-        self.access_levels = {int(key): value for key, value in self.access_levels.items()}
-        self.bot = BotConfig.from_dict(self.bot)
-        self.database = DatabaseConfig.from_dict(self.database)
+    database: DatabaseConfig = marshaller.attrib(deserializer=DatabaseConfig.deserialize, factory=DatabaseConfig)
+    emoji_guild: typing.Optional[bases.Snowflake] = marshaller.attrib(
+        deserializer=bases.Snowflake, if_undefined=None, default=None
+    )
+    log_level: str = marshaller.attrib(deserializer=str, if_undefined=lambda: "INFO", default="INFO")
+    prefixes: typing.List[str] = marshaller.attrib(
+        deserializer=lambda payload: [str(prefix) for prefix in payload],
+        if_undefined=lambda: ["."],
+        factory=lambda: ["."],
+    )

@@ -1,11 +1,12 @@
+from __future__ import annotations
+
 import json
 import logging
 import os
 import typing
 
-
+from hikari.clients import stateless
 import yaml
-
 
 from reinhard import client
 from reinhard import config
@@ -15,7 +16,7 @@ CONFIG_PARSERS = {"yaml": yaml.safe_load, "json": json.load}
 
 def parse_config(
     config_path: typing.Optional[str] = None,
-    config_marshaler: typing.Callable[[dict], typing.Any] = config.ExtendedOptions.from_dict,
+    config_marshaler: typing.Callable[[dict], typing.Any] = config.ExtendedOptions.deserialize,
 ):
     if config_path is None:
         return config_marshaler({})
@@ -42,10 +43,11 @@ def main():
     config_obj: config.ExtendedOptions = parse_config(config_path)
 
     logging.basicConfig(
-        level=config_obj.bot.log_level,
+        level=config_obj.log_level,
         format="%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
-    bot_client = client.BotClient(config_obj)
-    bot_client.run(token=config_obj.bot.token)
+    bot_client = stateless.StatelessBot(config=config_obj)
+    client.CommandClient(bot_client, modules=["reinhard.modules.sudo"])
+    bot_client.run()

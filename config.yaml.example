@@ -1,10 +1,9 @@
-bot:
-  token: "A.DISCORD.TOKEN"
+access_levels:
+  115590097100865541: 5
 database:
+  database: "postgres"
   host: "69.69.69.69"
   name: "postgres"
   password: "A PASSWORD"
-  database: "postgres"
   port: 5432
-access_levels:
-  115590097100865541: 5
+token: "A.DISCORD.TOKEN"

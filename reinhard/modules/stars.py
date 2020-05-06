@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import typing
 
-
 import asyncpg
-from hikari.net import errors
-from hikari.orm.models import channels as _channels
-from hikari.orm.models import embeds as _embeds
-from hikari.orm.models import messages as _messages
+from hikari import channels as _channels
+from hikari import errors
+from hikari import messages as _messages
+from hikari import embeds
 
 from reinhard.util import command_client
 from reinhard.util import basic as util
@@ -15,13 +14,15 @@ from reinhard import sql
 
 
 if typing.TYPE_CHECKING:
-    from hikari.orm import models
+    from hikari import bases as _bases
+    from hikari import users as _users
 
 
 #  TODO: star status (e.g. deleted)
 #  TODO: freeze stars when deleted?
 #  TODO: handle sql errors?
 #  TODO: starboard minimum count
+#  TODO: state
 
 
 exports = ["StarboardCluster"]
@@ -37,26 +38,26 @@ class StarboardCluster(command_client.CommandCluster):
 
     @staticmethod
     async def get_starboard_channel(
-        guild: models.guilds.GuildLikeT, conn: asyncpg.connection
+        guild: _bases.Snowflake, conn: asyncpg.connection
     ) -> typing.Optional[asyncpg.Record]:
-        return await conn.fetchrow("SELECT * FROM StarboardChannels WHERE guild_id = $1;", int(guild))
+        return await conn.fetchrow("SELECT * FROM StarboardChannels WHERE guild_id = $1;", guild)
 
     @staticmethod
     async def get_starboard_entry(
-        message: models.messages.MessageLikeT, conn: asyncpg.connection
+        message: _messages.MessageLikeT, conn: asyncpg.connection
     ) -> typing.Optional[asyncpg.Record]:
         return await conn.fetchrow("SELECT * From StarboardEntries WHERE message_id = $1", int(message))
 
     @staticmethod
-    async def get_star_count(message: models.messages.MessageLikeT, conn: asyncpg.connection) -> int:
+    async def get_star_count(message: _messages.MessageLikeT, conn: asyncpg.connection) -> int:
         result = await conn.fetchrow("SELECT COUNT(*) FROM PostStars WHERE message_id = $1", int(message))
         return result["count"]
 
-    async def on_message_reaction_add(self, reaction: models.reactions.Reaction, user: models.users.User) -> None:
+    async def on_message_reaction_add(self, reaction: _messages.Reaction, user: _users.User) -> None:
         if user.is_bot or reaction.emoji != UNICODE_STAR:
             return
 
-        message_obj = self._fabric.state_registry.get_mandatory_message_by_id(
+        message_obj = self._components.rest.fetch_message(
             message_id=reaction.message_id, channel_id=reaction.channel_id
         )
         # This shouldn't ever fail.
@@ -65,14 +66,14 @@ class StarboardCluster(command_client.CommandCluster):
         if user != message_obj.author:
             await self.consume_star_increment(message_obj, user)
 
-    async def on_message_reaction_remove(self, reaction: models.reactions.Reaction, user: models.users.User):
+    async def on_message_reaction_remove(self, reaction: _messages.Reaction, user: _users.User):
         # Could check to see if this is the message's author but we'll take this at the
         if user.is_bot or reaction.emoji != UNICODE_STAR:
             return
 
         await self.consume_star_decrement(reaction.message_id, user)
 
-    async def consume_star_increment(self, message: models.messages.Message, reactor: models.users.BaseUser) -> bool:
+    async def consume_star_increment(self, message: _messages.Message, reactor: _users.BaseUser) -> bool:
         async with self.client.sql_pool.acquire() as conn:
             if await self.get_starboard_entry(message, conn) is None:
                 await conn.execute(
@@ -87,9 +88,7 @@ class StarboardCluster(command_client.CommandCluster):
                 )
             return post_star is None
 
-    async def consume_star_decrement(
-        self, message: models.messages.MessageLikeT, reactor: models.users.BaseUser
-    ) -> bool:
+    async def consume_star_decrement(self, message: _messages.MessageLikeT, reactor: _users.BaseUser) -> bool:
         async with self.client.sql_pool.acquire() as conn:
             original_star = await conn.fetchrow(
                 "SELECT * FROM PostStars WHERE message_id = $1 and starer_id = $2;", int(message), reactor.id,
@@ -104,7 +103,7 @@ class StarboardCluster(command_client.CommandCluster):
             return False
 
     @command_client.command(trigger="set starboard", aliases=["register starboard"])
-    @util.command_error_relay((errors.NotFoundHTTPError, errors.BadRequestHTTPError, errors.ForbiddenHTTPError))
+    @util.command_error_relay((errors.NotFound, errors.BadRequest, errors.Forbidden))
     async def set_starboard(
         self, ctx: command_client.Context, target_channel: typing.Optional[_channels.Channel] = None
     ) -> None:
@@ -120,7 +119,9 @@ class StarboardCluster(command_client.CommandCluster):
                 raise command_client.CommandError("Unknown channel ID supplied.")
 
         async with self.client.sql_pool.acquire() as conn:
-            if (starboard_channel := await self.get_starboard_channel(target_channel.guild, conn)) is None:
+            if (
+                starboard_channel := await self.get_starboard_channel(target_channel.guild.id, conn)
+            ) is None:  # TODO? .id
                 await conn.execute(
                     self.sql_scripts.create_starboard_channel, target_channel.guild_id, target_channel.id
                 )
@@ -135,7 +136,7 @@ class StarboardCluster(command_client.CommandCluster):
     @command_client.command
     async def star(self, ctx: command_client.Context, target_message: _messages.Message) -> None:
         if not target_message.is_resolved:
-            with util.CommandErrorRelay((errors.NotFoundHTTPError, errors.BadRequestHTTPError)):
+            with util.CommandErrorRelay((errors.NotFound, errors.BadRequest)):
                 target_message = await target_message
 
         if target_message.author.id == ctx.message.author.id:  # TODO: hikari bug?
@@ -158,8 +159,6 @@ class StarboardCluster(command_client.CommandCluster):
             else:
                 await ctx.reply(content="Starboard entry not found.")
 
-    async def generate_star_embed(
-        self, message: models.messages.MessageLikeT, conn: asyncpg.connection
-    ) -> models.embeds.Embed:
+    async def generate_star_embed(self, message: _messages.MessageLikeT, conn: asyncpg.connection) -> embeds.Embed:
         if star_count := await self.get_star_count(message, conn):
-            return _embeds.Embed()
+            return embeds.Embed()

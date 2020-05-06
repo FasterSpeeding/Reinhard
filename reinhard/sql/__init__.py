@@ -1,10 +1,11 @@
+from __future__ import annotations
+
 import os
 import re
 import pathlib
 import typing
 
-
-from hikari.internal_utilities import assertions
+from hikari.internal import assertions
 import asyncpg
 
 
@@ -14,7 +15,7 @@ def script_getter_factory(key: str):  # Could just make this retrieve the file.
     using explicit properties and to handle errors for when the modules aren't loaded.
     """
 
-    def script_getter(self) -> str:
+    def script_getter(self: CachedScripts) -> str:
         """Used to get a loaded script using it's key/name."""
         try:
             return self.scripts[key]
@@ -84,5 +85,5 @@ async def initialise_schema(sql_scripts: CachedScripts, conn: asyncpg.Connection
     """
     try:
         await conn.execute(sql_scripts.schema)
-    except asyncpg.PostgresError as e:
-        raise RuntimeError("Failed to initialise database.") from e
+    except asyncpg.PostgresError as exc:
+        raise RuntimeError("Failed to initialise database.") from exc

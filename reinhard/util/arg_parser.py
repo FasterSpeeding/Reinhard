@@ -6,19 +6,17 @@ import inspect
 import re
 import typing
 
-from hikari.internal_utilities import assertions
-from hikari.internal_utilities import containers
-from hikari.orm.models import bases
-from hikari.orm.models import channels
-from hikari.orm.models import members
-from hikari.orm.models import messages
-from hikari.orm.models import users
-
+from hikari.internal import assertions
+from hikari.internal import conversions
+from hikari.internal import more_collections
+from hikari import bases
+from hikari import channels
+from hikari import guilds
+from hikari import messages
+from hikari import users
 
 from reinhard.util import command_client
 
-if typing.TYPE_CHECKING:
-    from hikari.internal_utilities import aio
 
 QUOTE_SEPARATORS = ('"', "'")
 
@@ -32,13 +30,14 @@ def basic_arg_parsers(content: str, ceiling: typing.Optional[int]) -> typing.Ite
     while i < len(content):
         i += 1
         char = content[i] if i != len(content) else " "
-        if char == " " and i - last_space > 1:
+        if ceiling and count == ceiling:
+            yield content[last_space + 1 :]
+            return
+
+        elif char == " " and i - last_space > 1:
             if last_quote:
                 spaces_found_while_quoting.append(i)
                 continue
-            elif ceiling and count == ceiling:
-                yield content[last_space + 1 :]
-                return
             else:
                 count += 1
                 yield content[last_space + 1 : i]
@@ -67,19 +66,19 @@ class ConversionError(ValueError):
 
 
 class AbstractConverter(abc.ABC):
-    _converter_implementations: typing.List[typing.Tuple[type(AbstractConverter), typing.Tuple[typing.Type]]] = []
+    _converter_implementations: typing.List[typing.Tuple[type(AbstractConverter), typing.Tuple[typing.Type]]]
     inheritable: bool
 
     def __init_subclass__(cls, **kwargs):
-        types = kwargs.pop("types", containers.EMPTY_SEQUENCE)
+        types = kwargs.pop("types", more_collections.EMPTY_SEQUENCE)
         inheritable = kwargs.pop("inheritable", False)
         super().__init_subclass__(**kwargs)
         for base_type in types:
-            assertions.assert_that(
-                not cls.get_converter_from_type(base_type), f"Type {base_type} already registered.",
-            )
+            assertions.assert_that(not cls.get_converter_from_type(base_type), f"Type {base_type} already registered.")
         cls.inheritable = inheritable
-        cls._converter_implementations.append((cls(), tuple(types)))
+        if not hasattr(AbstractConverter, "_converter_implementations"):
+            AbstractConverter._converter_implementations = []
+        AbstractConverter._converter_implementations.append((cls(), tuple(types)))
 
     @abc.abstractmethod
     async def convert(self, ctx: command_client.Context, argument: str) -> typing.Any:
@@ -116,16 +115,16 @@ class BaseIDConverter(AbstractConverter, abc.ABC):
         raise command_client.CommandError("Invalid mention or ID passed.")
 
 
-class ChannelConverter(BaseIDConverter, types=(channels.Channel,), inheritable=True):
+class ChannelConverter(BaseIDConverter, types=(channels.PartialChannel,), inheritable=True):
     def __init__(self):
         self._id_regex = re.compile(r"<#(\d+)>")
 
-    async def convert(self, ctx: command_client.Context, argument: str) -> channels.Channel:
+    async def convert(self, ctx: command_client.Context, argument: str) -> channels.PartialChannel:
         if match := self._match_id(argument):
             return ctx.fabric.state_registry.get_mandatory_channel_by_id(match)
 
 
-class SnowflakeConverter(BaseIDConverter, types=(bases.SnowflakeMixin,)):
+class SnowflakeConverter(BaseIDConverter, types=(bases.UniqueEntity,)):
     def __init__(self) -> None:
         self._id_regex = re.compile(r"<[(?:@!?)#&](\d+)>")
 
@@ -139,13 +138,13 @@ class UserConverter(BaseIDConverter, types=(users.User,)):
     def __init__(self) -> None:
         self._id_regex = re.compile(r"<@!?(\d+)>")
 
-    async def convert(self, ctx: command_client.Context, argument: str) -> users.BaseUser:
+    async def convert(self, ctx: command_client.Context, argument: str) -> users.User:
         if match := self._match_id(argument):
             return ctx.fabric.state_registry.get_mandatory_user_by_id(match)
 
 
-class MemberConverter(UserConverter, types=(members.Member,)):
-    async def convert(self, ctx: command_client.Context, argument: str) -> members.Member:
+class MemberConverter(UserConverter, types=(guilds.GuildMember,)):
+    async def convert(self, ctx: command_client.Context, argument: str) -> guilds.GuildMember:
         if not ctx.message.guild:
             raise ConversionError("Cannot get a member from a DM channel.")  # TODO: better error
 
@@ -157,6 +156,7 @@ class MessageConverter(SnowflakeConverter, types=(messages.Message,)):
     async def convert(self, ctx: command_client.Context, argument: str) -> messages.Message:
         message_id = super().convert(ctx, argument)
         return ctx.fabric.state_registry.get_mandatory_message_by_id(message_id, ctx.message.channel_id)
+        #  TODO: state and error handling?
 
 
 class AbstractCommandParser(abc.ABC):
@@ -192,18 +192,18 @@ POSITIONAL_TYPES = (
 
 
 class CommandParser(AbstractCommandParser):
-    __slots__ = ("greedy", "signature", "parameters")
+    __slots__ = ("greedy", "signature")
 
     greedy: bool
     signature: inspect.Signature
-    parameters: typing.MutableMapping[str, inspect.Parameter]
 
-    def __init__(self, func: aio.CoroutineFunctionT, greedy: bool) -> None:
+    def __init__(
+        self, func: typing.Callable[[...], typing.Coroutine[typing.Any, typing.Any, typing.Any]], greedy: bool
+    ) -> None:
         self.greedy = greedy
-        self.signature = inspect.signature(func)
-        self.parameters = self.signature.parameters.copy()
-        self._resolve_and_validate_parameters(func)
-        # Remove the `context` arg for now, `self` should be trimmed during binding.
+        self.signature = conversions.resolve_signature(func)
+        self._validate_parameters()
+        # Remove the `ctx` arg for now, `self` should be trimmed during binding.
         self.trim_parameters(1)
 
     @staticmethod
@@ -221,7 +221,7 @@ class CommandParser(AbstractCommandParser):
 
         if typing.get_origin(parameter.annotation) is typing.Union:
             for potential_type in parameter.annotation.__args__:
-                if potential_type is None:
+                if potential_type is type(None):
                     continue
 
                 with contextlib.suppress(command_client.CommandError):
@@ -230,21 +230,10 @@ class CommandParser(AbstractCommandParser):
             raise command_client.CommandError(f"Invalid value for argument `{parameter.name}`.")
         return await self._convert_value(ctx, value, parameter.annotation)
 
-    def _resolve_and_validate_parameters(self, func: aio.CoroutineFunctionT) -> None:
+    def _validate_parameters(self) -> None:
         var_position = False
-        resolved_type_hints = None
-        for key, value in self.parameters.items():
-            # If a value is a string than it is a future reference and will need to be resolved.
-            if isinstance(value.annotation, str):
-                if not resolved_type_hints:
-                    #    # TODO: typing.get_type_hints isn't always following wrapped scopes.
-                    #    nsobj = func
-                    #    while hasattr(nsobj, "__wrapped__"):
-                    #        nsobj = nsobj.__wrapped__
-                    #    scope = nsobj.__globals__
-                    resolved_type_hints = typing.get_type_hints(func)  # , scope)
-                self.parameters[key] = value.replace(annotation=resolved_type_hints[value.name])
-            if origin := typing.get_origin(self.parameters[key].annotation):
+        for key, value in self.signature.parameters.items():
+            if origin := typing.get_origin(value.annotation):
                 assertions.assert_that(
                     origin in SUPPORTED_TYPING_WRAPPERS, f"Typing wrapper `{origin}` is not supported by this parser."
                 )
@@ -253,13 +242,10 @@ class CommandParser(AbstractCommandParser):
             var_position = value.kind is value.VAR_POSITIONAL
 
     def trim_parameters(self, to_trim: int) -> None:
-        while to_trim != 0:
-            try:
-                self.parameters.popitem(last=False)
-            except KeyError:
-                raise KeyError("Missing required parameter (likely `self` or `context`).")
-            else:
-                to_trim -= 1
+        try:
+            self.signature = self.signature.replace(parameters=list(self.signature.parameters.values())[to_trim:])
+        except KeyError:
+            raise KeyError("Missing required parameter (likely `self` or `ctx`).")
 
     @staticmethod
     def _get_next_argument(arguments: typing.Iterator[str]) -> typing.Optional[str]:
@@ -273,8 +259,8 @@ class CommandParser(AbstractCommandParser):
     ) -> typing.Tuple[typing.List[typing.Any], typing.MutableMapping[str, typing.Any]]:
         args: typing.List[typing.Any] = []
         kwargs: typing.MutableMapping[str, typing.Any] = {}
-        arguments = basic_arg_parsers(ctx.content, ceiling=len(self.parameters) if self.greedy else None)
-        for parameter in self.parameters.values():
+        arguments = basic_arg_parsers(ctx.content, ceiling=len(self.signature.parameters) if self.greedy else None)
+        for parameter in self.signature.parameters.values():
             # Just a typing hack, may be removed in the future.
             parameter: inspect.Parameter
             if (

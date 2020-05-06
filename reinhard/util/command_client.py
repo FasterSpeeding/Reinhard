@@ -12,7 +12,6 @@ __all__ = [
 import abc
 import asyncio
 import contextlib
-import dataclasses
 import enum
 import importlib
 import inspect
@@ -22,37 +21,34 @@ import types
 import typing
 
 
-from hikari.internal_utilities import aio
-from hikari.internal_utilities import assertions
-from hikari.internal_utilities import containers
-from hikari.internal_utilities import loggers
-from hikari.internal_utilities import unspecified
-from hikari.orm.gateway import event_types as discord_event_types
-from hikari.orm.models import bases
-from hikari.orm.models import media
-from hikari.orm.models import members
-from hikari.orm.models import permissions
-from hikari.orm import client
+from hikari.clients import configs
+from hikari.events import base as base_events
+from hikari.events import message as message_events
+from hikari.internal import assertions
+from hikari.internal import marshaller
+from hikari.internal import more_collections
+from hikari import bases
 from hikari import errors
+from hikari import permissions
+import attr
 
 
 from reinhard.util import arg_parser
 
-
 if typing.TYPE_CHECKING:
-    from hikari.internal_utilities import type_hints
-    from hikari.orm.http import base_http_adapter
-    from hikari.orm.models import channels
-    from hikari.orm.models import embeds
-    from hikari.orm.models import guilds
-    from hikari.orm.models import messages
-    from hikari.orm.state import base_registry
-    from hikari.orm import fabric
+    from hikari.clients import components as _components
+    from hikari.internal import more_typing
+    from hikari.state import dispatchers as _dispatchers
+    from hikari import messages
 
-SEND_MESSAGE_PERMISSIONS = permissions.VIEW_CHANNEL | permissions.SEND_MESSAGES
-ATTACH_FILE_PERMISSIONS = SEND_MESSAGE_PERMISSIONS | permissions.ATTACH_FILES
+    CheckLikeT = typing.Callable[["Context"], typing.Union[bool, typing.Coroutine[typing.Any, typing.Any, bool]]]
+    CommandFunctionT = typing.Callable[[...], more_typing.Coroutine[None]]
+
+SEND_MESSAGE_PERMISSIONS = permissions.Permission.VIEW_CHANNEL | permissions.Permission.SEND_MESSAGES
+ATTACH_FILE_PERMISSIONS = SEND_MESSAGE_PERMISSIONS | permissions.Permission.ATTACH_FILES
 
 # TODO: use command hooks instead of specific stuff like get_guild_prefixes?
+# Todo event dispatching?
 
 
 class CommandEvents(enum.Enum):
@@ -64,31 +60,9 @@ class CommandEvents(enum.Enum):
         return self.value
 
 
-def sanitize_content(content: str) -> str:
-    return content  # TODO: This.
-
-
 class TriggerTypes(enum.Enum):
     PREFIX = enum.auto()
     MENTION = enum.auto()  # TODO: trigger commands with a mention
-
-
-def get_guild_channel_permissions(
-    guild: guilds.Guild, channel: channels.GuildChannel, member: members.Member
-) -> permissions.Permission:
-    if member.id == guild.owner_id:
-        return permissions.Permission.ADMINISTRATOR
-
-    permission_value = guild.roles[guild.id].permissions
-    for role_id in member.roles:
-        permission_value |= guild.roles[role_id].permissions
-
-    for role_id in (guild.id, *member.roles, member.id):
-        if overwrite := channel.permission_overwrites.get(role_id):
-            permission_value |= overwrite.allow
-            permission_value &= ~overwrite.deny
-
-    return permission_value
 
 
 class HikariPermissionError(errors.HikariError):  # TODO: better name
@@ -104,127 +78,104 @@ class HikariPermissionError(errors.HikariError):  # TODO: better name
         # for permission in m
 
 
+@attr.attrs(init=True, slots=True)
 class Context:
-    __slots__ = ("command", "content", "fabric", "message", "trigger", "trigger_type", "triggering_name")
+    content: str = attr.attrib()
 
-    command: AbstractCommand
-
-    content: str
-
-    fabric: fabric.Fabric
+    components: _components.Components = attr.attrib()
 
     #: The message that triggered this command.
     #:
     #: :type: :class:`hikari.orm.models.messages.Message`
-    message: messages.Message
+    message: messages.Message = attr.attrib()
 
     #: The string prefix or mention that triggered this command.
     #:
     #: :type: :class:`str`
-    trigger: str
+    trigger: str = attr.attrib()
 
     #: The mention or prefix that triggered this event.
     #:
     #: :type: :class:`TriggerTypes`
-    trigger_type: TriggerTypes
+    trigger_type: TriggerTypes = attr.attrib()
 
     #: The command alias that triggered this command.
     #:
     #: :type: :class:`str`
-    triggering_name: str
+    triggering_name: str = attr.attrib(default=None)
 
-    def __init__(
-        self,
-        fabric_obj: fabric.Fabric,
-        content: str,
-        message: messages.Message,
-        trigger: str,
-        trigger_type: TriggerTypes,
-    ) -> None:
-        self.fabric = fabric_obj
-        self.content = content
-        self.message = message
-        self.trigger = trigger
-        self.trigger_type = trigger_type
+    command: AbstractCommand = attr.attrib(default=None)
 
-    async def fetch_permissions(self, member: typing.Optional[members.MemberLikeT] = None) -> permissions.Permission:
-        if not (channel := self.message.channel):
-            channel = await self.fabric.http_adapter.fetch_channel(self.message.channel_id)
-        if channel.is_dm:
-            return permissions.ADMINISTRATOR
-        if not (guild := channel.guild):
-            guild = await self.fabric.http_adapter.fetch_guild(self.message.guild)
-
-        member = member or self.message.author
-        if guild and not isinstance(member, members.Member):
-            member = guild.members.get(int(member)) or await self.fabric.http_adapter.fetch_member(member, guild)
-        return get_guild_channel_permissions(guild, channel, member)
-
-    @property
-    def http(self) -> base_http_adapter.BaseHTTPAdapter:
-        return self.fabric.http_adapter
-
-    def prune_content(self, length: int):
+    def prune_content(self, length: int) -> None:
         self.content = self.content[length:]
 
-    @property
-    def state(self) -> base_registry.BaseRegistry:
-        return self.fabric.state_registry
-
-    async def reply(
-        self,
-        *,
-        content: type_hints.NotRequired[str] = unspecified.UNSPECIFIED,
-        tts: bool = False,
-        files: type_hints.NotRequired[typing.Collection[media.AbstractFile]] = unspecified.UNSPECIFIED,
-        embed: type_hints.NotRequired[embeds.Embed] = unspecified.UNSPECIFIED,
-        soft_send: bool = False,  # TODO: what was this?
-        sanitize: bool = False,
-    ) -> messages.Message:
-        """Used to handle response length and permission checks for command responses."""
-        if content is not unspecified.UNSPECIFIED and len(content) > 2000:
-            files = files or []
-            files.append(media.InMemoryFile("message.txt", bytes(content, "utf-8")))
-            content = "This response is too large to send, see attached file."
-        elif content is not unspecified.UNSPECIFIED and sanitize:
-            content = sanitize_content(content)
-
-        current_permissions = await self.fetch_permissions(self.fabric.state_registry.me)
-        required_permissions = ATTACH_FILE_PERMISSIONS if files else SEND_MESSAGE_PERMISSIONS
-        # if (current_permissions & required_permissions) != required_permissions:
-        #    raise HikariPermissionError(required_permissions, current_permissions)
-
-        return await self.fabric.http_adapter.create_message(
-            self.message.channel_id, content=content, tts=tts, embed=embed, files=files
-        )
-
-    def set_command_trigger(self, trigger: str):
+    def set_command_trigger(self, trigger: str) -> None:
         self.triggering_name = trigger
 
-    def set_command(self, command_obj: AbstractCommand):
+    def set_command(self, command_obj: AbstractCommand) -> None:
         self.command = command_obj
 
+    @property
+    def cluster(self) -> AbstractCommandCluster:
+        return self.command.cluster
 
-@dataclasses.dataclass()
-class CommandClientOptions(client.client_options.ClientOptions, bases.MarshalMixin):
-    access_levels: typing.MutableMapping[int, int] = dataclasses.field(default_factory=dict)
-    prefixes: typing.List[str] = dataclasses.field(default_factory=list)
+
+HookLikeT = typing.Callable[[Context], typing.Coroutine[typing.Any, typing.Any, None]]
+
+
+@attr.attrs(init=True, slots=True)
+class CommandHooks:  # TODO: this
+    pre_execution: typing.Callable[[Context, ...], typing.Coroutine[typing.Any, typing.Any, bool]] = attr.attrib(
+        default=None
+    )
+    post_execution: HookLikeT = attr.attrib(default=None)
+    on_error: typing.Callable[[Context, BaseException], typing.Coroutine[typing.Any, typing.Any, None]] = attr.attrib(
+        default=None
+    )
+    on_success: HookLikeT = attr.attrib(default=None)
+    on_ratelimit: HookLikeT = attr.attrib(default=None)  # TODO: implement?
+
+    def set_pre_execution(
+        self, hook: typing.Callable[[Context, ...], typing.Coroutine[typing.Any, typing.Any, bool]]
+    ) -> typing.Callable[[Context, ...], typing.Coroutine[typing.Any, typing.Any, bool]]:
+        assertions.assert_none(self.pre_execution, "Pre-execution hook already set.")
+        self.pre_execution = hook
+        return hook
+
+    def set_post_execution(self, hook: HookLikeT) -> HookLikeT:  # TODO: better typing
+        assertions.assert_none(self.post_execution, "Post-execution hook already set.")
+        self.post_execution = hook
+        return hook
+
+    def set_on_error(
+        self, hook: typing.Callable[[Context, BaseException], typing.Coroutine[typing.Any, typing.Any, None]]
+    ) -> typing.Callable[[Context, BaseException], typing.Coroutine[typing.Any, typing.Any, None]]:
+        assertions.assert_none(self.on_error, "On error hook already set.")
+        self.on_error = hook
+        return hook
+
+    def set_on_success(self, hook: HookLikeT) -> HookLikeT:
+        assertions.assert_none(self.on_success, "On success hook already set.")
+        self.on_success = hook
+        return hook
+
+
+@marshaller.marshallable()
+@attr.s(slots=True, kw_only=True)
+class CommandClientOptions(configs.BotConfig):
+    access_levels: typing.MutableMapping[bases.Snowflake, int] = marshaller.attrib(
+        deserializer=lambda levels: {bases.Snowflake(sn): int(level) for sn, level in levels.items()}
+    )
+    prefixes: typing.List[str] = marshaller.attrib(deserializer=lambda prefixes: [str(prefix) for prefix in prefixes])
     # TODO: handle modules (plus maybe other stuff) here?
 
-    def __post_init__(self) -> None:
-        self.access_levels = {int(key): value for key, value in self.access_levels.items()}
 
-
-class CommandError(Exception):
-    __slots__ = ("response",)
-
+@attr.attrs(init=True, slots=True)
+class CommandError(errors.HikariError):
     #: The string response that the client should send in chat if it has send messages permission.
     #:
     #: :type: :class:`str`
-    response: str
-
-    def __init__(self, response: str) -> None:
-        self.response = response
+    response: str = attr.attrib()
 
     def __str__(self) -> str:
         return self.response
@@ -235,9 +186,6 @@ class CheckFail(Exception):
 
 
 class Executable(abc.ABC):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     @abc.abstractmethod
     async def check(self, ctx: Context) -> bool:
         """
@@ -262,25 +210,33 @@ class Executable(abc.ABC):
         """
 
 
+@attr.attrs(init=True, slots=True)
 class AbstractCommand(Executable, abc.ABC):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
 
-    #: The user access level that'll be required to execute this command, defaults to 0.
-    #:
-    #: :type: :class:`int`
-    level: int
-
-    meta: typing.Optional[typing.MutableMapping[typing.Any, typing.Any]]
+    _func: CommandFunctionT = attr.attrib()
 
     #: The triggers used to activate this command in chat along with a prefix.
     #:
     #: :type: :class:`typing.Tuple` of :class:`int`
-    triggers: typing.Tuple[str]
+    triggers: typing.Tuple[str] = attr.attrib()
 
-    @abc.abstractmethod
+    _cluster: typing.Optional[AbstractCommandCluster] = attr.attrib(default=None)
+
+    meta: typing.Optional[typing.MutableMapping[typing.Any, typing.Any]] = attr.attrib(factory=dict)
+
+    hooks: CommandHooks = attr.attrib(factory=CommandHooks)
+
+    #: The user access level that'll be required to execute this command, defaults to 0.
+    #:
+    #: :type: :class:`int`
+    level: int = attr.attrib(default=0)
+
     def bind_cluster(self, cluster: AbstractCommandCluster) -> None:
-        ...
+        # This ensures that the cluster will always be passed-through as `self`.
+        self._func = types.MethodType(self._func, cluster)
+        # This allows for calling the raw function as an attribute of the cluster.
+        setattr(cluster, self._func.__name__, self._func)
+        self._cluster = cluster
 
     @abc.abstractmethod
     def check_prefix(self, content: str) -> str:
@@ -299,19 +255,37 @@ class AbstractCommand(Executable, abc.ABC):
         ...
 
     @property
-    @abc.abstractmethod
+    def cluster(self) -> typing.Optional[AbstractCommandCluster]:
+        return self._cluster
+
+    @property
+    def docstring(self) -> str:
+        return inspect.getdoc(self._func)
+
+    @property
+    def function(self) -> CommandFunctionT:
+        return self._func
+
+    @property
     def name(self) -> str:
-        ...
+        """Get the name of this command."""
+        return self._func.__name__
+
+    @staticmethod
+    def generate_trigger(function: typing.Optional[CommandFunctionT] = None) -> str:
+        """Get a trigger for this command based on it's function's name."""
+        return function.__name__.replace("_", " ")
+
+
+@attr.attrs(init=True, slots=True)
+class FailedCheck(StopIteration):
+    checks: typing.Sequence[typing.Tuple[CheckLikeT, typing.Optional[BaseException]]]
 
 
 class Command(AbstractCommand):
-    __slots__ = ("_checks", "_cluster", "_func", "level", "meta", "parser", "triggers")
+    __slots__ = ("_checks", "_cluster", "_func", "parser")
 
     _checks: typing.List[CheckLikeT]
-
-    _cluster: typing.Optional[AbstractCommandCluster]
-
-    _func: aio.CoroutineFunctionT
 
     logger: logging.Logger
 
@@ -319,38 +293,38 @@ class Command(AbstractCommand):
 
     def __init__(
         self,
-        func: typing.Optional[aio.CoroutineFunctionT] = None,
+        func: typing.Optional[CommandFunctionT] = None,
         trigger: typing.Optional[str] = None,
         *,
         aliases: typing.Optional[typing.List[str]] = None,
+        hooks: typing.Optional[CommandHooks] = None,
         level: int = 0,
         meta: typing.Optional[typing.MutableMapping[typing.Any, typing.Any]] = None,
         cluster: typing.Optional[AbstractCommandCluster] = None,
         greedy: bool = False,
     ) -> None:
-        self.logger = loggers.get_named_logger(self)
+        super().__init__(
+            func=func,
+            hooks=hooks or CommandHooks(),
+            level=level,
+            meta=meta or {},
+            triggers=tuple(
+                trig
+                for trig in (trigger or self.generate_trigger(func), *(aliases or more_collections.EMPTY_COLLECTION))
+                if trig is not None
+            ),
+        )
+        self.logger = logging.getLogger(type(self).__qualname__)
         self._checks = [self.check_prefix_from_context]
-        self._func = func
-        self.level = level
-        self.meta = meta
         self.parser = arg_parser.CommandParser(self._func, greedy=greedy)
         if cluster:
             self.bind_cluster(cluster)
-        else:
-            self._cluster = None
-        if not trigger:
-            trigger = self.generate_trigger()
-        self.triggers = tuple(trig for trig in (trigger, *(aliases or containers.EMPTY_COLLECTION)) if trig is not None)
 
     def __repr__(self) -> str:
         return f"Command({'|'.join(self.triggers)})"
 
     def bind_cluster(self, cluster: AbstractCommandCluster) -> None:
-        # This ensures that `self` will automatically be passed through.
-        self._func = types.MethodType(self._func, cluster)
-        # This allows for calling the raw function as an attribute of the cluster.
-        setattr(cluster, self._func.__name__, self._func)
-        self._cluster = cluster
+        super().bind_cluster(cluster)
         # Now that we know self will automatically be passed, we need to trim the parameters again.
         self.parser.trim_parameters(1)
 
@@ -363,23 +337,23 @@ class Command(AbstractCommand):
     def register_check(self, check: CheckLikeT) -> None:
         self._checks.append(check)
 
-    async def check(self, ctx: Context) -> bool:
-        result: bool = False
+    async def check(self, ctx: Context) -> None:
+        failed: typing.Sequence[typing.Tuple[CheckLikeT, typing.Optional[Exception]]] = []
         ctx.set_command(self)  # TODO: is this the best way to do this?
+        result = True
         for check in self._checks:
             try:
-                if asyncio.iscoroutinefunction(check):
-                    result = await check(ctx)
-                else:
-                    result = check(ctx)
+                result = check(ctx)
+                if asyncio.iscoroutine(result):
+                    result = await result
             except Exception as exc:
-                traceback.print_exc()
-                self.logger.warning("Command check `%s` raised exception in `%s` command: %s", check, self.name, exc)
-                result = False
-            finally:
+                failed.append(check, exc)
+            else:
                 if not result:
-                    break
-        return result
+                    failed.append(check, None)
+
+        if failed:
+            raise FailedCheck(failed)
 
     def check_prefix(self, content: str) -> str:
         for trigger in self.triggers:
@@ -396,27 +370,54 @@ class Command(AbstractCommand):
     async def execute(self, ctx: Context) -> None:
         try:
             args, kwargs = await self.parser.parse(ctx)
+            if self._trigger_pre_execution_hook(ctx, *args, **kwargs) is False:
+                return
             await self._func(ctx, *args, **kwargs)
         except CommandError as exc:
-            with contextlib.suppress(HikariPermissionError):
-                await ctx.reply(content=str(exc))
+            with contextlib.suppress(errors.HTTPError):  # TODO: better permission handling?
+                response = str(exc)
+                await ctx.message.reply(content=response if len(response) <= 2000 else response[:1997] + "...")
         except Exception as exc:
-            if self._cluster:
-                await self._cluster.dispatch_cluster_event(CommandEvents.ERROR, ctx, exc)  # TODO: move
+            await self._trigger_error_hook(ctx, exc)
             raise exc
+        else:
+            await self._trigger_on_success_hook(ctx)
+        finally:
+            await self._execute_post_execution_hook(ctx)
 
-    def generate_trigger(self) -> str:
-        """Get a trigger for this command based on it's function's name."""
-        return self.name.replace("_", " ")
+    async def _trigger_pre_execution_hook(self, ctx: Context, *args, **kwargs) -> bool:
+        result = True
+        if self.hooks.pre_execution:
+            result = await self.hooks.pre_execution(ctx, *args, **kwargs)
 
-    @property
-    def name(self) -> str:
-        """Get the name of this command."""
-        return self._func.__name__
+        if self._cluster and self._cluster.hooks.pre_execution:  # TODO: does this matter?
+            result = result and self._cluster.hooks.pre_execution(ctx, *args, **kwargs)  # TODO: for consistency?
+        return result
+
+    async def _trigger_error_hook(self, ctx: Context, exception: BaseException) -> None:
+        if self.hooks.on_error:
+            await self.hooks.on_error(ctx, exception)
+
+        if self._cluster and self._cluster.hooks.on_error:
+            await self._cluster.hooks.on_error(ctx, exception)
+
+    async def _trigger_on_success_hook(self, ctx: Context) -> None:
+        if self.hooks.on_success:
+            await self.hooks.on_success(ctx)
+
+        if self._cluster and self._cluster.hooks.on_success:
+            await self._cluster.hooks.on_success(ctx)
+
+    async def _execute_post_execution_hook(self, ctx: Context) -> None:
+        if self.hooks.post_execution:
+            await self.hooks.post_execution(ctx)
+
+        if self._cluster and self._cluster.hooks.post_execution:
+            await self._cluster.hooks.post_execution(ctx)
 
 
 def command(
-    __arg=..., cls: type(AbstractCommand) = Command, group: typing.Optional[str] = None, **kwargs
+    __arg=..., cls: typing.Type[AbstractCommand] = Command, group: typing.Optional[str] = None, **kwargs
 ):  # TODO: handle groups...
     def decorator(coro_fn):
         return cls(coro_fn, **kwargs)
@@ -424,19 +425,22 @@ def command(
     return decorator if __arg is ... else decorator(__arg)
 
 
+def event(event_: base_events.HikariEvent):
+    def decorator(coro_fn):
+        coro_fn.__event__ = event_
+        return coro_fn
+
+    return decorator
+
+
 class CommandGroup(Executable):
     ...
 
 
-class AbstractCommandCluster(abc.ABC):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-
-    @abc.abstractmethod
-    def add_cluster_event(
-        self, event_name: typing.Union[str, CommandEvents], coroutine_function: aio.CoroutineFunctionT
-    ) -> None:
-        ...
+class AbstractCommandCluster:  # TODO: Executable  TODO: proper type annotations
+    def __init__(self, components: _components.Components, *, hooks: CommandHooks):
+        self._components = components
+        self.hooks = hooks or CommandHooks()
 
     @abc.abstractmethod
     async def get_command_from_context(self, ctx: Context) -> typing.AsyncIterator[AbstractCommand]:
@@ -465,12 +469,12 @@ class AbstractCommandCluster(abc.ABC):
     @abc.abstractmethod
     @typing.overload
     def register_command(
-        self, func: aio.CoroutineFunctionT, *aliases: str, trigger: typing.Optional[str] = None, bind: bool = False,
+        self, func: CommandFunctionT, *aliases: str, trigger: typing.Optional[str] = None, bind: bool = False,
     ) -> None:
         ...
 
     @abc.abstractmethod
-    def register_command(self, func, *aliases, trigger=None, bind=False,) -> None:
+    def register_command(self, func, *aliases, trigger=None, bind=False) -> None:
         """
         Register a command in this cluster.
 
@@ -500,18 +504,17 @@ class AbstractCommandCluster(abc.ABC):
                 If the passed command object wasn't found.
         """
 
+    @abc.abstractmethod
+    async def load(self) -> None:
+        ...
+
+    @abc.abstractmethod
+    async def unload(self) -> None:
+        ...
+
 
 class CommandCluster(AbstractCommandCluster):
-    __slots__ = ("_event_dispatcher", "_fabric", "client", "logger", "cluster_commands")
-
-    _event_dispatcher: aio.EventDelegate
-
-    _fabric: typing.Optional[fabric.Fabric]
-
-    #: The command client this cluster is loaded in.
-    #:
-    #: :type: :class:`AbstractCommandClient` or :class:`None`
-    client: typing.Optional[AbstractCommandClient]
+    __slots__ = ("_components", "logger", "commands", "hooks")
 
     #: The class wide logger.
     #:
@@ -521,38 +524,29 @@ class CommandCluster(AbstractCommandCluster):
     #: A list of the commands that are loaded in this cluster.
     #:
     #: :type: :class:`typing.Sequence` of :class:`AbstractCommand`
-    cluster_commands: typing.List[AbstractCommand]
+    commands: typing.List[AbstractCommand]
 
-    def __init__(
-        self, command_client: typing.Optional[AbstractCommandClient] = None, bind: bool = True, **kwargs
-    ) -> None:
-        super().__init__(**kwargs)
-        self.client = command_client
-        if command_client:
-            self._fabric = command_client._fabric
-        self._event_dispatcher = aio.EventDelegate()
-        self.logger = loggers.get_named_logger(self)
-        self.cluster_commands = []
-        if bind:
-            self.bind_commands()
-            self.bind_listeners()
-        self.dispatch_cluster_event(CommandEvents.LOAD, self)  # TODO: unload and do this somewhere better
+    def __init__(self, components: _components.Components, *, hooks: typing.Optional[CommandHooks] = None) -> None:
+        AbstractCommandCluster.__init__(self, components, hooks=hooks)
+        self.logger = logging.getLogger(type(self).__qualname__)
+        self.commands = []
+        self.bind_commands()
+        self.bind_listeners()
 
-    def add_cluster_event(
-        self, event_name: typing.Union[str, CommandEvents], coroutine_function: aio.CoroutineFunctionT
-    ) -> None:
-        self.logger.debug(
-            "Subscribing %s%s to %s event in %s cluster.",
-            coroutine_function.__name__,
-            inspect.signature(coroutine_function),
-            event_name,
-            self.__class__.__name__,
-        )
-        self._event_dispatcher.add(str(event_name), coroutine_function)
+    async def access_check(self, command_obj: AbstractCommand, message: messages.Message) -> bool:
+        """
+        Used to check if a command can be accessed by the calling user and in the calling channel/guild.
 
-    def bind_client(self, command_client: AbstractCommandClient) -> None:
-        self.client = command_client
-        self._fabric = command_client._fabric
+        Args:
+            command_obj:
+                The :class:`AbstractCommand` derived object to check access levels for.
+            message:
+                The :class:`messages.Message` object to check access levels for.
+
+        Returns:
+            A :class:`bool` representation of whether this command can be accessed.
+        """
+        return self._components.config.access_levels.get(message.author.id, 0) >= command_obj.level  # TODO: sql filter.
 
     def bind_commands(self) -> None:
         """
@@ -563,8 +557,8 @@ class CommandCluster(AbstractCommandCluster):
                 if the commands for this cluster have already been binded or if any duplicate triggers are found while
                 loading commands.
         """
-        assertions.assert_that(
-            not self.cluster_commands,
+        assertions.assert_that(  # TODO: overwrite commands?
+            not self.commands,
             f"Cannot bind commands in cluster '{self.__class__.__name__}' when commands have already been binded.",
         )
         for name, command_obj in inspect.getmembers(self, predicate=lambda attr: isinstance(attr, AbstractCommand)):
@@ -572,39 +566,36 @@ class CommandCluster(AbstractCommandCluster):
             self.logger.debug(
                 "Binded command %s in %s cluster.", command_obj.name, self.__class__.__name__,
             )
-            self.cluster_commands.append(command_obj)
-        self.cluster_commands.sort(key=lambda comm: comm.name, reverse=True)
+        self.commands.sort(key=lambda comm: comm.name, reverse=True)
 
-    def bind_listeners(self) -> None:
-        for name, function in self.get_cluster_event_listeners():
-            if name not in discord_event_types.EventType.__members__.values():
-                self.add_cluster_event(name, function)
-
-    def dispatch_cluster_event(self, event: typing.Union[CommandEvents, str], *args) -> asyncio.Future:
-        self.logger.debug("Dispatching %s command event in %s cluster.", str(event), self.__class__.__name__)
-        return self._event_dispatcher.dispatch(str(event), *args)
+    def bind_listeners(self) -> None:  # TODO: bind listeners from a specific cluster?
+        """Used to add event listeners from all loaded command clusters to hikari's internal event listener."""
+        for _, function in self.get_cluster_event_listeners():
+            self.logger.debug(f"Registering {function.__event__} event listener for command client.")
+            self._components.event_dispatcher.add_listener(function.__event__, function)
 
     async def get_command_from_context(self, ctx: Context) -> typing.AsyncIterator[AbstractCommand]:
-        for command_obj in self.cluster_commands:
-            if await command_obj.check(ctx):
-                yield command_obj
+        for command_obj in self.commands:
+            try:
+                await command_obj.check(ctx)
+            except FailedCheck:
+                continue
+            else:
+                if await self.access_check(command_obj, ctx.message):
+                    yield command_obj
 
     def get_command_from_name(self, content: str) -> typing.Iterator[typing.Tuple[AbstractCommand, str]]:
-        for command_obj in self.cluster_commands:
+        for command_obj in self.commands:
             if prefix := command_obj.check_prefix(content):
                 yield command_obj, prefix
 
-    def get_cluster_event_listeners(self) -> typing.Generator[typing.Tuple[str, aio.CoroutineFunctionT]]:
+    def get_cluster_event_listeners(self) -> typing.Sequence[typing.Tuple[str, _dispatchers.EventCallbackT]]:
         """Get a generator of the event listeners attached to this cluster."""
-        return (
-            (name[3:], function)
-            for name, function in inspect.getmembers(self, predicate=asyncio.iscoroutinefunction)
-            if name.startswith("on_")
-        )
+        return inspect.getmembers(self, predicate=lambda obj: hasattr(obj, "__event__"))
 
     def register_command(
         self,
-        func: typing.Union[aio.CoroutineFunctionT, AbstractCommand],
+        func: typing.Union[CommandFunctionT, AbstractCommand],
         *aliases: str,
         trigger: typing.Optional[str] = None,
         bind: bool = False,
@@ -620,19 +611,22 @@ class CommandCluster(AbstractCommandCluster):
                 self.logger.warning(
                     "Possible overlapping trigger '%s' found in %s cluster.", trigger, self.__class__.__name__,
                 )
-        self.cluster_commands.append(command_obj)
+        self.commands.append(command_obj)
 
     def unregister_command(self, command_obj: AbstractCommand) -> None:
         try:
-            self.cluster_commands.remove(command_obj)
+            self.commands.remove(command_obj)
         except ValueError:
             raise ValueError("Invalid command passed for this cluster.") from None
 
+    async def load(self) -> None:
+        ...
 
-class AbstractCommandClient(AbstractCommandCluster, abc.ABC):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    async def unload(self) -> None:
+        ...
 
+
+class AbstractCommandClient(AbstractCommandCluster, Executable, abc.ABC):
     @abc.abstractmethod
     async def get_global_command_from_context(self, ctx: Context) -> typing.AsyncIterator[AbstractCommand]:
         """
@@ -671,7 +665,7 @@ class AbstractCommandClient(AbstractCommandCluster, abc.ABC):
         """
 
 
-class CommandClient(AbstractCommandClient, CommandCluster, client.Client):
+class CommandClient(AbstractCommandClient, CommandCluster):
     """
     The central client that all command clusters will be binded to. This extends :class:`hikari.client.Client` and
     handles registering event listeners attached to the loaded clusters and the listener(s) required for commands.
@@ -680,58 +674,29 @@ class CommandClient(AbstractCommandClient, CommandCluster, client.Client):
         This inherits from :class:`CommandCluster` and can act as an independent Command Cluster for small bots.
     """
 
-    __slots__ = ("clusters", "get_guild_prefix")
+    # __slots__ = ("clusters",)
 
-    _client_options: CommandClientOptions
-
-    #: The command clusters that are loaded in this client.
-    #:
-    #: :type: :class:`typing.MutableMapping` of :class:`str` to :class:`AbstractCommandCluster`
-    clusters: typing.MutableMapping[str, AbstractCommandCluster]
-
-    get_guild_prefix: typing.Union[aio.CoroutineFunctionT, None]  # TODO: or normal method.
+    _clusters: typing.Mapping[str, AbstractCommandCluster]
 
     def __init__(
         self,
+        components: _components.Components,
         *,
-        loop: typing.Optional[asyncio.AbstractEventLoop] = None,
+        hooks: typing.Optional[CommandHooks] = None,
         modules: typing.List[str] = None,
-        options: typing.Optional[CommandClientOptions] = None,
     ) -> None:
-        super().__init__(bind=False, loop=loop, options=options)
-        self.clusters = {}
-        self.bind_commands()
-        self.load_from_modules(*(modules or containers.EMPTY_SEQUENCE))
-        self.bind_listeners()
+        CommandCluster.__init__(self, components, hooks=hooks)
+        self._clusters = {}
+        self._started = False
+        self.load_from_modules(*(modules or more_collections.EMPTY_SEQUENCE))
 
-    def add_event(self, event_name: str, coroutine_function: aio.CoroutineFunctionT) -> None:
-        if event_name in discord_event_types.EventType.__members__.values():
-            client.Client.add_event(self, event_name, coroutine_function)
-        else:
-            self.add_cluster_event(event_name, coroutine_function)
-
-    async def access_check(self, command_obj: AbstractCommand, message: messages.Message) -> bool:
-        """
-        Used to check if a command can be accessed by the calling user and in the calling channel/guild.
-
-        Args:
-            command_obj:
-                The :class:`AbstractCommand` derived object to check access levels for.
-            message:
-                The :class:`messages.Message` object to check access levels for.
-
-        Returns:
-            A :class:`bool` representation of whether this command can be accessed.
-        """
-        return self._client_options.access_levels.get(message.author.id, 0) >= command_obj.level  # TODO: sql filter.
-
-    def bind_listeners(self) -> None:
-        """Used to add event listeners from all loaded command clusters to hikari's internal event listener."""
-        for cluster in (self, *self.clusters.values()):
-            for name, function in cluster.get_cluster_event_listeners():
-                if name in discord_event_types.EventType.__members__.values():
-                    self.add_event(name, function)
-        super().bind_listeners()
+    async def load(self) -> None:
+        await super().load()
+        self.logger.debug("Starting up %s loaded clusters.", len(self._clusters) + 1)
+        for cluster in self._clusters.values():
+            self.logger.debug("Starting up %s cluster.", cluster.__class__.__name__)
+            await cluster.load()
+        self._started = True
 
     async def check_prefix(self, message: messages.Message) -> typing.Optional[str]:
         """
@@ -752,21 +717,17 @@ class CommandClient(AbstractCommandClient, CommandCluster, client.Client):
                 break
         return trigger_prefix
 
-    @property
-    def config(self) -> CommandClientOptions:
-        return self._client_options
-
     async def get_global_command_from_context(self, ctx: Context) -> typing.AsyncIterator[AbstractCommand]:
-        for cluster in (self, *self.clusters.values()):
+        for cluster in (self, *self._clusters.values()):
             async for command_obj in cluster.get_command_from_context(ctx):
                 yield command_obj
 
     def get_global_command_from_name(self, content: str) -> typing.Iterator[typing.Tuple[AbstractCommand, str]]:
         yield from self.get_command_from_name(content)
-        for cluster in self.clusters.values():
+        for cluster in (self, *self._clusters.values()):
             yield from cluster.get_command_from_name(content)
 
-    async def _get_prefixes(self, guild: typing.Optional[guilds.GuildLikeT]) -> typing.List[str]:
+    async def _get_prefixes(self, guild: typing.Optional[bases.Snowflake]) -> typing.List[str]:
         """
         Used to get the registered global prefixes and a guild's prefix from the function `get_guild_prefix` if this is
         being called from a guild and `get_guild_prefix` has been implemented on this object.
@@ -779,55 +740,64 @@ class CommandClient(AbstractCommandClient, CommandCluster, client.Client):
             An :class:`typing.Sequence` of :class:`str` representation of the applicable prefixes.
         """
         if guild is None or not hasattr(self, "get_guild_prefix"):
-            return self._client_options.prefixes
+            return self._components.config.prefixes  # TODO: this
 
-        if asyncio.iscoroutinefunction(self.get_guild_prefix):
-            guild_prefix = await self.get_guild_prefix(int(guild))  # TODO: maybe don't
-        else:
-            guild_prefix = self.get_guild_prefix(int(guild))
+        guild_prefix = self.get_guild_prefix(guild)
+        if asyncio.iscoroutine(guild_prefix):
+            guild_prefix = await guild_prefix
 
-        return [guild_prefix, *self._client_options.prefixes] if guild_prefix else self._client_options.prefixes
+        return [guild_prefix, *self._components.config.prefixes] if guild_prefix else self._components.config.prefixes
 
     def load_from_modules(self, *modules: str) -> None:
         for module_path in modules:
             module = importlib.import_module(module_path)
             module.setup(self)
 
+    @event(message_events.MessageCreateEvent)
     async def on_message_create(self, message: messages.Message) -> None:
         """Handles command triggering based on message creation."""
-        prefix = await self.check_prefix(message)  # TODO: maybe one day we won't have to await this.
+        if not self._started:
+            await self.load()
+
+        prefix = await self.check_prefix(message)
         mention = None  # TODO: mention at end of message?
         if prefix or mention:
             command_args = message.content[len(prefix or mention) :]
         else:
             return
 
-        ctx = Context(
-            self._fabric,
-            command_args,
-            message,
-            prefix or mention,
-            TriggerTypes.PREFIX if prefix else TriggerTypes.MENTION,
+        ctx = Context(  # TODO: stateless vs stateful
+            components=self._components,
+            content=command_args,
+            message=message,
+            trigger=prefix or mention,
+            trigger_type=TriggerTypes.PREFIX if prefix else TriggerTypes.MENTION,
         )
         async for command_obj in self.get_global_command_from_context(ctx):
-            if await self.access_check(command_obj, message):
-                break
+            break
         else:
             command_obj = None
 
         if command_obj is None:
             return
 
-        ctx.prune_content(len(ctx.triggering_name) + 1)
-
+        ctx.prune_content(len(ctx.triggering_name) + 1)  # TODO: no spaces?
         await command_obj.execute(ctx)
 
-    def register_cluster(self, cluster: typing.Union[AbstractCommandCluster, type(AbstractCommandCluster)]):
+    async def register_cluster(
+        self, cluster: typing.Union[AbstractCommandCluster, typing.Type[AbstractCommandCluster]]
+    ) -> None:
         if inspect.isclass(cluster):
-            cluster = cluster(self)
+            cluster = cluster(self._components)
         else:
-            cluster.bind_client(self)
-        self.clusters[cluster.__class__.__name__] = cluster
+            cluster.bind_client(self)  # TODO
+        await cluster.load()
+        self._clusters[cluster.__class__.__name__] = cluster
+
+    async def deregister_cluster(self, cluster: str) -> AbstractCommandCluster:
+        cluster = self._clusters.pop(cluster)  # TODO: support the actual object?
+        await cluster.unload()
+        return cluster
 
 
 class ReinhardCommandClient(CommandClient):
@@ -835,7 +805,8 @@ class ReinhardCommandClient(CommandClient):
 
     def _consume_client_loadable(self, loadable: typing.Any) -> bool:
         if inspect.isclass(loadable) and issubclass(loadable, AbstractCommandCluster):
-            self.register_cluster(loadable)
+            cluster = loadable(self._components)
+            self._clusters[cluster.__class__.__name__] = cluster
         elif isinstance(loadable, AbstractCommand):  # TODO: or executable?
             self.register_command(loadable)
         elif callable(loadable):
@@ -847,7 +818,7 @@ class ReinhardCommandClient(CommandClient):
     def load_from_modules(self, *modules: str) -> None:
         for module_path in modules:
             module = importlib.import_module(module_path)
-            exports = getattr(module, "exports", containers.EMPTY_SEQUENCE)
+            exports = getattr(module, "exports", more_collections.EMPTY_SEQUENCE)
             for item in exports:
                 try:
                     item = getattr(module, item)
@@ -861,6 +832,3 @@ class ReinhardCommandClient(CommandClient):
 
             if not exports:
                 self.logger.warning("No exports found in %s", module_path)
-
-
-CheckLikeT = typing.Callable[[Context], typing.Union[bool, typing.Coroutine[typing.Any, typing.Any, bool]]]
