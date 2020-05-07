@@ -1,16 +1,17 @@
 from __future__ import annotations
 
+import asyncio
 import copy
 import time
 import typing
 
-from hikari import embeds
 import asyncpg
+from hikari import embeds
 
+from reinhard import sql
 from reinhard.util import command_client
 from reinhard.util import command_hooks
-from reinhard.util import embed_paginator
-from reinhard import sql
+from reinhard.util import paginators
 
 if typing.TYPE_CHECKING:
     from hikari.clients import components as _components
@@ -22,30 +23,31 @@ class CommandClient(command_client.ReinhardCommandClient):
             modules = [f"reinhard.modules.{module}" for module in ("stars", "moderation", "sudo")]
         super().__init__(
             components=components,
-            hooks=command_client.CommandHooks(on_error=command_hooks.error_hook),
+            hooks=command_client.CommandHooks(
+                on_error=command_hooks.error_hook, on_conversion_error=command_hooks.on_conversion_error
+            ),
             modules=modules,
         )
         self.sql_pool: typing.Optional[asyncpg.pool.Pool] = None
         self.sql_scripts = sql.CachedScripts(pattern=r"[.*schema.sql]|[*prefix.sql]")
         self.help_embeds = {}
-        self.paginator_pool = embed_paginator.PaginatorPool(self._components)
-
-    async def unload(self) -> None:
-        await super().unload()
-        await self.sql_pool.close()
+        self.paginator_pool = paginators.PaginatorPool(self.components)
 
     async def load(self) -> None:
         await super().load()
         self.sql_pool = await asyncpg.create_pool(
-            password=self._components.config.database.password,
-            host=self._components.config.database.host,
-            user=self._components.config.database.user,
-            database=self._components.config.database.database,
-            port=self._components.config.database.port,
+            password=self.components.config.database.password,
+            host=self.components.config.database.host,
+            user=self.components.config.database.user,
+            database=self.components.config.database.database,
+            port=self.components.config.database.port,
         )
         async with self.sql_pool.acquire() as conn:
             await sql.initialise_schema(self.sql_scripts, conn)
-        self.paginator_pool.blacklist.append((await self._components.rest.fetch_me()).id)
+
+    async def unload(self) -> None:
+        await super().unload()
+        await self.sql_pool.close()
 
     @command_client.command
     async def about(self, ctx: command_client.Context) -> None:
@@ -81,7 +83,7 @@ class CommandClient(command_client.ReinhardCommandClient):
         requireds = f"<{', '.join(requireds)}> " if requireds else ""
         optionals = f"[{', '.join(optionals)}]" if optionals else ""
         names = f"({' | '.join(command.triggers)})" if len(command.triggers) > 1 else command.triggers[0]
-        return f"{self._components.config.prefixes[0]}{names} {requireds}{optionals}"
+        return f"{self.components.config.prefixes[0]}{names} {requireds}{optionals}"
 
     def generate_help_embed(self) -> typing.Iterator[typing.Tuple[str, embeds.Embed]]:
         for cluster in (self, *self._clusters.values()):
@@ -137,16 +139,16 @@ class CommandClient(command_client.ReinhardCommandClient):
             )
 
     @command_client.command
-    async def ping(self, ctx: command_client.Context) -> None:
+    async def ping(self, ctx: command_client.Context, delay: int = 0) -> None:
         """Get statistics about the latency between this bot and Discord's API."""
-        shard_id = (ctx.message.guild_id >> 22) % ctx.components.shards[0].shard_count if ctx.message.guild_id else 0
+        await asyncio.sleep(delay)
         message_sent = time.perf_counter()
         message_obj = await ctx.message.reply(content="Nyaa!")
         api_latency = round((time.perf_counter() - message_sent) * 1000)
-        gateway_latency = round(self._components.shards[shard_id].heartbeat_latency * 1000)
+        gateway_latency = round(ctx.shard.heartbeat_latency * 1000)
 
         await ctx.components.rest.update_message(
             message=message_obj,
             channel=message_obj.channel_id,
-            content=f"Pong! :ping_pong:\nAPI: {api_latency}\nGateway:{gateway_latency}",
+            content=f"Pong! :ping_pong:\nAPI: {api_latency}\nGateway: {gateway_latency}",
         )

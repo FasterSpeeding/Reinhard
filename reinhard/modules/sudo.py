@@ -16,7 +16,7 @@ from hikari import files
 
 from reinhard.util import command_client
 from reinhard.util import command_hooks
-from reinhard.util import embed_paginator
+from reinhard.util import paginators
 
 if typing.TYPE_CHECKING:
     from hikari import applications as _applications
@@ -29,23 +29,29 @@ exports = ["SudoCluster"]
 
 class SudoCluster(command_client.CommandCluster):
     def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs, hooks=command_client.CommandHooks(on_error=command_hooks.error_hook))
+        super().__init__(
+            *args,
+            **kwargs,
+            hooks=command_client.CommandHooks(
+                on_error=command_hooks.error_hook, on_conversion_error=command_hooks.on_conversion_error
+            ),
+        )
         self.application: typing.Optional[_applications.Application] = None
         self.application_task = None  # todo: annotation?
         for command in self.commands:
             command.register_check(self.owner_check)
-        self.paginator_pool = embed_paginator.PaginatorPool(self._components)
+        self.paginator_pool = paginators.PaginatorPool(self.components)
 
     async def load(self) -> None:
         await super().load()
-        self.application = await self._components.rest.fetch_my_application_info()
+        self.application = await self.components.rest.fetch_my_application_info()
         self.application_task = asyncio.create_task(self.update_application())
 
     async def update_application(self) -> None:
         while True:
             await asyncio.sleep(1800)
             try:
-                self.application = await self._components.rest.fetch_my_application_info()
+                self.application = await self.components.rest.fetch_my_application_info()
             except errors.HTTPErrorResponse as exc:
                 self.logger.warning("Failed to fetch application object:\n  - %s", exc)
 
@@ -102,7 +108,7 @@ class SudoCluster(command_client.CommandCluster):
 
         result, exec_time, failed = await self.eval_python_code(ctx, code[0])
         color = 0xF04747 if failed else 0x43B581
-        page_generator = embed_paginator.string_paginator(result, wrapper="```python\n{}\n```", char_limit=2034)
+        page_generator = paginators.string_paginator(result, wrapper="```python\n{}\n```", char_limit=2034)
         embed_generator = (
             (
                 "",
@@ -125,7 +131,7 @@ class SudoCluster(command_client.CommandCluster):
         Pass "r" as the last argument to steal from the message reactions.
         Pass "u" or "c" or "s" to steal from a user custom status.
         """
-        if not self._components.config.emoji_guild:
+        if not self.components.config.emoji_guild:
             await ctx.message.reply(content="The target emoji guild not set for this bot.")
             return
         channel = None
@@ -195,8 +201,8 @@ class SudoCluster(command_client.CommandCluster):
         for name, path in results:
             url = f"https://cdn.discordapp.com/emojis/{path}?v=1"
             try:
-                await self._components.rest.create_guild_emoji(
-                    guild=self._components.config.emoji_guild,
+                await self.components.rest.create_guild_emoji(
+                    guild=self.components.config.emoji_guild,
                     reason=reason,
                     name=name,
                     image=files.WebResourceStream("", url),
@@ -212,8 +218,3 @@ class SudoCluster(command_client.CommandCluster):
             )
         else:
             await ctx.message.reply(content=f":thumbsup: ({count})")
-
-
-@SudoCluster.error.hooks.set_on_error
-async def on_error(ctx: command_client.Context, exception) -> None:
-    await ctx.message.reply(content=f"test {exception}")

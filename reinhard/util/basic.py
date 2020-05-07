@@ -3,7 +3,7 @@ from __future__ import annotations
 import functools
 import typing
 
-from reinhard.util import command_client
+from reinhard.util import errors
 
 from hikari.internal import more_collections
 
@@ -26,7 +26,7 @@ class CommandErrorRelay:
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         if exc_type in self.errors:
-            raise command_client.CommandError(
+            raise errors.CommandError(
                 (self.error_responses or more_collections.EMPTY_DICT).get(exc_type)
                 or str(getattr(exc_val, "message", exc_val))
             )  # f"{exc_type.__name__}: {exc_val}"
@@ -36,14 +36,13 @@ def command_error_relay(
     errors: typing.Union[BaseException, typing.Tuple[typing.Type[BaseException], ...]],
     errors_responses: typing.Optional[typing.MutableMapping[typing.Type[BaseException], str]] = None,
 ):
-    @typing.no_type_check
     def decorator(func: typing.Callable[[...], typing.Coroutine[typing.Any, typing.Any, typing.Any]]):
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             try:
                 return await func(*args, **kwargs)
             except errors as exc:
-                raise command_client.CommandError(
+                raise errors.CommandError(
                     (errors_responses or more_collections.EMPTY_DICT).get(type(exc))
                     or str(getattr(exc, "message", exc))
                 )

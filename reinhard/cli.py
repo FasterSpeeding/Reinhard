@@ -5,8 +5,8 @@ import logging
 import os
 import typing
 
-from hikari.clients import stateless
 import yaml
+from hikari.clients import stateless
 
 from reinhard import client
 from reinhard import config

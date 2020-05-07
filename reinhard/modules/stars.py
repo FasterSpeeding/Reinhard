@@ -8,6 +8,7 @@ from hikari import errors
 from hikari import messages as _messages
 from hikari import embeds
 
+import reinhard.util.errors
 from reinhard.util import command_client
 from reinhard.util import basic as util
 from reinhard import sql
@@ -57,9 +58,7 @@ class StarboardCluster(command_client.CommandCluster):
         if user.is_bot or reaction.emoji != UNICODE_STAR:
             return
 
-        message_obj = self._components.rest.fetch_message(
-            message_id=reaction.message_id, channel_id=reaction.channel_id
-        )
+        message_obj = self.components.rest.fetch_message(message_id=reaction.message_id, channel_id=reaction.channel_id)
         # This shouldn't ever fail.
         message_obj = await message_obj if not message_obj.is_resolved else message_obj
 
@@ -116,7 +115,7 @@ class StarboardCluster(command_client.CommandCluster):
 
             # Should flag both DM channels and channels from other guilds.
             if getattr(target_channel, "guild_id", None) != channel.guild_id:
-                raise command_client.CommandError("Unknown channel ID supplied.")
+                raise reinhard.util.errors.CommandError("Unknown channel ID supplied.")
 
         async with self.client.sql_pool.acquire() as conn:
             if (
@@ -140,7 +139,7 @@ class StarboardCluster(command_client.CommandCluster):
                 target_message = await target_message
 
         if target_message.author.id == ctx.message.author.id:  # TODO: hikari bug?
-            raise command_client.CommandError("You cannot star your own message.")
+            raise reinhard.util.errors.CommandError("You cannot star your own message.")
 
         if await self.consume_star_increment(target_message, ctx.message.author):
             response = "Added star to message."

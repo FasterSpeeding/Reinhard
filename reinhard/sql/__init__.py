@@ -5,8 +5,8 @@ import re
 import pathlib
 import typing
 
-from hikari.internal import assertions
 import asyncpg
+from hikari.internal import assertions
 
 
 def script_getter_factory(key: str):  # Could just make this retrieve the file.

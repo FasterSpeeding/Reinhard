@@ -5,31 +5,38 @@ import datetime
 import logging
 import typing
 
+import attr
 from hikari import emojis
 from hikari import errors
 from hikari import events
 
 if typing.TYPE_CHECKING:
-    from hikari.clients import components as _components
     from hikari import bases
     from hikari import embeds
     from hikari import messages
+    from hikari.clients import components as hikari_components
 
 
 END = object()
 
 
+@attr.attrs(init=False, repr=True, slots=True)
 class ResponsePaginator:
-    __slots__ = (
-        "authors",
-        "_buffer",
-        "_emoji_triggers",
-        "_generator",
-        "_index",
-        "last_triggered",
-        "message",
-        "timeout",
-    )
+    authors: typing.Sequence[bases.Snowflake] = attr.attrib()
+
+    _buffer: typing.Sequence[typing.Tuple[str, embeds.Embed]] = attr.attrib()
+
+    _emoji_triggers: typing.MutableMapping[str, typing.Callable[[], typing.Any]] = attr.attrib()
+
+    _generator: typing.Optional[typing.Iterator[typing.Tuple[str, embeds.Embed]]] = attr.attrib()
+
+    _index: int = attr.attrib()
+
+    last_triggered: datetime.datetime = attr.attrib()
+
+    message: typing.Optional[messages.Message] = attr.attrib()
+
+    timeout: datetime.timedelta = attr.attrib()
 
     def __init__(
         self,
@@ -39,18 +46,18 @@ class ResponsePaginator:
         authors: typing.Optional[typing.Sequence[bases.Snowflake]],
         timeout: typing.Optional[datetime.timedelta] = None,
     ) -> None:
-        self.authors: typing.Sequence[bases.Snowflake] = authors or []
-        self._buffer: typing.Sequence[typing.Tuple[str, embeds.Embed]] = [first_entry]
-        self._emoji_triggers: typing.MutableMapping[str, typing.Callable[[], typing.Any]] = {
+        self.authors = authors or []
+        self._buffer = [first_entry]
+        self._emoji_triggers = {
             "\N{BLACK LEFT-POINTING TRIANGLE}\N{VARIATION SELECTOR-16}": self.previous,
             "\N{BLACK SQUARE FOR STOP}\N{VARIATION SELECTOR-16}": self.on_disable,
             "\N{BLACK RIGHT-POINTING TRIANGLE}\N{VARIATION SELECTOR-16}": self.next,
         }
-        self._generator: typing.Optional[typing.Iterator[typing.Tuple[str, embeds.Embed]]] = generator
-        self._index: int = 0
-        self.last_triggered: datetime.datetime = datetime.datetime.now()
-        self.message: typing.Optional[messages.Message] = None
-        self.timeout: datetime.timedelta = timeout or datetime.timedelta(seconds=15)
+        self._generator = generator
+        self._index = 0
+        self.last_triggered = datetime.datetime.now()
+        self.message = None
+        self.timeout = timeout or datetime.timedelta(seconds=15)
 
     def next(self) -> typing.Optional[typing.Tuple[str, embeds.Embed]]:
         if len(self._buffer) > self._index + 1:
@@ -96,6 +103,9 @@ class ResponsePaginator:
         if not isinstance(emoji, emojis.UnicodeEmoji) or self.authors and user_id not in self.authors:
             return
 
+        if self.expired:
+            await self.deregister_message()
+
         if method := self._emoji_triggers.get(emoji.name):
             result = method()
             if asyncio.iscoroutine(result):
@@ -110,11 +120,13 @@ class ResponsePaginator:
         return END
 
     async def deregister_message(self) -> None:
-        for emoji in self._emoji_triggers.keys():
-            try:
-                await self.message.delete_reaction(emoji)
-            except errors.HTTPError:
-                ...
+        if self.message:
+            self.message = None
+            for emoji in self._emoji_triggers.keys():
+                try:
+                    await self.message.delete_reaction(emoji)
+                except errors.HTTPError:
+                    ...
 
     @property
     def expired(self) -> bool:
@@ -169,22 +181,25 @@ class AsyncResponsePaginator(ResponsePaginator):
         return super().on_disable()
 
 
+@attr.attrs(init=False, repr=True, slots=True)
 class PaginatorPool:
-    __slots__ = (
-        "blacklist",
-        "_components",
-        "garbage_collect_task",
-        "listeners",
-        "logger",
-    )
+    blacklist: typing.Sequence[bases.Snowflake] = attr.attrib()
 
-    def __init__(self, components: _components.Components) -> None:
-        self.blacklist: typing.Sequence[bases.Snowflake] = []
+    _components: hikari_components.Components = attr.attrib()
+
+    garbage_collect_task: typing.Optional[asyncio.Task] = attr.attrib()
+
+    listeners: typing.Mapping[bases.Snowflake, ResponsePaginator] = attr.attrib()
+
+    logger: logging.Logger = attr.attrib()
+
+    def __init__(self, components: hikari_components.Components) -> None:
+        self.blacklist = []
         self._components = components
         components.event_dispatcher.add_listener(events.MessageReactionAddEvent, self.on_reaction_modify)
         components.event_dispatcher.add_listener(events.MessageReactionRemoveEvent, self.on_reaction_modify)
-        self.garbage_collect_task: typing.Optional[asyncio.Task] = None
-        self.listeners: typing.Mapping[bases.Snowflake, ResponsePaginator] = {}
+        self.garbage_collect_task = None
+        self.listeners = {}
         self.logger = logging.getLogger(type(self).__qualname__)
 
     async def register_message(
@@ -220,7 +235,7 @@ class PaginatorPool:
             self.logger.debug("performing embed paginator garbage collection pass.")
             try:
                 for listener in list(self.listeners.values()):
-                    if listener.expired:
+                    if listener.expired and listener in self.listeners:
                         del self.listeners[listener.message.id]
                         await listener.deregister_message()  # TODO: asyncio.create_task?
             except Exception as exc:

@@ -3,8 +3,8 @@ from __future__ import annotations
 import attr
 import typing
 
-from hikari.internal import marshaller
 from hikari import bases
+from hikari.internal import marshaller
 
 from reinhard.util import command_client
 
