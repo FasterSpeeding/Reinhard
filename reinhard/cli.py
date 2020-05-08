@@ -48,6 +48,16 @@ def main():
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
+    file_logger = logging.FileHandler("bot.log")
+    file_logger.setLevel(config_obj.file_log_level)
+    file_logger.setFormatter(
+        logging.Formatter(
+            fmt="%(asctime)s.%(msecs)03d %(levelname)s %(module)s - %(funcName)s: %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    )
+    logging.getLogger().addHandler(file_logger)
+
     bot_client = stateless.StatelessBot(config=config_obj)
     client.CommandClient(bot_client, modules=["reinhard.modules.sudo"])
     bot_client.run()

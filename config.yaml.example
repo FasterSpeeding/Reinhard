@@ -3,7 +3,7 @@ access_levels:
 database:
   database: "postgres"
   host: "69.69.69.69"
-  name: "postgres"
+  user: "postgres"
   password: "A PASSWORD"
   port: 5432
 token: "A.DISCORD.TOKEN"

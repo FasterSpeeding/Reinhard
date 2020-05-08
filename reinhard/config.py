@@ -26,6 +26,7 @@ class ExtendedOptions(command_client.CommandClientOptions):
     emoji_guild: typing.Optional[bases.Snowflake] = marshaller.attrib(
         deserializer=bases.Snowflake, if_undefined=None, default=None
     )
+    file_log_level: str = marshaller.attrib(deserializer=str, if_undefined=lambda: "WARNING", default="WARNING")
     log_level: str = marshaller.attrib(deserializer=str, if_undefined=lambda: "INFO", default="INFO")
     prefixes: typing.List[str] = marshaller.attrib(
         deserializer=lambda payload: [str(prefix) for prefix in payload],
