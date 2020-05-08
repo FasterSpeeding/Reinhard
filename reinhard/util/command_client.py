@@ -362,7 +362,7 @@ class Command(AbstractCommand):
         level: int = 0,
         meta: typing.Optional[typing.MutableMapping[typing.Any, typing.Any]] = None,
         cluster: typing.Optional[AbstractCommandCluster] = None,
-        greedy: bool = False,
+        greedy: typing.Optional[str] = None,
     ) -> None:
         if trigger is None:
             trigger = generate_trigger(func)

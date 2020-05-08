@@ -3,8 +3,12 @@ from __future__ import annotations
 import abc
 import inspect
 import re
+import shlex
 import typing
+import distutils.util
 
+import attr
+import click
 from hikari import bases
 from hikari import channels
 from hikari import errors as hikari_errors
@@ -25,49 +29,6 @@ if typing.TYPE_CHECKING:
     import enum
 
     from hikari.clients import components as _components
-
-
-QUOTE_SEPARATORS = ('"', "'")
-
-
-def basic_arg_parsers(content: str, ceiling: typing.Optional[int]) -> typing.Iterator[str]:
-    last_space: int = -1
-    spaces_found_while_quoting: typing.List[int] = []
-    last_quote: typing.Optional[int] = None
-    i: int = -1
-    count: int = 1
-    while i < len(content):
-        i += 1
-        char = content[i] if i != len(content) else " "
-        if ceiling and count == ceiling:
-            yield content[last_space + 1 :]
-            return
-
-        if char == " " and i - last_space > 1:
-            if last_quote:
-                spaces_found_while_quoting.append(i)
-                continue
-
-            count += 1
-            yield content[last_space + 1 : i]
-            last_space = i
-
-        elif char in QUOTE_SEPARATORS:  # and content[i -  1] != "\\":
-            if last_quote is None:
-                last_quote = i
-                spaces_found_while_quoting.append(last_space)
-            elif content[last_quote] == char:
-                count += 1
-                yield content[last_quote + 1 : i]
-                last_space = i
-                spaces_found_while_quoting.clear()
-                last_quote = None
-
-    if last_quote:
-        i = 1
-        while i < len(spaces_found_while_quoting):
-            yield content[spaces_found_while_quoting[i - 1] + 1 : spaces_found_while_quoting[i]]
-            spaces_found_while_quoting.pop(i - 1)
 
 
 def calculate_missing_flags(
@@ -239,7 +200,7 @@ class UserConverter(BaseIDConverter, types=(users.User,)):
 class MemberConverter(UserConverter, types=(guilds.GuildMember,)):
     def convert(self, ctx: command_client.Context, argument: str) -> guilds.GuildMember:
         if not ctx.message.guild:
-            raise errors.ConversionError("Cannot get a member from a DM channel.")  # TODO: better error
+            raise ValueError("Cannot get a member from a DM channel.")  # TODO: better error and error
 
         if match := self._match_id(argument):
             return ctx.fabric.state_registry.get_mandatory_member_by_id(match, ctx.message.guild_id)
@@ -282,27 +243,37 @@ class AbstractCommandParser(abc.ABC):
         """
 
 
+BUILTIN_OVERRIDES = {bool: distutils.util.strtobool}
+
+
 SUPPORTED_TYPING_WRAPPERS = (typing.Union,)  # typing.Optional just resolves to typing.Union[type, NoneType]
 
 POSITIONAL_TYPES = (
     inspect.Parameter.VAR_POSITIONAL,
     inspect.Parameter.POSITIONAL_ONLY,
-    inspect.Parameter.POSITIONAL_OR_KEYWORD,
 )
 
 
+@attr.attrs(init=False, slots=True)
 class CommandParser(AbstractCommandParser):
-    __slots__ = ("_converters", "greedy", "signature")
-
-    _converters: typing.Mapping[str, typing.Tuple[typing.Tuple[typing.Callable, bool], ...]]
-    greedy: bool
-    signature: inspect.Signature
+    _converters: typing.Mapping[str, typing.Tuple[typing.Tuple[typing.Callable, bool], ...]] = attr.attrib()
+    greedy: typing.Optional[str] = attr.attrib()
+    _option_parser: typing.Optional[click.OptionParser] = attr.attrib()
+    _shlex: shlex.shlex
+    signature: inspect.Signature = attr.attrib()
 
     def __init__(
-        self, func: typing.Callable[[...], typing.Coroutine[typing.Any, typing.Any, typing.Any]], greedy: bool
+        self,
+        func: typing.Callable[[...], typing.Coroutine[typing.Any, typing.Any, typing.Any]],
+        greedy: typing.Optional[str] = None,
     ) -> None:
         self._converters = {}
         self.greedy = greedy
+        self._option_parser = None
+        self._shlex = shlex.shlex("", posix=True)
+        self._shlex.whitespace = "\t\r "
+        self._shlex.whitespace_split = True
+        self._shlex.commenters = ""
         self.signature = conversions.resolve_signature(func)
         # Remove the `ctx` arg for now, `self` should be trimmed by the command object itself.
         self.trim_parameters(1)
@@ -322,7 +293,7 @@ class CommandParser(AbstractCommandParser):
                 failed.append(exc)
         if failed:
             raise errors.ConversionError(
-                msg=f"Invalid value for argument `{parameter.name}`.", origins=failed
+                msg=f"Invalid value for argument `{parameter.name.replace('_', '-')}`.", origins=failed
             ) from failed[0]
         return value
 
@@ -336,11 +307,22 @@ class CommandParser(AbstractCommandParser):
             if not converter.verify_intents(components):
                 return converter.missing_intents_default, True if converter.missing_intents_default else None
             return converter, True
-        return annotation, False
+        return BUILTIN_OVERRIDES.get(annotation, annotation), False
 
     def resolve_and_validate_annotations(self, components: _components.Components) -> None:
+        greedy_found = False
+        parser = click.OptionParser()
         var_position = False
+        # As this doesn't handle defaults, we have to do that ourselves.
+        parser.ignore_unknown_options = True
+        assertions.assert_that(
+            not self.greedy or self.greedy in self.signature.parameters, f"Unknown greedy argument set `{self.greedy}`."
+        )
         for key, value in self.signature.parameters.items():
+            assertions.assert_that(
+                value.kind not in POSITIONAL_TYPES or not greedy_found,
+                "Positional arguments after a greedy argument aren't supported by this parser.",
+            )
             if origin := typing.get_origin(value.annotation):
                 assertions.assert_that(
                     origin in SUPPORTED_TYPING_WRAPPERS, f"Typing wrapper `{origin}` is not supported by this parser."
@@ -351,9 +333,20 @@ class CommandParser(AbstractCommandParser):
             else:
                 converter = self._resolve_annotation(components=components, annotation=value.annotation)
                 self._converters[key] = (converter,) if converter is not None else ()
+
+            if self.greedy == key:
+                greedy_found = True
+            # We don't want this to parse greedy arguments
+            elif value.default is inspect.Parameter.empty and value.kind is not value.VAR_POSITIONAL:
+                parser.add_argument(key)
+            elif value.kind is not value.VAR_POSITIONAL:
+                parser.add_option([f"--{key.replace('_', '-')}"], key)
             assertions.assert_that(value.kind is not value.VAR_KEYWORD, "**kwargs are not supported by this parser.")
-            assertions.assert_that(not var_position, "Arguments after *args are not supported by this parser.")
             var_position = value.kind is value.VAR_POSITIONAL
+        assertions.assert_that(
+            not (var_position and self.greedy), "The `greedy` parser flag and *args are mutually exclusive."
+        )
+        self._option_parser = parser
 
     def trim_parameters(self, to_trim: int) -> None:
         parameters = list(self.signature.parameters.values())
@@ -366,41 +359,51 @@ class CommandParser(AbstractCommandParser):
             if parameter.name in self._converters:
                 del self._converters[parameter.name]
 
-    @staticmethod
-    def _get_next_argument(arguments: typing.Iterator[str]) -> typing.Optional[str]:
-        try:
-            return next(arguments)
-        except StopIteration:
-            return None
-
     def parse(
         self, ctx: command_client.Context
-    ) -> typing.Tuple[typing.List[typing.Any], typing.MutableMapping[str, typing.Any]]:
-        args: typing.List[typing.Any] = []
+    ) -> typing.Tuple[typing.Sequence[typing.Any], typing.MutableMapping[str, typing.Any]]:
+        args: typing.Sequence[typing.Any] = []
         kwargs: typing.MutableMapping[str, typing.Any] = {}
-        arguments = basic_arg_parsers(ctx.content, ceiling=len(self.signature.parameters) if self.greedy else None)
+        if ctx.content:
+            self._shlex.push_source(ctx.content)
+            self._shlex.state = " "
+        try:
+            values, arguments, _ = self._option_parser.parse_args(list(self._shlex) if ctx.content else [])
+        except Exception as exc:
+            raise errors.ConversionError(str(exc), [exc]) from exc
+
+        if self.greedy:
+            parameter = self.signature.parameters[self.greedy]
+            result = self._convert(ctx, " ".join(arguments), parameter)
+            if parameter.kind in POSITIONAL_TYPES:
+                args.append(result)
+            else:
+                kwargs[parameter.name] = result
+            arguments = []
+
         for parameter in self.signature.parameters.values():
             # Just a typing hack, may be removed in the future.
             parameter: inspect.Parameter
-            if (
-                not (value := self._get_next_argument(arguments))
-                and parameter.default is parameter.empty
-                # VAR_POSITIONAL parameters should default to an empty tuple anyway.
-                and parameter.kind is not parameter.VAR_POSITIONAL
-            ):
-                raise TypeError(f"Missing required argument `{parameter.name}`")  # TODO: ???
-            elif not value:
-                break
+            # greedy and VAR_POSITIONAL should be exclusive anyway
+            if parameter.name == self.greedy:
+                continue
 
-            while True:
-                result = self._convert(ctx, value, parameter)
-                if parameter.kind in POSITIONAL_TYPES:
-                    args.append(result)
-                else:
-                    kwargs[parameter.name] = result
+            # If we reach a VAR_POSITIONAL parameter then we want to consume all of the positional arguments.
+            if parameter.kind is parameter.VAR_POSITIONAL:
+                args.extend(self._convert(ctx, value, parameter) for value in arguments)
+                continue
 
-                # If we reach a VAR_POSITIONAL parameter then we want to want to
-                # consume the remaining arguments as positional arguments.
-                if parameter.kind is not parameter.VAR_POSITIONAL or not (value := self._get_next_argument(arguments)):
-                    break
+            # VAR_POSITIONAL parameters should default to an empty tuple anyway.
+            if (value := values.get(parameter.name)) is None and parameter.default is parameter.empty:
+                raise errors.ConversionError(f"Missing required argument `{parameter.name}`")
+
+            if value is None:
+                value = parameter.default
+            else:
+                value = self._convert(ctx, value, parameter)
+
+            if parameter.kind in POSITIONAL_TYPES:
+                args.append(value)
+            else:
+                kwargs[parameter.name] = value
         return args, kwargs

@@ -64,7 +64,7 @@ class SudoCluster(command_client.CommandCluster):
             return any(ctx.message.author.id == member_id for member_id in self.application.team.members.keys())
         return ctx.message.author.id == self.application.owner.id
 
-    @command_client.command(greedy=True)  # level=5
+    @command_client.command(greedy="args")
     async def echo(self, ctx: command_client.Context, args: str) -> None:
         await ctx.message.reply(content=args)
 
@@ -99,8 +99,8 @@ class SudoCluster(command_client.CommandCluster):
             result.extend(stderr.splitlines())
         return result or ["..."], exec_time, failed
 
-    @command_client.command(greedy=True, aliases=["exec", "sudo"])
-    async def eval(self, ctx: command_client.Context, code: str) -> None:
+    @command_client.command(aliases=["exec", "sudo"], greedy="code")
+    async def eval(self, ctx: command_client.Context, code: str, suppress_response: bool = False) -> None:
         code = re.findall(r"```(?:[\w]*\n?)([\s\S(^\\`{3})]*?)\n*```", code)
         if not code:
             await ctx.message.reply(content="Expected a python code block.")
@@ -108,6 +108,9 @@ class SudoCluster(command_client.CommandCluster):
 
         result, exec_time, failed = await self.eval_python_code(ctx, code[0])
         color = 0xF04747 if failed else 0x43B581
+        if suppress_response:
+            return
+
         page_generator = paginators.string_paginator(result, wrapper="```python\n{}\n```", char_limit=2034)
         embed_generator = (
             (
@@ -124,7 +127,7 @@ class SudoCluster(command_client.CommandCluster):
             message, generator=embed_generator, first_entry=first_page, authors=[ctx.message.author.id]
         )
 
-    @command_client.command(greedy=True)
+    @command_client.command(greedy="target")
     async def steal(self, ctx: command_client.Context, target: bases.Snowflake, args: str = ""):
         """Used to steal emojis from messages content or reactions.
 

@@ -81,7 +81,7 @@ class CommandClient(command_client.ReinhardCommandClient):
                 icon=self.current_user.avatar_url,
                 url=hikari_url,
             )
-            .add_field(name="Uptime", value=":".join(str(uptime).split(":")[:2]), inline=True)
+            .add_field(name="Uptime", value=str(uptime), inline=True)
             .add_field(
                 name="Process",
                 value=f"{memory_usage:.2f} MiB ({memory_percent:.0f}%)\n{cpu_usage:.2f}% CPU",
@@ -99,37 +99,31 @@ class CommandClient(command_client.ReinhardCommandClient):
                 return data["prefix"]
 
     def _form_command_name(self, command: command_client.AbstractCommand) -> str:
-        requireds = []
-        optionals = []
+        arguments = []
         for parameter in command.parser.signature.parameters.values():
-            if parameter.annotation is parameter.empty:
-                argument = parameter.name
-            else:
+            annotation = ""
+            if parameter.annotation is not parameter.empty:
                 if args := typing.get_args(parameter.annotation):
                     annotation = " | ".join(getattr(arg, "__name__", str(arg)) for arg in args if arg is not type(None))
                 else:
                     annotation = getattr(parameter.annotation, "__name__", str(parameter.annotation))
-                argument = f"{parameter.name}: {annotation}"
-            if parameter.default is parameter.empty:
-                requireds.append(argument)
-            else:
-                optionals.append(argument)
-        if command.parser.greedy:
-            if optionals:
-                optionals.append(optionals.pop() + "...")
-            elif requireds:
-                requireds.append(requireds.pop() + "...")
-        requireds = f"<{', '.join(requireds)}> " if requireds else ""
-        optionals = f"[{', '.join(optionals)}]" if optionals else ""
+
+            name = parameter.name.replace("_", "-")
+            if parameter.name == command.parser.greedy:
+                name = f"{name}..."
+            elif parameter.default is not parameter.empty:
+                name = f"--{name}"
+            arguments.append(f"{name} : {annotation}" if annotation else name)
+        arguments = f"<{', '.join(arguments)}>" if arguments else ""
         names = f"({' | '.join(command.triggers)})" if len(command.triggers) > 1 else command.triggers[0]
-        return f"{self.components.config.prefixes[0]}{names} {requireds}{optionals}"
+        return f"{self.components.config.prefixes[0]}{names} {arguments}"
 
     def generate_help_embed(self) -> typing.Iterator[typing.Tuple[str, embeds.Embed]]:
         for cluster in (self, *self._clusters.values()):
             embed = embeds.Embed(
                 title=cluster.__class__.__name__,
                 color=constants.EMBED_COLOUR,
-                description="Argument key: <required> [optional], with '...'specifying a multi-word argument",
+                description="Argument key: <required, multi-word..., --optional>",
             )
             for command in cluster.commands:
                 if len(embed.fields) == 25:
@@ -145,7 +139,7 @@ class CommandClient(command_client.ReinhardCommandClient):
                 )
             yield cluster.__class__.__name__, embed  # TODO: better name generation
 
-    @command_client.command(greedy=True)
+    @command_client.command(greedy="command")
     async def help(
         self, ctx: command_client.Context, command: typing.Optional[str] = None
     ) -> None:  # TODO: do we even support typing.Union?

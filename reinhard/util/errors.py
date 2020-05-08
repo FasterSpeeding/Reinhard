@@ -46,7 +46,7 @@ class FailedCheck(CommandClientError):
 @attr.attrs(init=True, repr=True, slots=True)
 class ConversionError(CommandClientError):
     msg: str = attr.attrib()
-    origins: typing.Sequence[BaseException] = attr.attrib(default=None)
+    origins: typing.Sequence[BaseException] = attr.attrib(factory=list)
 
     def __str__(self) -> str:
         return self.msg
