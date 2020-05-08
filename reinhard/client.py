@@ -3,13 +3,15 @@ from __future__ import annotations
 import asyncio
 import copy
 import datetime
+import platform
 import time
 import typing
 
 import asyncpg
 import psutil
-from hikari import __url__ as hikari_url
 from hikari import embeds
+from hikari import __url__ as hikari_url
+from hikari import __version__ as hikari_version
 
 from reinhard import sql
 from reinhard.util import command_client
@@ -84,6 +86,10 @@ class CommandClient(command_client.ReinhardCommandClient):
                 name="Process",
                 value=f"{memory_usage:.2f} MiB ({memory_percent:.0f}%)\n{cpu_usage:.2f}% CPU",
                 inline=True,
+            )
+            .set_footer(
+                icon="http://i.imgur.com/5BFecvA.png",
+                text=f"Made with Hikari v{hikari_version} (python {platform.python_version()})",
             )
         )
 
