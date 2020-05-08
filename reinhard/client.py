@@ -2,22 +2,34 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import datetime
 import time
 import typing
 
 import asyncpg
+import psutil
+from hikari import __url__ as hikari_url
 from hikari import embeds
 
 from reinhard import sql
 from reinhard.util import command_client
 from reinhard.util import command_hooks
+from reinhard.util import constants
 from reinhard.util import paginators
 
 if typing.TYPE_CHECKING:
+    from hikari import users as _users
     from hikari.clients import components as _components
 
 
 class CommandClient(command_client.ReinhardCommandClient):
+    current_user: typing.Optional[_users.MyUser]
+    help_embeds: typing.Mapping[str, embeds.Embed]
+    paginator_pool: paginators.PaginatorPool
+    process: psutil.Process
+    sql_pool: typing.Optional[asyncpg.pool.Pool]
+    sql_scripts: sql.CachedScripts
+
     def __init__(self, components: _components.Components, *, modules: typing.List[str] = None) -> None:
         if modules is None:
             modules = [f"reinhard.modules.{module}" for module in ("stars", "moderation", "sudo")]
@@ -28,10 +40,12 @@ class CommandClient(command_client.ReinhardCommandClient):
             ),
             modules=modules,
         )
-        self.sql_pool: typing.Optional[asyncpg.pool.Pool] = None
-        self.sql_scripts = sql.CachedScripts(pattern=r"[.*schema.sql]|[*prefix.sql]")
+        self.current_user = None
         self.help_embeds = {}
         self.paginator_pool = paginators.PaginatorPool(self.components)
+        self.process = psutil.Process()
+        self.sql_pool = None
+        self.sql_scripts = sql.CachedScripts(pattern=r"[.*schema.sql]|[*prefix.sql]")
 
     async def load(self) -> None:
         await super().load()
@@ -42,6 +56,7 @@ class CommandClient(command_client.ReinhardCommandClient):
             database=self.components.config.database.database,
             port=self.components.config.database.port,
         )
+        self.current_user = await self.components.rest.fetch_me()
         async with self.sql_pool.acquire() as conn:
             await sql.initialise_schema(self.sql_scripts, conn)
 
@@ -52,7 +67,25 @@ class CommandClient(command_client.ReinhardCommandClient):
     @command_client.command
     async def about(self, ctx: command_client.Context) -> None:
         """Get general information about this bot."""
-        await ctx.message.reply(content="TODO: This")
+        start_date = datetime.datetime.fromtimestamp(self.process.create_time())
+        uptime = datetime.datetime.now() - start_date
+        memory_usage = self.process.memory_full_info().uss / 1024 ** 2
+        cpu_usage = self.process.cpu_percent() / psutil.cpu_count()
+        memory_percent = self.process.memory_percent()
+        await ctx.message.reply(
+            embed=embeds.Embed(description="An experimental pythonic Hikari bot.", color=constants.EMBED_COLOUR)
+            .set_author(
+                name=f"Reinhard: Shard {ctx.shard_id} of {ctx.shard.shard_count}",
+                icon=self.current_user.avatar_url,
+                url=hikari_url,
+            )
+            .add_field(name="Uptime", value=":".join(str(uptime).split(":")[:2]), inline=True)
+            .add_field(
+                name="Process",
+                value=f"{memory_usage:.2f} MiB ({memory_percent:.0f}%)\n{cpu_usage:.2f}% CPU",
+                inline=True,
+            )
+        )
 
     async def get_guild_prefix(self, guild_id: int) -> typing.Optional[str]:
         async with self.sql_pool.acquire() as conn:
@@ -89,7 +122,7 @@ class CommandClient(command_client.ReinhardCommandClient):
         for cluster in (self, *self._clusters.values()):
             embed = embeds.Embed(
                 title=cluster.__class__.__name__,
-                color=0x55CDFC,
+                color=constants.EMBED_COLOUR,
                 description="Argument key: <required> [optional], with '...'specifying a multi-word argument",
             )
             for command in cluster.commands:
@@ -127,7 +160,7 @@ class CommandClient(command_client.ReinhardCommandClient):
                     embed=embeds.Embed(
                         title=self._form_command_name(command),
                         description=command.docstring[:2000] if command.docstring else "...",
-                        color=0x55CDFC,
+                        color=constants.EMBED_COLOUR,
                     )
                 )
         else:

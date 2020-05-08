@@ -13,12 +13,12 @@ class CommandErrorRelay:
 
     def __init__(
         self,
-        errors: typing.Tuple[typing.Type[BaseException], ...],
+        _errors: typing.Tuple[typing.Type[BaseException], ...],
         errors_responses: typing.Optional[typing.MutableMapping[typing.Type[BaseException], str]] = None,
     ) -> None:
         # if isinstance(errors, BaseException):
         #    errors = [errors]
-        self.errors: typing.Tuple[typing.Type[BaseException], ...] = errors
+        self.errors: typing.Tuple[typing.Type[BaseException], ...] = _errors
         self.error_responses: typing.Optional[typing.MutableMapping[typing.Type[BaseException], str]] = errors_responses
 
     def __enter__(self) -> None:
@@ -33,7 +33,7 @@ class CommandErrorRelay:
 
 
 def command_error_relay(
-    errors: typing.Union[BaseException, typing.Tuple[typing.Type[BaseException], ...]],
+    _errors: typing.Union[BaseException, typing.Tuple[typing.Type[BaseException], ...]],
     errors_responses: typing.Optional[typing.MutableMapping[typing.Type[BaseException], str]] = None,
 ):
     def decorator(func: typing.Callable[[...], typing.Coroutine[typing.Any, typing.Any, typing.Any]]):
@@ -41,7 +41,7 @@ def command_error_relay(
         async def wrapper(*args, **kwargs):
             try:
                 return await func(*args, **kwargs)
-            except errors as exc:
+            except _errors as exc:
                 raise errors.CommandError(
                     (errors_responses or more_collections.EMPTY_DICT).get(type(exc))
                     or str(getattr(exc, "message", exc))
