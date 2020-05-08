@@ -71,8 +71,8 @@ def basic_arg_parsers(content: str, ceiling: typing.Optional[int]) -> typing.Ite
 
 
 def calculate_missing_flags(
-    value: enum.IntFlag, required: enum.IntEnum, origin_enum: typing.Type[enum.IntEnum]
-) -> enum.IntEnum:
+    value: enum.IntFlag, required: enum.IntFlag, origin_enum: typing.Type[enum.IntFlag]
+) -> enum.IntFlag:
     missing = origin_enum(0)
     for flag in origin_enum.__members__.values():
         if (flag & required) == flag and (flag & value) != flag:
@@ -388,7 +388,7 @@ class CommandParser(AbstractCommandParser):
                 # VAR_POSITIONAL parameters should default to an empty tuple anyway.
                 and parameter.kind is not parameter.VAR_POSITIONAL
             ):
-                raise errors.CommandError(f"Missing required argument `{parameter.name}`")
+                raise TypeError(f"Missing required argument `{parameter.name}`")  # TODO: ???
             elif not value:
                 break
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
+import traceback
 import typing
 
 import attr
@@ -120,11 +121,11 @@ class ResponsePaginator:
         return END
 
     async def deregister_message(self) -> None:
-        if self.message:
+        if message := self.message:
             self.message = None
             for emoji in self._emoji_triggers.keys():
                 try:
-                    await self.message.delete_reaction(emoji)
+                    await message.delete_reaction(emoji)
                 except errors.HTTPError:
                     ...
 
@@ -234,12 +235,13 @@ class PaginatorPool:
         while True:
             self.logger.debug("performing embed paginator garbage collection pass.")
             try:
-                for listener in list(self.listeners.values()):
-                    if listener.expired and listener in self.listeners:
-                        del self.listeners[listener.message.id]
+                for listener_id, listener in tuple(self.listeners.items()):
+                    if listener.expired and listener_id in self.listeners:
+                        del self.listeners[listener_id]
                         await listener.deregister_message()  # TODO: asyncio.create_task?
             except Exception as exc:
                 self.logger.warning("Failed to garbage collect embed paginator:\n  - %s", exc)
+                traceback.print_exc()
             await asyncio.sleep(5)  # TODO: is this good?
 
 

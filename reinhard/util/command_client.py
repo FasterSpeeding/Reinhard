@@ -46,17 +46,7 @@ if typing.TYPE_CHECKING:
 SEND_MESSAGE_PERMISSIONS = permissions.Permission.VIEW_CHANNEL | permissions.Permission.SEND_MESSAGES
 ATTACH_FILE_PERMISSIONS = SEND_MESSAGE_PERMISSIONS | permissions.Permission.ATTACH_FILES
 
-# TODO: use command hooks instead of specific stuff like get_guild_prefixes?
-# Todo event dispatching?
-
-
-class CommandEvents(enum.Enum):
-    ERROR = "error"
-    LOAD = "load"
-    UNLOAD = "unload"
-
-    def __str__(self) -> str:
-        return self.value
+# TODO: stuff like get_guild_prefixes?
 
 
 class TriggerTypes(enum.Enum):
@@ -374,14 +364,14 @@ class Command(AbstractCommand):
         cluster: typing.Optional[AbstractCommandCluster] = None,
         greedy: bool = False,
     ) -> None:
+        if trigger is None:
+            trigger = generate_trigger(func)
         super().__init__(
             hooks=hooks or CommandHooks(),
             level=level,
             meta=meta or {},
             triggers=tuple(
-                trig
-                for trig in (trigger or generate_trigger(func), *(aliases or more_collections.EMPTY_COLLECTION))
-                if trig is not None
+                trig for trig in (trigger, *(aliases or more_collections.EMPTY_COLLECTION)) if trig is not None
             ),
         )
         self.logger = logging.getLogger(type(self).__qualname__)
@@ -562,9 +552,7 @@ class CommandGroup(AbstractCommand):
         return command_obj
 
 
-def command(
-    __arg=..., cls: typing.Type[AbstractCommand] = Command, group: typing.Optional[str] = None, **kwargs
-):  # TODO: handle groups...
+def command(__arg=..., *, cls: typing.Type[AbstractCommand] = Command, **kwargs):  # TODO: handle groups...
     def decorator(coro_fn):
         return cls(coro_fn, **kwargs)
 
@@ -575,6 +563,19 @@ def event(event_: base_events.HikariEvent):  # TODO: typing annotation support
     def decorator(coro_fn):
         coro_fn.__event__ = event_
         return coro_fn
+
+    return decorator
+
+
+def group(
+    name: str,
+    *,
+    group_class: typing.Type[AbstractCommand] = CommandGroup,
+    command_class: typing.Type[AbstractCommand] = Command,
+    **kwargs,
+):
+    def decorator(coro_fn):
+        return group_class(name=name, master_command=command_class(coro_fn, name=""), **kwargs)
 
     return decorator
 
@@ -667,7 +668,9 @@ class CommandCluster(AbstractCommandCluster):
     def __init__(
         self, client: CommandClient, components: _components.Components, *, hooks: typing.Optional[CommandHooks] = None
     ) -> None:
-        AbstractCommandCluster.__init__(self, client=client, components=components, hooks=hooks, started=False)
+        AbstractCommandCluster.__init__(
+            self, client=client, components=components, hooks=hooks or CommandHooks(), started=False
+        )
         self.logger = logging.getLogger(type(self).__qualname__)
         self.commands = []
         self.bind_commands()
@@ -714,7 +717,7 @@ class CommandCluster(AbstractCommandCluster):
             )
         self.commands.sort(key=lambda comm: comm.name, reverse=True)  # TODO: why was this reversed again?
 
-    def bind_listeners(self) -> None:  # TODO: bind listeners from a specific cluster?
+    def bind_listeners(self) -> None:
         """Used to add event listeners from all loaded command clusters to hikari's internal event listener."""
         for _, function in self.get_cluster_event_listeners():
             self.logger.debug(f"Registering {function.__event__} event listener for command client.")
@@ -728,7 +731,9 @@ class CommandCluster(AbstractCommandCluster):
         async for command_obj, trigger in self.get_command_from_context(ctx):
             ctx.set_command_trigger(trigger)
             ctx.prune_content(len(trigger) + 1)  # TODO: no space? also here?
-            await command_obj.execute(ctx, hooks=[self.hooks])
+            hooks = hooks or []
+            hooks.append(self.hooks)
+            await command_obj.execute(ctx, hooks=hooks)
             return True
         return False
 
@@ -750,7 +755,7 @@ class CommandCluster(AbstractCommandCluster):
             if prefix := command_obj.check_prefix(content):
                 yield command_obj, prefix
 
-    def register_command(self, command_obj: AbstractCommand, bind: bool = False) -> None:  # TODO: decorator?
+    def register_command(self, command_obj: AbstractCommand, *, bind: bool = False) -> None:  # TODO: decorator?
         if bind:
             command_obj.bind_cluster(self)
         for trigger in command_obj.triggers:
