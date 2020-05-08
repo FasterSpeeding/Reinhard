@@ -15,7 +15,7 @@ class DatabaseConfig(marshaller.Deserializable):
     password: str = marshaller.attrib(repr=False, deserializer=str)
     database: str = marshaller.attrib(repr=False, deserializer=str, if_undefined=lambda: "postgres", default="postgres")
     host: str = marshaller.attrib(repr=False, deserializer=str, if_undefined=lambda: "localhost", default="localhost")
-    port: int = marshaller.attrib(repr=False, serializer=int, if_undefined=lambda: 5432, factory=lambda: 5432)
+    port: int = marshaller.attrib(repr=False, deserializer=int, if_undefined=lambda: 5432, factory=lambda: 5432)
     user: str = marshaller.attrib(repr=False, deserializer=str, if_undefined=lambda: "postgres", default="postgres")
 
 
