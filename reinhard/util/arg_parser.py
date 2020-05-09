@@ -32,8 +32,9 @@ if typing.TYPE_CHECKING:
 
 
 def calculate_missing_flags(
-    value: enum.IntFlag, required: enum.IntFlag, origin_enum: typing.Type[enum.IntFlag]
+    value: enum.IntFlag, required: enum.IntFlag
 ) -> enum.IntFlag:
+    origin_enum = type(required)
     missing = origin_enum(0)
     for flag in origin_enum.__members__.values():
         if (flag & required) == flag and (flag & value) != flag:
@@ -86,7 +87,7 @@ class AbstractConverter(abc.ABC):  # These shouldn't be making requests therefor
         failed = []
         for shard in components.shards.values():
             if shard.intents is not None and (self._required_intents & shard.intents) != self._required_intents:
-                failed[shard.shard_id] = calculate_missing_flags(self._required_intents, shard.intents, intents.Intent)
+                failed[shard.shard_id] = calculate_missing_flags(self._required_intents, shard.intents)
         if failed:
             message = (
                 f"Missing intents required for {self.__class__.__name__} converter being used on shards. "
@@ -243,7 +244,9 @@ class AbstractCommandParser(abc.ABC):
         """
 
 
-BUILTIN_OVERRIDES = {bool: distutils.util.strtobool}
+# We override NoneType with None as typing wrappers will contain NoneType but generally we'll want to hand around
+# the None singleton.
+BUILTIN_OVERRIDES = {bool: distutils.util.strtobool, type(None): None}
 
 
 SUPPORTED_TYPING_WRAPPERS = (typing.Union,)  # typing.Optional just resolves to typing.Union[type, NoneType]
@@ -271,9 +274,10 @@ class CommandParser(AbstractCommandParser):
         self.greedy = greedy
         self._option_parser = None
         self._shlex = shlex.shlex("", posix=True)
-        self._shlex.whitespace = "\t\r "
-        self._shlex.whitespace_split = True
         self._shlex.commenters = ""
+        # self._shlex.quotes += "`"  # TODO: consider this
+        self._shlex.whitespace = "\t\r\n "   # is relying on quotes for getting passed new lines good enough?
+        self._shlex.whitespace_split = True
         self.signature = conversions.resolve_signature(func)
         # Remove the `ctx` arg for now, `self` should be trimmed by the command object itself.
         self.trim_parameters(1)
@@ -301,7 +305,7 @@ class CommandParser(AbstractCommandParser):
         self, components: _components.Components, annotation: typing.Any
     ) -> typing.Union[typing.Any, typing.Sequence[typing.Any], None]:
         if args := typing.get_args(annotation):
-            return tuple((self._resolve_annotation(components, arg) for arg in args if arg not in (type(None), None)))
+            return tuple((self._resolve_annotation(components, arg) for arg in args if arg is not None))
 
         if converter := AbstractConverter.get_converter_from_type(annotation):
             if not converter.verify_intents(components):
@@ -312,9 +316,9 @@ class CommandParser(AbstractCommandParser):
     def resolve_and_validate_annotations(self, components: _components.Components) -> None:
         greedy_found = False
         parser = click.OptionParser()
-        var_position = False
         # As this doesn't handle defaults, we have to do that ourselves.
         parser.ignore_unknown_options = True
+        var_position = False
         assertions.assert_that(
             not self.greedy or self.greedy in self.signature.parameters, f"Unknown greedy argument set `{self.greedy}`."
         )
@@ -364,6 +368,8 @@ class CommandParser(AbstractCommandParser):
     ) -> typing.Tuple[typing.Sequence[typing.Any], typing.MutableMapping[str, typing.Any]]:
         args: typing.Sequence[typing.Any] = []
         kwargs: typing.MutableMapping[str, typing.Any] = {}
+        # If we push an empty string to shlex then iterate over shlex, it'll try to get input from sys.stdin, causing
+        # the client to hang.
         if ctx.content:
             self._shlex.push_source(ctx.content)
             self._shlex.state = " "

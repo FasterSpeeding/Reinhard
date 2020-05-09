@@ -16,6 +16,7 @@ from hikari import files
 
 from reinhard.util import command_client
 from reinhard.util import command_hooks
+from reinhard.util import constants
 from reinhard.util import paginators
 
 if typing.TYPE_CHECKING:
@@ -99,15 +100,15 @@ class SudoCluster(command_client.CommandCluster):
             result.extend(stderr.splitlines())
         return result or ["..."], exec_time, failed
 
-    @command_client.command(aliases=["exec", "sudo"], greedy="code")
-    async def eval(self, ctx: command_client.Context, code: str, suppress_response: bool = False) -> None:
-        code = re.findall(r"```(?:[\w]*\n?)([\s\S(^\\`{3})]*?)\n*```", code)
+    @command_client.command(aliases=["exec", "sudo"])
+    async def eval(self, ctx: command_client.Context, suppress_response: bool = False) -> None:
+        code = re.findall(r"```(?:[\w]*\n?)([\s\S(^\\`{3})]*?)\n*```", ctx.message.content)
         if not code:
             await ctx.message.reply(content="Expected a python code block.")
             return
 
         result, exec_time, failed = await self.eval_python_code(ctx, code[0])
-        color = 0xF04747 if failed else 0x43B581
+        color = constants.FAILED_COLOUR if failed else constants.PASS_COLOUR
         if suppress_response:
             return
 
