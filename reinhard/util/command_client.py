@@ -4,7 +4,6 @@ __all__ = [
     "command",
     "Command",
     "CommandClient",
-    "CommandClientOptions",
     "CommandCluster",
 ]
 
@@ -22,11 +21,8 @@ import attr
 from hikari import bases
 from hikari import errors as hikari_errors
 from hikari import permissions
-from hikari.clients import configs
 from hikari.events import message as message_events
 from hikari.events import other as other_events
-from hikari.internal import assertions
-from hikari.internal import marshaller
 from hikari.internal import more_collections
 
 from reinhard.util import arg_parser
@@ -37,11 +33,10 @@ if typing.TYPE_CHECKING:
     from hikari.clients import components as _components
     from hikari.clients import shards as _shards
     from hikari.events import base as base_events
-    from hikari.internal import more_typing
     from hikari.state import dispatchers as _dispatchers
 
     CheckLikeT = typing.Callable[["Context"], typing.Union[bool, typing.Coroutine[typing.Any, typing.Any, bool]]]
-    CommandFunctionT = typing.Callable[[...], more_typing.Coroutine[None]]
+    CommandFunctionT = typing.Callable[[...], typing.Coroutine[typing.Any, typing.Any, None]]
 
 SEND_MESSAGE_PERMISSIONS = permissions.Permission.VIEW_CHANNEL | permissions.Permission.SEND_MESSAGES
 ATTACH_FILE_PERMISSIONS = SEND_MESSAGE_PERMISSIONS | permissions.Permission.ATTACH_FILES
@@ -54,7 +49,7 @@ class TriggerTypes(enum.Enum):
     MENTION = enum.auto()  # TODO: trigger commands with a mention
 
 
-@attr.attrs(init=True, slots=True)
+@attr.attrs(init=True, kw_only=True, slots=True)
 class Context:
     content: str = attr.attrib()
 
@@ -99,7 +94,7 @@ class Context:
 HookLikeT = typing.Callable[[Context], typing.Coroutine[typing.Any, typing.Any, None]]
 
 
-@attr.attrs(init=True, slots=True)
+@attr.attrs(init=True, kw_only=True, slots=True)
 class CommandHooks:  # TODO: this
     pre_execution: typing.Callable[[Context, ...], typing.Coroutine[typing.Any, typing.Any, bool]] = attr.attrib(
         default=None
@@ -117,12 +112,14 @@ class CommandHooks:  # TODO: this
     def set_pre_execution(
         self, hook: typing.Callable[[Context, ...], typing.Coroutine[typing.Any, typing.Any, bool]]
     ) -> typing.Callable[[Context, ...], typing.Coroutine[typing.Any, typing.Any, bool]]:
-        assertions.assert_none(self.pre_execution, "Pre-execution hook already set.")
+        if self.pre_execution:
+            raise ValueError("Pre-execution hook already set.")  # TODO: value error?
         self.pre_execution = hook
         return hook
 
     def set_post_execution(self, hook: HookLikeT) -> HookLikeT:  # TODO: better typing
-        assertions.assert_none(self.post_execution, "Post-execution hook already set.")
+        if self.post_execution:
+            raise ValueError("Post-execution hook already set.")
         self.post_execution = hook
         return hook
 
@@ -130,19 +127,22 @@ class CommandHooks:  # TODO: this
         self,
         hook: typing.Callable[[Context, errors.ConversionError], typing.Coroutine[typing.Any, typing.Any, typing.Any]],
     ) -> typing.Callable[[Context, errors.ConversionError], typing.Coroutine[typing.Any, typing.Any, typing.Any]]:
-        assertions.assert_none(self.on_conversion_error, "On conversion error hook already set.")
+        if self.on_conversion_error:
+            raise ValueError("On conversion error hook already set.")
         self.on_conversion_error = hook
         return hook
 
     def set_on_error(
         self, hook: typing.Callable[[Context, BaseException], typing.Coroutine[typing.Any, typing.Any, None]]
     ) -> typing.Callable[[Context, BaseException], typing.Coroutine[typing.Any, typing.Any, None]]:
-        assertions.assert_none(self.on_error, "On error hook already set.")
+        if self.on_error:
+            raise ValueError("On error hook already set.")
         self.on_error = hook
         return hook
 
     def set_on_success(self, hook: HookLikeT) -> HookLikeT:
-        assertions.assert_none(self.on_success, "On success hook already set.")
+        if self.on_success:
+            raise ValueError("On success hook already set.")
         self.on_success = hook
         return hook
 
@@ -213,18 +213,6 @@ class CommandHooks:  # TODO: this
                 await hook.post_execution(ctx)
 
 
-@marshaller.marshallable()
-@attr.s(slots=True, kw_only=True)
-class CommandClientOptions(configs.BotConfig):
-    access_levels: typing.MutableMapping[bases.Snowflake, int] = marshaller.attrib(
-        deserializer=lambda levels: {bases.Snowflake(sn): int(level) for sn, level in levels.items()}
-    )
-    prefixes: typing.Sequence[str] = marshaller.attrib(
-        deserializer=lambda prefixes: [str(prefix) for prefix in prefixes]
-    )
-    # TODO: handle modules (plus maybe other stuff) here?
-
-
 class Executable(abc.ABC):
     @abc.abstractmethod
     async def execute(self, ctx: Context, *, hooks: typing.Optional[typing.Sequence[CommandHooks]] = None) -> bool:
@@ -264,15 +252,15 @@ class ExecutableCommand(Executable, abc.ABC):
         """
 
 
-@attr.attrs(init=True)
+@attr.attrs(init=True, kw_only=True)
 class AbstractCommand(ExecutableCommand, abc.ABC):
 
     triggers: typing.Tuple[str, ...] = attr.attrib()
     """The triggers used to activate this command in chat along with a prefix."""
 
-    meta: typing.Optional[typing.MutableMapping[typing.Any, typing.Any]] = attr.attrib()
+    meta: typing.MutableMapping[typing.Any, typing.Any] = attr.attrib(factory=dict)
 
-    hooks: CommandHooks = attr.attrib()
+    hooks: CommandHooks = attr.attrib(factory=CommandHooks)
 
     level: int = attr.attrib()
     """The user access level that'll be required to execute this command, defaults to 0."""
@@ -395,7 +383,7 @@ class Command(AbstractCommand):
         self.parser.trim_parameters(1)
         # Before the parser can be used, we need to resolve it's converters and check them against the bot's declared
         # gateway intents.
-        self.parser.resolve_and_validate_annotations(cluster.components)
+        self.parser.components_hook(cluster.components)
 
     async def check(self, ctx: Context) -> None:
         return await run_checks(ctx, self._checks)
@@ -552,7 +540,7 @@ class CommandGroup(AbstractCommand):
         return command_obj
 
 
-def command(__arg=..., *, cls: typing.Type[AbstractCommand] = Command, **kwargs):  # TODO: handle groups...
+def command(__arg=..., *, cls: typing.Type[AbstractCommand] = Command, **kwargs):
     def decorator(coro_fn):
         return cls(coro_fn, **kwargs)
 
@@ -573,20 +561,20 @@ def group(
     group_class: typing.Type[AbstractCommand] = CommandGroup,
     command_class: typing.Type[AbstractCommand] = Command,
     **kwargs,
-):
+):  # TODO: test this
     def decorator(coro_fn):
         return group_class(name=name, master_command=command_class(coro_fn, name=""), **kwargs)
 
     return decorator
 
 
-@attr.attrs(init=True)
+@attr.attrs(init=True, kw_only=True)
 class AbstractCommandCluster(Executable):  # TODO: Executable  TODO: proper type annotations
     client: CommandClient = attr.attrib()
 
     components: _components.Components = attr.attrib()
 
-    hooks: CommandHooks = attr.attrib()
+    hooks: CommandHooks = attr.attrib(factory=CommandHooks)
 
     started: bool = attr.attrib()
 
@@ -706,10 +694,10 @@ class CommandCluster(AbstractCommandCluster):
                 if the commands for this cluster have already been binded or if any duplicate triggers are found while
                 loading commands.
         """
-        assertions.assert_that(  # TODO: overwrite commands?
-            not self.commands,
-            f"Cannot bind commands in cluster '{self.__class__.__name__}' when commands have already been binded.",
-        )
+        if self.commands:  # TODO: overwrite commands?
+            raise ValueError(
+                "Cannot bind commands in cluster '{self.__class__.__name__}' when commands have already been binded."
+            )
         for name, command_obj in inspect.getmembers(self, predicate=lambda attr: isinstance(attr, AbstractCommand)):
             self.register_command(command_obj, bind=True)
             self.logger.debug(

@@ -18,7 +18,7 @@ async def error_hook(ctx: command_client.Context, exception: BaseException) -> N
             embed=embeds.Embed(
                 title=f"An unexpected {type(exception).__name__} occurred",
                 color=15746887,
-                description=f"```python\n{str(exception)[:1950]}```",
+                description=f"```python\n{str(exception)[:1950].replace(ctx.components.config.token, 'REDACTED')}```",
             ),
         )
 

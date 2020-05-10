@@ -95,7 +95,7 @@ class ResponsePaginator:
             return self._buffer[-1]
         return None
 
-    async def register_message(self, message: messages.Message):  # TODO: ???
+    async def register_message(self, message: messages.Message) -> None:  # TODO: ???
         self.message = message
         for emoji in self._emoji_triggers.keys():
             await message.add_reaction(emoji)

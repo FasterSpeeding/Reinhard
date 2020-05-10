@@ -16,10 +16,10 @@ CONFIG_PARSERS = {"yaml": yaml.safe_load, "json": json.load}
 
 def parse_config(
     config_path: typing.Optional[str] = None,
-    config_marshaler: typing.Callable[[dict], typing.Any] = config.ExtendedOptions.deserialize,
+    config_marshaller: typing.Callable[[dict], typing.Any] = config.ExtendedOptions.deserialize,
 ):
     if config_path is None:
-        return config_marshaler({})
+        return config_marshaller({})
 
     file_type = config_path.split(".")[-1].lower()
     if (parser := CONFIG_PARSERS.get(file_type)) is None:
@@ -27,7 +27,7 @@ def parse_config(
 
     if config_path is not None:
         with open(config_path, "r") as file:
-            return config_marshaler(parser(file))
+            return config_marshaller(parser(file))
 
 
 def main():

@@ -109,7 +109,7 @@ class CommandClient(command_client.ReinhardCommandClient):
                     annotation = getattr(parameter.annotation, "__name__", str(parameter.annotation))
 
             name = parameter.name.replace("_", "-")
-            if parameter.name == command.parser.greedy:
+            if parameter.name == command.parser.is_greedy:
                 name = f"{name}..."
             elif parameter.default is not parameter.empty:
                 name = f"--{name}"

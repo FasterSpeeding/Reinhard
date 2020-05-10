@@ -16,7 +16,6 @@ from hikari import guilds
 from hikari import intents
 from hikari import messages
 from hikari import users
-from hikari.internal import assertions
 from hikari.internal import conversions
 from hikari.internal import helpers
 from hikari.internal import more_collections
@@ -31,9 +30,7 @@ if typing.TYPE_CHECKING:
     from hikari.clients import components as _components
 
 
-def calculate_missing_flags(
-    value: enum.IntFlag, required: enum.IntFlag
-) -> enum.IntFlag:
+def calculate_missing_flags(value: enum.IntFlag, required: enum.IntFlag) -> enum.IntFlag:
     origin_enum = type(required)
     missing = origin_enum(0)
     for flag in origin_enum.__members__.values():
@@ -58,11 +55,10 @@ class AbstractConverter(abc.ABC):  # These shouldn't be making requests therefor
             AbstractConverter._converter_implementations = []
 
         for base_type in types:
-            assertions.assert_that(
+            if AbstractConverter.get_converter_from_name(base_type.__name__):
                 #  get_from_name avoids it throwing errors on an inheritable overlapping with a non-inheritable
-                not AbstractConverter.get_converter_from_name(base_type.__name__),
-                f"Type {base_type} already registered.",
-            )  #  TODO: make sure no overlap between inheritables while allowing overlap between inheritable and non-inheritables
+                raise RuntimeError(f"Type {base_type} already registered.")
+            #  TODO: make sure no overlap between inheritables while allowing overlap between inheritable and non-inheritables
 
         AbstractConverter._converter_implementations.append((cls(), tuple(types)))
         # Prioritize non-inheritable converters over inheritable ones.
@@ -78,6 +74,9 @@ class AbstractConverter(abc.ABC):  # These shouldn't be making requests therefor
         self.inheritable = inheritable
         self.missing_intents_default = missing_intents_default  # TODO: get_converter_from_type?
         self._required_intents = required_intents
+
+    def __call__(self, *args, **kwargs) -> typing.Any:
+        return self.convert(*args, **kwargs)
 
     @abc.abstractmethod
     def convert(self, ctx: command_client.Context, argument: str) -> typing.Any:  # Cache only
@@ -102,8 +101,9 @@ class AbstractConverter(abc.ABC):  # These shouldn't be making requests therefor
         for converter, types in cls._converter_implementations:
             if not converter.inheritable and argument_type not in types:
                 continue
-            elif converter.inheritable and inspect.isclass(argument_type) and not issubclass(argument_type, types):
+            if converter.inheritable and inspect.isclass(argument_type) and not issubclass(argument_type, types):
                 continue
+
             return converter
 
     @classmethod
@@ -219,13 +219,116 @@ class MessageConverter(SnowflakeConverter, types=(messages.Message,)):
         #  TODO: state and error handling?
 
 
+# We override NoneType with None as typing wrappers will contain NoneType but generally we'll want to hand around the
+# None singleton.
+BUILTIN_OVERRIDES = {bool: distutils.util.strtobool, type(None): None}
+
+SUPPORTED_TYPING_WRAPPERS = (typing.Union,)  # typing.Optional just resolves to typing.Union[type, NoneType]
+
+POSITIONAL_TYPES = (
+    inspect.Parameter.VAR_POSITIONAL,
+    inspect.Parameter.POSITIONAL_ONLY,
+)
+
+
+@attr.attrs(init=True, kw_only=True, slots=False)
+class AbstractParameter:
+    converters: typing.Tuple[typing.Union[typing.Callable, AbstractConverter], ...] = attr.attr(factory=tuple)
+    default: typing.Optional[typing.Any] = attr.attr(default=None)
+    flags: typing.Mapping[str, typing.Any] = attr.attr(factory=dict)
+    key: str = attr.attr()
+    names: typing.Optional[typing.Tuple[str]] = attr.attr(default=None)
+
+    @abc.abstractmethod
+    def components_hook(self, ctx: _components.Components) -> None:
+        ...
+
+    @abc.abstractmethod
+    def convert(self, ctx: command_client.Context, value: str) -> typing.Any:
+        ...
+
+
+NO_DEFAULT = object()
+
+
+@attr.attrs(slots=True, init=False)
+class Parameter(AbstractParameter):
+    def __init__(
+        self,
+        key: str,
+        *,
+        names: typing.Optional[typing.Tuple[str]] = None,
+        converters: typing.Optional[typing.Tuple[typing.Union[typing.Callable, AbstractConverter], ...]] = None,
+        default: typing.Any = NO_DEFAULT,
+        **flags: typing.Any,
+    ):
+        super().__init__(
+            converters=converters or (), default=default, flags=flags, key=key, names=names,
+        )
+        # While it may be tempting to have validation here, parameter validation should be attached to the parser
+        # implementation rather than the parameters themselves.
+
+    def components_hook(self, components: _components.Components) -> None:
+        converters: typing.Sequence[typing.Union[typing.Callable, AbstractConverter]] = []
+        for converter in self.converters:
+            if custom_converter := AbstractConverter.get_converter_from_type(converter):
+                if custom_converter.verify_intents(components):
+                    converters.append(custom_converter)
+                elif custom_converter.missing_intents_default:
+                    converters.append(custom_converter.missing_intents_default)
+            else:
+                converters.append(BUILTIN_OVERRIDES.get(converter, converter))
+        self.converters = tuple(converters)
+
+    def convert(self, ctx: command_client.Context, value: str) -> typing.Any:
+        failed = []
+        for converter in self.converters:
+            try:
+                #  TODO: use the function signature to work out if it requires ctx or not?
+                if isinstance(converter, AbstractConverter):
+                    return converter.convert(ctx, value)
+                else:
+                    return converter(value)
+            except Exception as exc:
+                failed.append(exc)
+        if failed:
+            raise errors.ConversionError(msg=f"Invalid value for argument `{self.key}`.", origins=failed) from failed[0]
+        return value
+
+    @property
+    def is_greedy(self) -> bool:
+        return self.flags.get("greedy", False)
+
+
+def parameter(key, *, cls: typing.Type[AbstractParameter] = Parameter, **kwargs):
+    def decorator(func):
+        if not hasattr(func, "__parameters__"):
+            func.__parameters__ = {}
+        func.__parameters__[key] = cls(**kwargs)
+        return func
+
+    return decorator
+
+
+@attr.attrs(init=True, repr=False, slots=False, kw_only=True)
 class AbstractCommandParser(abc.ABC):
+    flags: typing.Mapping[str, typing.Any] = attr.attrib(factory=dict)
+    parameters: typing.Tuple[AbstractParameter, ...] = attr.attrib(factory=dict)
+
+    @abc.abstractmethod
+    def components_hook(self, components: _components.Components) -> None:
+        ...
+
     @abc.abstractmethod
     def parse(self, ctx: command_client.Context) -> typing.MutableMapping[str, typing.Any]:
         ...
 
     @abc.abstractmethod
-    def resolve_and_validate_annotations(self, components: _components.Components) -> None:
+    def set_parameters(self, parameters: typing.Sequence[AbstractParameter]) -> None:
+        ...
+
+    @abc.abstractmethod
+    def set_parameters_from_annotations(self, func: typing.Callable) -> None:
         ...
 
     @abc.abstractmethod
@@ -243,125 +346,37 @@ class AbstractCommandParser(abc.ABC):
                 If the `to_trim` passed is higher than the amount of known parameters.
         """
 
-
-# We override NoneType with None as typing wrappers will contain NoneType but generally we'll want to hand around
-# the None singleton.
-BUILTIN_OVERRIDES = {bool: distutils.util.strtobool, type(None): None}
-
-
-SUPPORTED_TYPING_WRAPPERS = (typing.Union,)  # typing.Optional just resolves to typing.Union[type, NoneType]
-
-POSITIONAL_TYPES = (
-    inspect.Parameter.VAR_POSITIONAL,
-    inspect.Parameter.POSITIONAL_ONLY,
-)
+    @abc.abstractmethod
+    def validate_signature(self, signature: inspect.Signature) -> None:
+        ...
 
 
 @attr.attrs(init=False, slots=True)
 class CommandParser(AbstractCommandParser):
-    _converters: typing.Mapping[str, typing.Tuple[typing.Tuple[typing.Callable, bool], ...]] = attr.attrib()
-    greedy: typing.Optional[str] = attr.attrib()
     _option_parser: typing.Optional[click.OptionParser] = attr.attrib()
     _shlex: shlex.shlex
-    signature: inspect.Signature = attr.attrib()
+    _signature: inspect.Signature = attr.attrib()
 
     def __init__(
-        self,
-        func: typing.Callable[[...], typing.Coroutine[typing.Any, typing.Any, typing.Any]],
-        greedy: typing.Optional[str] = None,
+        self, func: typing.Callable[[...], typing.Coroutine[typing.Any, typing.Any, typing.Any]], **flags: typing.Any,
     ) -> None:
-        self._converters = {}
-        self.greedy = greedy
+        super().__init__(parameters={}, flags=flags)
         self._option_parser = None
         self._shlex = shlex.shlex("", posix=True)
         self._shlex.commenters = ""
-        # self._shlex.quotes += "`"  # TODO: consider this
-        self._shlex.whitespace = "\t\r\n "   # is relying on quotes for getting passed new lines good enough?
+        self._shlex.whitespace = "\t\r\n "
         self._shlex.whitespace_split = True
         self.signature = conversions.resolve_signature(func)
         # Remove the `ctx` arg for now, `self` should be trimmed by the command object itself.
         self.trim_parameters(1)
+        if hasattr(func, "__parameters__"):
+            self.set_parameters(func.__parameters__)
 
-    def _convert(self, ctx: command_client.Context, value: str, parameter: inspect.Parameter) -> typing.Any:
-        if parameter.annotation is parameter.empty:
-            return value
-
-        failed = []
-        for converter, requires_ctx in self._converters[parameter.name]:
-            try:
-                if requires_ctx:
-                    return converter(ctx, value)
-                else:
-                    return converter(value)
-            except Exception as exc:
-                failed.append(exc)
-        if failed:
-            raise errors.ConversionError(
-                msg=f"Invalid value for argument `{parameter.name.replace('_', '-')}`.", origins=failed
-            ) from failed[0]
-        return value
-
-    def _resolve_annotation(
-        self, components: _components.Components, annotation: typing.Any
-    ) -> typing.Union[typing.Any, typing.Sequence[typing.Any], None]:
-        if args := typing.get_args(annotation):
-            return tuple((self._resolve_annotation(components, arg) for arg in args if arg is not None))
-
-        if converter := AbstractConverter.get_converter_from_type(annotation):
-            if not converter.verify_intents(components):
-                return converter.missing_intents_default, True if converter.missing_intents_default else None
-            return converter, True
-        return BUILTIN_OVERRIDES.get(annotation, annotation), False
-
-    def resolve_and_validate_annotations(self, components: _components.Components) -> None:
-        greedy_found = False
-        parser = click.OptionParser()
-        # As this doesn't handle defaults, we have to do that ourselves.
-        parser.ignore_unknown_options = True
-        var_position = False
-        assertions.assert_that(
-            not self.greedy or self.greedy in self.signature.parameters, f"Unknown greedy argument set `{self.greedy}`."
-        )
-        for key, value in self.signature.parameters.items():
-            assertions.assert_that(
-                value.kind not in POSITIONAL_TYPES or not greedy_found,
-                "Positional arguments after a greedy argument aren't supported by this parser.",
-            )
-            if origin := typing.get_origin(value.annotation):
-                assertions.assert_that(
-                    origin in SUPPORTED_TYPING_WRAPPERS, f"Typing wrapper `{origin}` is not supported by this parser."
-                )
-                self._converters[key] = self._resolve_annotation(components=components, annotation=value.annotation)
-            elif value.annotation is inspect.Parameter.empty:
-                self._converters[key] = ()
-            else:
-                converter = self._resolve_annotation(components=components, annotation=value.annotation)
-                self._converters[key] = (converter,) if converter is not None else ()
-
-            if self.greedy == key:
-                greedy_found = True
-            # We don't want this to parse greedy arguments
-            elif value.default is inspect.Parameter.empty and value.kind is not value.VAR_POSITIONAL:
-                parser.add_argument(key)
-            elif value.kind is not value.VAR_POSITIONAL:
-                parser.add_option([f"--{key.replace('_', '-')}"], key)
-            assertions.assert_that(value.kind is not value.VAR_KEYWORD, "**kwargs are not supported by this parser.")
-            var_position = value.kind is value.VAR_POSITIONAL
-        assertions.assert_that(
-            not (var_position and self.greedy), "The `greedy` parser flag and *args are mutually exclusive."
-        )
-        self._option_parser = parser
-
-    def trim_parameters(self, to_trim: int) -> None:
-        parameters = list(self.signature.parameters.values())
-        try:
-            self.signature = self.signature.replace(parameters=parameters[to_trim:])
-        except KeyError:
-            raise KeyError("Missing required parameter (likely `self` or `ctx`).")
-
-        for parameter in parameters[:to_trim]:
-            if parameter.name in self._converters:
-                del self._converters[parameter.name]
+    def components_hook(self, components: _components.Components) -> None:
+        if not self.parameters and components.config.set_parameters_from_annotations:
+            self.set_parameters_from_annotations(self._signature)
+        for param in self.parameters:
+            param.components_hook(components)
 
     def parse(
         self, ctx: command_client.Context
@@ -374,42 +389,136 @@ class CommandParser(AbstractCommandParser):
             self._shlex.push_source(ctx.content)
             self._shlex.state = " "
         try:
-            values, arguments, _ = self._option_parser.parse_args(list(self._shlex) if ctx.content else [])
+            values, arguments, _ = self._option_parser.parse_args(
+                list(self._shlex) if ctx.content else more_collections.EMPTY_SEQUENCE
+            )
         except Exception as exc:
             raise errors.ConversionError(str(exc), [exc]) from exc
 
-        if self.greedy:
-            parameter = self.signature.parameters[self.greedy]
-            result = self._convert(ctx, " ".join(arguments), parameter)
-            if parameter.kind in POSITIONAL_TYPES:
-                args.append(result)
-            else:
-                kwargs[parameter.name] = result
-            arguments = []
-
-        for parameter in self.signature.parameters.values():
-            # Just a typing hack, may be removed in the future.
-            parameter: inspect.Parameter
+        for param in self.parameters:
+            kind = self._signature.parameters[param.key]
             # greedy and VAR_POSITIONAL should be exclusive anyway
-            if parameter.name == self.greedy:
+            if param.flags.get("greedy", False):
+                result = param.convert(ctx, " ".join(arguments))
+                if kind in POSITIONAL_TYPES:
+                    args.append(result)
+                else:
+                    kwargs[param.key] = result
+                arguments = []
                 continue
 
             # If we reach a VAR_POSITIONAL parameter then we want to consume all of the positional arguments.
-            if parameter.kind is parameter.VAR_POSITIONAL:
-                args.extend(self._convert(ctx, value, parameter) for value in arguments)
+            if kind is inspect.Parameter.VAR_POSITIONAL:
+                args.extend(param.convert(ctx, value) for value in arguments)
                 continue
 
             # VAR_POSITIONAL parameters should default to an empty tuple anyway.
-            if (value := values.get(parameter.name)) is None and parameter.default is parameter.empty:
-                raise errors.ConversionError(f"Missing required argument `{parameter.name}`")
+            if (value := values.get(param.key)) is None and param.default is NO_DEFAULT:
+                raise errors.ConversionError(f"Missing required argument `{param.key}`")
 
             if value is None:
-                value = parameter.default
+                value = param.default
             else:
-                value = self._convert(ctx, value, parameter)
+                value = param.convert(ctx, value)
 
-            if parameter.kind in POSITIONAL_TYPES:
+            if kind in POSITIONAL_TYPES:
                 args.append(value)
             else:
-                kwargs[parameter.name] = value
+                kwargs[param.key] = value
         return args, kwargs
+
+    def set_parameters(self, parameters: typing.Sequence[AbstractParameter]) -> None:
+        self.parameters = tuple(parameters)
+        # We can't clear the parser so each time we have to just replace it.
+        option_parser = click.OptionParser()
+        # As this doesn't handle defaults, we have to do that ourselves.
+        option_parser.ignore_unknown_options = True
+        for param in parameters:
+            self._validate_parameter(param)
+            if param.default is NO_DEFAULT:
+                option_parser.add_argument(param.key)
+            else:
+                option_parser.add_option(param.names, param.key)
+        self._option_parser = option_parser
+        self.validate_signature(self._signature)
+
+    def set_parameters_from_annotations(self, signature: inspect.Signature) -> None:
+        greedy_name = self.flags.get("greedy")
+        parameters = []
+        if greedy_name and greedy_name not in signature.parameters:
+            raise IndexError(f"Greedy name {greedy_name} not found in {signature}.")
+
+        # We set the converter's bool flag to False until it gets resolved with components later on.
+        for key, value in signature.parameters.items():
+            if isinstance(value.annotation, str):
+                raise ValueError(f"Cannot get parameters from a signature that includes forward reference annotations.")
+            converters = ()
+            # typing.wraps should convert None to NoneType.
+            if origin := typing.get_origin(value.annotation):
+                if origin not in SUPPORTED_TYPING_WRAPPERS:
+                    raise ValueError(f"Typing wrapper `{origin}` is not supported by this parser.")
+                converters = tuple(arg for arg in typing.get_args(value.annotation) if arg is not type(None))
+            elif value.annotation not in (inspect.Parameter.empty, type(None)):
+                converters = (value.annotation,)
+            default = NO_DEFAULT if value.default is inspect.Parameter.empty else value.default
+            name = f"--{key.replace('_', '-')}"
+            parameters.append(
+                Parameter(
+                    converters=converters,
+                    default=default,
+                    greedy=greedy_name == key,
+                    key=key,
+                    names=(name,) if default is not NO_DEFAULT else None,
+                )
+            )
+        self.set_parameters(parameters)
+
+    def trim_parameters(self, to_trim: int) -> None:
+        parameters = list(self._signature.parameters.values())
+        try:
+            self._signature = self._signature.replace(parameters=parameters[to_trim:])
+        except KeyError:
+            raise KeyError("Missing required parameter (likely `self` or `ctx`).")
+
+        parameter_names = (param.name for param in parameters[:to_trim])
+        new_parameters = None
+        for param in self.parameters:
+            if param.key in parameter_names:
+                if new_parameters is None:
+                    new_parameters = list(self.parameters)
+                new_parameters.remove(param)
+
+        if new_parameters is not None:
+            self.parameters = tuple(new_parameters)
+
+    def _validate_parameter(self, param: AbstractParameter) -> None:
+        if param.default is not NO_DEFAULT:  # TODO: this? or self.greedy:  # TODO: what was this for?
+            if not all(name.startswith("-") for name in param.names):
+                raise ValueError("Names for optional arguments must start with `-`")
+            if not param.names:
+                raise TypeError(f"Missing names for optional parameter {self}")
+        elif param.names:
+            raise TypeError("Required arguments cannot have assigned names.")
+
+    def validate_signature(self, signature: inspect.Signature) -> None:
+        if sum(param.flags.get("greedy", False) for param in self.parameters) > 1:
+            raise ValueError(f"Too many greedy arguments set for {self.__class__.__name__}.")
+        contains_greedy = any(param.flags.get("greedy", False) for param in self.parameters)
+        found_greedy = False
+
+        for value in self.parameters:
+            greedy = value.flags.get("greedy", False)
+            if value.key not in signature.parameters:
+                raise ValueError(f"{value.key} parameter not found in {signature}")
+            kind = signature.parameters[value.key].kind
+            if kind is inspect.Parameter.VAR_POSITIONAL and contains_greedy:
+                raise TypeError("The greedy argument and *arg are mutually exclusive.")
+            if found_greedy and kind in POSITIONAL_TYPES:
+                raise TypeError("Positional arguments after a greedy argument aren't supported by this parser.")
+            if kind is inspect.Parameter.VAR_KEYWORD:
+                raise TypeError("**kwargs are not supported by this parser.")
+            if value.default is NO_DEFAULT and kind is inspect.Parameter.KEYWORD_ONLY and not greedy:
+                raise TypeError(f"Keyword only argument {value.key} needs a default.")
+            # if value.default is not NO_DEFAULT and kind is inspect.Parameter.POSITIONAL_ONLY:
+            #     raise TypeError(f"Positional only argument {value.key} cannot have a default.")
+            found_greedy = greedy
