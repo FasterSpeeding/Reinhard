@@ -327,7 +327,7 @@ async def run_checks(ctx: Context, checks: typing.Sequence[CheckLikeT]) -> None:
                 failed.append((check, None))
 
     if failed:
-        raise errors.FailedCheck(failed)
+        raise errors.FailedCheck(tuple(failed))
 
 
 @attr.attrs(init=False, slots=True, repr=False)
@@ -735,7 +735,7 @@ class CommandCluster(AbstractCommandCluster):
             return True
         return False
 
-    async def get_command_from_context(self, ctx: Context) -> typing.AsyncIterator[typing.TupleAbstractCommand, str]:
+    async def get_command_from_context(self, ctx: Context) -> typing.AsyncIterator[typing.Tuple[AbstractCommand, str]]:
         for command_obj in self.commands:
             if (trigger := command_obj.check_prefix_from_context(ctx)) is None:
                 continue

@@ -41,14 +41,14 @@ class CommandError(CommandClientError):
 
 @attr.attrs(init=True, slots=True)
 class FailedCheck(CommandClientError):
-    checks: typing.Sequence[typing.Tuple[command_client.CheckLikeT, typing.Optional[BaseException]]] = attr.attrib()
+    checks: typing.Tuple[typing.Tuple[command_client.CheckLikeT, typing.Optional[BaseException]], ...] = attr.attrib()
 
 
 @attr.attrs(init=True, repr=True, slots=True)
 class ConversionError(CommandClientError):
     msg: str = attr.attrib()
-    parameter: typing.Optional[parser.Parameter] = attr.attrib(default=None)
-    origins: typing.Sequence[BaseException] = attr.attrib(factory=list)
+    parameter: typing.Optional[parser.AbstractParameter] = attr.attrib(default=None)
+    origins: typing.Tuple[BaseException, ...] = attr.attrib(factory=list)
 
     def __str__(self) -> str:
         return self.msg

@@ -306,7 +306,7 @@ class Parameter(AbstractParameter):
                 failed.append(exc)
         if failed:
             raise errors.ConversionError(
-                msg=f"Invalid value for argument '{self.key}'", parameter=self, origins=failed
+                msg=f"Invalid value for argument '{self.key}'", parameter=self, origins=tuple(failed)
             ) from failed[0]
         return value
 
@@ -407,7 +407,7 @@ class CommandParser(AbstractCommandParser):
             values, arguments, _ = self._option_parser.parse_args(list(self._shlex) if ctx.content else [])
         # ValueError catches unclosed quote errors from shlex.
         except (click.exceptions.BadOptionUsage, ValueError) as exc:  # TODO: more errors?
-            raise errors.ConversionError(msg=str(exc), origins=[exc]) from exc  # TODO: better message?
+            raise errors.ConversionError(msg=str(exc), origins=(exc,)) from exc  # TODO: better message?
 
         for param in self.parameters:
             kind = self.signature.parameters[param.key]
