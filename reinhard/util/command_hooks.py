@@ -15,7 +15,7 @@ if typing.TYPE_CHECKING:
 
 async def error_hook(ctx: command_client.Context, exception: BaseException) -> None:
     with contextlib.suppress(hikari_errors.Forbidden, hikari_errors.NotFound):  # TODO: better permission checks
-        await ctx.message.reply(  # command_client.CommandPermissionError?
+        await ctx.message.safe_reply(  # command_client.CommandPermissionError?
             embed=embeds.Embed(
                 title=f"An unexpected {type(exception).__name__} occurred",
                 color=constants.FAILED_COLOUR,
@@ -30,4 +30,4 @@ async def on_conversion_error(ctx: command_client.Context, exception: errors.Con
         if exception.origins and (origin_message := str(exception.origins[0])) != message:
             message += f": {origin_message}"
 
-        await ctx.message.reply(content=message)
+        await ctx.message.safe_reply(content=message)
