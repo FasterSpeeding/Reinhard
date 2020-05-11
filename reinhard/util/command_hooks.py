@@ -26,4 +26,8 @@ async def error_hook(ctx: command_client.Context, exception: BaseException) -> N
 
 async def on_conversion_error(ctx: command_client.Context, exception: errors.ConversionError) -> None:
     with contextlib.suppress(hikari_errors.Forbidden, hikari_errors.NotFound):
-        await ctx.message.reply(content=f"{exception}: {exception.origins[0]}" if exception.origins else str(exception))
+        message = str(exception)
+        if exception.origins and (origin_message := str(exception.origins[0])) != message:
+            message += f": {origin_message}"
+
+        await ctx.message.reply(content=message)

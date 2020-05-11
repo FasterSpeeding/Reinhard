@@ -404,16 +404,15 @@ class CommandParser(AbstractCommandParser):
             self._shlex.push_source(ctx.content)
             self._shlex.state = " "
         try:
-            values, arguments, _ = self._option_parser.parse_args(
-                list(self._shlex) if ctx.content else more_collections.EMPTY_SEQUENCE
-            )
-        except Exception as exc:  # TODO: better exception catch
-            raise errors.ConversionError(msg=str(exc), origins=[exc]) from exc
+            values, arguments, _ = self._option_parser.parse_args(list(self._shlex) if ctx.content else [])
+        # ValueError catches unclosed quote errors from shlex.
+        except (click.exceptions.BadOptionUsage, ValueError) as exc:  # TODO: more errors?
+            raise errors.ConversionError(msg=str(exc), origins=[exc]) from exc  # TODO: better message?
 
         for param in self.parameters:
             kind = self.signature.parameters[param.key]
             # greedy and VAR_POSITIONAL should be exclusive anyway
-            if param.flags.get("greedy", False):
+            if param.flags.get("greedy", False):  # TODO: enforce greedy isn't empty resource.
                 result = param.convert(ctx, " ".join(arguments))
                 if kind in POSITIONAL_TYPES:
                     args.append(result)

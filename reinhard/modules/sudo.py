@@ -67,7 +67,7 @@ class SudoCluster(command_client.CommandCluster):
 
     @command_client.command(greedy="args")
     async def echo(self, ctx: command_client.Context, args: str) -> None:
-        await ctx.message.reply(content=args)
+        await ctx.message.reply(content=args)  # TODO: enforce greedy isn't empty resource
 
     async def eval_python_code(
         self, ctx: command_client.Context, code: str
@@ -109,7 +109,7 @@ class SudoCluster(command_client.CommandCluster):
 
         result, exec_time, failed = await self.eval_python_code(ctx, code[0])
         color = constants.FAILED_COLOUR if failed else constants.PASS_COLOUR
-        if suppress_response:
+        if suppress_response:  # TODO: if "--suppress-response" in args
             return
 
         page_generator = paginators.string_paginator(result, wrapper="```python\n{}\n```", char_limit=2034)
@@ -128,8 +128,8 @@ class SudoCluster(command_client.CommandCluster):
             message, generator=embed_generator, first_entry=first_page, authors=[ctx.message.author.id]
         )
 
-    @command_client.command(greedy="target")
-    async def steal(self, ctx: command_client.Context, target: bases.Snowflake, args: str = ""):
+    @command_client.command()
+    async def steal(self, ctx: command_client.Context, target: bases.Snowflake, *args: str):
         """Used to steal emojis from messages content or reactions.
 
         Pass "r" as the last argument to steal from the message reactions.
