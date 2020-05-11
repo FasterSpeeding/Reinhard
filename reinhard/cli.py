@@ -59,5 +59,5 @@ def main():
     logging.getLogger().addHandler(file_logger)
 
     bot_client = stateless.StatelessBot(config=config_obj)
-    client.CommandClient(bot_client, modules=["reinhard.modules.sudo"])
+    client.CommandClient(bot_client, modules=["reinhard.modules.sudo", "reinhard.modules.util"])
     bot_client.run()

@@ -25,7 +25,7 @@ from hikari.events import message as message_events
 from hikari.events import other as other_events
 from hikari.internal import more_collections
 
-from reinhard.util import arg_parser
+from reinhard.util import parser
 from reinhard.util import errors
 
 if typing.TYPE_CHECKING:
@@ -165,18 +165,12 @@ class CommandHooks:  # TODO: this
         *,
         extra_hooks: typing.Optional[typing.Sequence[CommandHooks]] = None,
     ) -> None:
-        caught = False
         if self.on_conversion_error:
             await self.on_conversion_error(ctx, exception)
-            caught = True
 
         for hook in extra_hooks or more_collections.EMPTY_SEQUENCE:
             if hook.on_conversion_error:
                 await hook.on_conversion_error(ctx, exception)
-                caught = True
-
-        if not caught:  # This should be caught or thrown to the logs, we don't want stuff to fail silently.
-            raise exception from exception.origins[0]
 
     async def trigger_error_hooks(
         self,
@@ -265,6 +259,8 @@ class AbstractCommand(ExecutableCommand, abc.ABC):
     level: int = attr.attrib()
     """The user access level that'll be required to execute this command, defaults to 0."""
 
+    parser: typing.Optional[parser.AbstractCommandParser]
+
     @abc.abstractmethod
     def __call__(self, *args, **kwargs) -> typing.Coroutine[typing.Any, typing.Any, typing.Any]:
         ...
@@ -304,7 +300,14 @@ class AbstractCommand(ExecutableCommand, abc.ABC):
     def register_check(self, check: CheckLikeT) -> None:
         ...
 
+    @abc.abstractmethod  # TODO: differentiate between command and command group.
+    def _create_parser(
+        self, func: typing.Callable[[...], typing.Coroutine[typing.Any, typing.Any, typing.Any]], **kwargs: typing.Any
+    ) -> parser.AbstractCommandParser:
+        ...
 
+
+# TODO: be more consistent with "func", "function", etc etc
 def generate_trigger(function: typing.Optional[CommandFunctionT] = None) -> str:
     """Get a trigger for this command based on it's function's name."""
     return function.__name__.replace("_", " ")
@@ -335,8 +338,6 @@ class Command(AbstractCommand):
 
     logger: logging.Logger
 
-    parser: arg_parser.AbstractCommandParser
-
     _cluster: typing.Optional[AbstractCommandCluster] = attr.attrib(default=None)
 
     def __init__(
@@ -365,7 +366,7 @@ class Command(AbstractCommand):
         self.logger = logging.getLogger(type(self).__qualname__)
         self._checks = []
         self._func = func
-        self.parser = arg_parser.CommandParser(self._func, greedy=greedy)
+        self.parser = self._create_parser(self._func, greedy=greedy)
         if cluster:
             self.bind_cluster(cluster)
 
@@ -413,11 +414,15 @@ class Command(AbstractCommand):
 
     async def execute(self, ctx: Context, *, hooks: typing.Optional[typing.Sequence[CommandHooks]] = None) -> bool:
         ctx.set_command(self)
-        try:
-            args, kwargs = self.parser.parse(ctx)
-        except errors.ConversionError as exc:
-            await self.hooks.trigger_on_conversion_error_hooks(ctx, exc, extra_hooks=hooks)
-            return True  # TODO: raise exception?
+        if self.parser:
+            try:
+                args, kwargs = self.parser.parse(ctx)
+            except errors.ConversionError as exc:
+                await self.hooks.trigger_on_conversion_error_hooks(ctx, exc, extra_hooks=hooks)
+                self.logger.debug("Command %s raised a Conversion Error: %s", self, exc)
+                return True
+        else:
+            args, kwargs = more_collections.EMPTY_SEQUENCE, more_collections.EMPTY_DICT
 
         try:
             if await self.hooks.trigger_pre_execution_hooks(ctx, *args, **kwargs, extra_hooks=hooks) is False:
@@ -444,6 +449,11 @@ class Command(AbstractCommand):
 
     def register_check(self, check: CheckLikeT) -> None:
         self._checks.append(check)
+
+    def _create_parser(
+        self, func: typing.Callable[[...], typing.Coroutine[typing.Any, typing.Any, typing.Any]], **kwargs: typing.Any
+    ) -> parser.AbstractCommandParser:
+        return parser.CommandParser(func=func, **kwargs)
 
 
 class CommandGroup(AbstractCommand):

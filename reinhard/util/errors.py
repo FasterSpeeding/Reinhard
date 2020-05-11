@@ -9,6 +9,7 @@ if typing.TYPE_CHECKING:
     from hikari import permissions
 
     from reinhard.util import command_client
+    from reinhard.util import parser
 
 
 class CommandClientError(hikari_errors.HikariError):
@@ -46,6 +47,7 @@ class FailedCheck(CommandClientError):
 @attr.attrs(init=True, repr=True, slots=True)
 class ConversionError(CommandClientError):
     msg: str = attr.attrib()
+    parameter: typing.Optional[parser.Parameter] = attr.attrib(default=None)
     origins: typing.Sequence[BaseException] = attr.attrib(factory=list)
 
     def __str__(self) -> str:

@@ -11,6 +11,7 @@ import attr
 import click
 from hikari import bases
 from hikari import channels
+from hikari import colors
 from hikari import errors as hikari_errors
 from hikari import guilds
 from hikari import intents
@@ -93,8 +94,8 @@ class AbstractConverter(abc.ABC):  # These shouldn't be making requests therefor
                 "This will default to pass-through or be ignored."
             )
             helpers.warning(message, category=hikari_errors.IntentWarning, stack_level=4)  # Todo: stack_level
-            return True
-        return False
+            return False
+        return True
 
     @classmethod
     def get_converter_from_type(cls, argument_type: typing.Type) -> typing.Optional[AbstractConverter]:
@@ -111,6 +112,18 @@ class AbstractConverter(abc.ABC):  # These shouldn't be making requests therefor
         for converter, types in cls._converter_implementations:
             if any(base_type.__name__ == name for base_type in types):
                 return converter
+
+
+class ColorConverter(AbstractConverter, types=(colors.Color,)):
+    def __init__(self):
+        super().__init__(inheritable=False, missing_intents_default=None, required_intents=intents.Intent(0))
+
+    def convert(self, _: command_client.Context, argument: str) -> typing.Any:
+        values = argument.split(" ")
+        if all(value.isdigit() for value in values):
+            values = (int(value) for value in values)
+
+        return colors.Color.of(*values)
 
 
 class BaseIDConverter(AbstractConverter, abc.ABC):
@@ -288,11 +301,13 @@ class Parameter(AbstractParameter):
                 if isinstance(converter, AbstractConverter):
                     return converter.convert(ctx, value)
                 else:
-                    return converter(value)
-            except Exception as exc:
+                    return converter(value)  # TODO: converter.__expected_exceptions__?
+            except ValueError as exc:  # TODO: more exceptions?
                 failed.append(exc)
         if failed:
-            raise errors.ConversionError(msg=f"Invalid value for argument `{self.key}`.", origins=failed) from failed[0]
+            raise errors.ConversionError(
+                msg=f"Invalid value for argument '{self.key}'", parameter=self, origins=failed
+            ) from failed[0]
         return value
 
     @property
@@ -355,7 +370,7 @@ class AbstractCommandParser(abc.ABC):
 class CommandParser(AbstractCommandParser):
     _option_parser: typing.Optional[click.OptionParser] = attr.attrib()
     _shlex: shlex.shlex
-    _signature: inspect.Signature = attr.attrib()
+    signature: inspect.Signature = attr.attrib()
 
     def __init__(
         self, func: typing.Callable[[...], typing.Coroutine[typing.Any, typing.Any, typing.Any]], **flags: typing.Any,
@@ -374,7 +389,7 @@ class CommandParser(AbstractCommandParser):
 
     def components_hook(self, components: _components.Components) -> None:
         if not self.parameters and components.config.set_parameters_from_annotations:
-            self.set_parameters_from_annotations(self._signature)
+            self.set_parameters_from_annotations(self.signature)
         for param in self.parameters:
             param.components_hook(components)
 
@@ -392,11 +407,11 @@ class CommandParser(AbstractCommandParser):
             values, arguments, _ = self._option_parser.parse_args(
                 list(self._shlex) if ctx.content else more_collections.EMPTY_SEQUENCE
             )
-        except Exception as exc:
-            raise errors.ConversionError(str(exc), [exc]) from exc
+        except Exception as exc:  # TODO: better exception catch
+            raise errors.ConversionError(msg=str(exc), origins=[exc]) from exc
 
         for param in self.parameters:
-            kind = self._signature.parameters[param.key]
+            kind = self.signature.parameters[param.key]
             # greedy and VAR_POSITIONAL should be exclusive anyway
             if param.flags.get("greedy", False):
                 result = param.convert(ctx, " ".join(arguments))
@@ -414,7 +429,7 @@ class CommandParser(AbstractCommandParser):
 
             # VAR_POSITIONAL parameters should default to an empty tuple anyway.
             if (value := values.get(param.key)) is None and param.default is NO_DEFAULT:
-                raise errors.ConversionError(f"Missing required argument `{param.key}`")
+                raise errors.ConversionError(msg=f"Missing required argument `{param.key}`", parameter=param)
 
             if value is None:
                 value = param.default
@@ -435,12 +450,12 @@ class CommandParser(AbstractCommandParser):
         option_parser.ignore_unknown_options = True
         for param in parameters:
             self._validate_parameter(param)
-            if param.default is NO_DEFAULT:
+            if param.default is NO_DEFAULT and not param.flags.get("greedy"):
                 option_parser.add_argument(param.key)
             else:
                 option_parser.add_option(param.names, param.key)
         self._option_parser = option_parser
-        self.validate_signature(self._signature)
+        self.validate_signature(self.signature)
 
     def set_parameters_from_annotations(self, signature: inspect.Signature) -> None:
         greedy_name = self.flags.get("greedy")
@@ -461,22 +476,22 @@ class CommandParser(AbstractCommandParser):
             elif value.annotation not in (inspect.Parameter.empty, type(None)):
                 converters = (value.annotation,)
             default = NO_DEFAULT if value.default is inspect.Parameter.empty else value.default
-            name = f"--{key.replace('_', '-')}"
+            greedy = greedy_name == key
             parameters.append(
                 Parameter(
                     converters=converters,
                     default=default,
-                    greedy=greedy_name == key,
+                    greedy=greedy,
                     key=key,
-                    names=(name,) if default is not NO_DEFAULT else None,
+                    names=(f"--{key.replace('_', '-')}",) if default is not NO_DEFAULT or greedy else None,
                 )
             )
         self.set_parameters(parameters)
 
     def trim_parameters(self, to_trim: int) -> None:
-        parameters = list(self._signature.parameters.values())
+        parameters = list(self.signature.parameters.values())
         try:
-            self._signature = self._signature.replace(parameters=parameters[to_trim:])
+            self.signature = self.signature.replace(parameters=parameters[to_trim:])
         except KeyError:
             raise KeyError("Missing required parameter (likely `self` or `ctx`).")
 
@@ -492,7 +507,8 @@ class CommandParser(AbstractCommandParser):
             self.parameters = tuple(new_parameters)
 
     def _validate_parameter(self, param: AbstractParameter) -> None:
-        if param.default is not NO_DEFAULT:  # TODO: this? or self.greedy:  # TODO: what was this for?
+        # TODO: this? or self.greedy:  # TODO: what was this for?
+        if param.default is not NO_DEFAULT or param.flags.get("greedy", False):
             if not all(name.startswith("-") for name in param.names):
                 raise ValueError("Names for optional arguments must start with `-`")
             if not param.names:
