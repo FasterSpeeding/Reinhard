@@ -69,8 +69,8 @@ class CommandClient(command_client.ReinhardCommandClient):
     @command_client.command
     async def about(self, ctx: command_client.Context) -> None:
         """Get general information about this bot."""
-        start_date = datetime.datetime.fromtimestamp(self.process.create_time())
-        uptime = datetime.datetime.now() - start_date
+        # start_date = datetime.datetime.fromtimestamp(self.process.create_time())
+        # uptime = datetime.datetime.now() - start_date
         memory_usage = self.process.memory_full_info().uss / 1024 ** 2
         cpu_usage = self.process.cpu_percent() / psutil.cpu_count()
         memory_percent = self.process.memory_percent()
@@ -81,7 +81,7 @@ class CommandClient(command_client.ReinhardCommandClient):
                 icon=self.current_user.avatar_url,
                 url=hikari_url,
             )
-            .add_field(name="Uptime", value=str(uptime), inline=True)
+            .add_field(name="Uptime", value="00:00", inline=True)  # str(uptime), inline=True)
             .add_field(
                 name="Process",
                 value=f"{memory_usage:.2f} MiB ({memory_percent:.0f}%)\n{cpu_usage:.2f}% CPU",
