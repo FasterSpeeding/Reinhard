@@ -131,7 +131,7 @@ class ResponsePaginator:
             self.message = None
             for emoji in self._emoji_triggers.keys():
                 try:
-                    await message.delete_reaction(emoji)
+                    await message.remove_reaction(emoji)
                 except errors.HTTPError:
                     ...
 
