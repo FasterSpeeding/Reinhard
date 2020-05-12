@@ -1,4 +1,4 @@
-git+https://gitlab.com/nekokatt/hikari
 asyncpg==0.20.0
+hikari==1.0.1.dev135
 psutil==5.7.0
 pyyaml==5.3

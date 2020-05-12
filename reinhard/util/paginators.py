@@ -18,6 +18,7 @@ if typing.TYPE_CHECKING:
     from hikari.clients import components as hikari_components
 
 
+DELETE_AND_END = object()
 END = object()
 
 
@@ -27,7 +28,9 @@ class ResponsePaginator:
 
     _buffer: typing.Sequence[typing.Tuple[str, embeds.Embed]] = attr.attrib()
 
-    _emoji_triggers: typing.MutableMapping[str, typing.Callable[[], typing.Any]] = attr.attrib()
+    _emoji_triggers: typing.MutableMapping[
+        typing.Union[bases.Snowflake, str], typing.Callable[[], typing.Any]
+    ] = attr.attrib()
 
     _generator: typing.Optional[typing.Iterator[typing.Tuple[str, embeds.Embed]]] = attr.attrib()
 
@@ -101,23 +104,26 @@ class ResponsePaginator:
             await message.add_reaction(emoji)
 
     async def on_reaction_modify(self, emoji: emojis.Emoji, user_id: bases.Snowflake) -> typing.Optional[typing.Any]:
-        if not isinstance(emoji, emojis.UnicodeEmoji) or self.authors and user_id not in self.authors:
+        if self.expired:
+            return END
+
+        if self.message is None or self.authors and user_id not in self.authors:
             return
 
-        if self.expired:
-            await self.deregister_message()
-
-        if method := self._emoji_triggers.get(emoji.name):
+        if method := self._emoji_triggers.get(emoji.name if isinstance(emoji, emojis.UnicodeEmoji) else emoji.id):
             result = method()
             if asyncio.iscoroutine(result):
                 result = await result
             if result:
-                if result is END:
+                if result is END or result is DELETE_AND_END:
                     return END
                 self.last_triggered = datetime.datetime.now()
                 await self.message.edit(content=result[0], embed=result[1])
 
     def on_disable(self) -> typing.Any:
+        if message := self.message:
+            self.message = None
+            asyncio.create_task(self._delete_message(message))
         return END
 
     async def deregister_message(self) -> None:
@@ -132,6 +138,13 @@ class ResponsePaginator:
     @property
     def expired(self) -> bool:
         return self.timeout < datetime.datetime.now() - self.last_triggered
+
+    @staticmethod
+    async def _delete_message(message: messages.Message) -> None:
+        try:
+            await message.delete()
+        except (errors.NotFound, errors.Forbidden):  # TODO: better permission handling.
+            ...
 
 
 class AsyncResponsePaginator(ResponsePaginator):

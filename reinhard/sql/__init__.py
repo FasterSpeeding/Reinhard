@@ -6,7 +6,6 @@ import pathlib
 import typing
 
 import asyncpg
-from hikari.internal import assertions
 
 
 def script_getter_factory(key: str):  # Could just make this retrieve the file.
@@ -43,12 +42,12 @@ class CachedScripts:
             file_path:
                 The string path of the file to load.
         """
-        assertions.assert_that(file_path.lower().endswith(".sql"), "File must be of type 'sql'")
+        if not file_path.lower().endswith(".sql"):
+            raise ValueError("File must be of type 'sql'")
         with open(file_path, "r") as file:
             name = os.path.basename(file.name)[:-4]
-            assertions.assert_that(
-                name not in self.scripts, f"Script '{name}' already loaded."
-            )  # TODO: allow overwriting?
+            if name in self.scripts:
+                raise RuntimeError("Script '{name}' already loaded.")  # TODO: allow overwriting?
             self.scripts[name] = file.read()
 
     def load_all_sql_files(self, root_dir: str = "./reinhard/sql", pattern: str = None) -> None:

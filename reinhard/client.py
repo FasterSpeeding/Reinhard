@@ -94,7 +94,7 @@ class CommandClient(command_client.ReinhardCommandClient):
         )
 
     async def get_guild_prefix(self, guild_id: int) -> typing.Optional[str]:
-        async with self.sql_pool.acquire() as conn:
+        async with self.sql_pool.acquire() as conn:  # TODO: this was called and raised a NoneTypeError?
             if data := await conn.fetchrow(self.sql_scripts.find_guild_prefix, guild_id):
                 return data["prefix"]
 

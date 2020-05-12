@@ -12,6 +12,7 @@ import click
 from hikari import bases
 from hikari import channels
 from hikari import colors
+from hikari import emojis
 from hikari import errors as hikari_errors
 from hikari import guilds
 from hikari import intents
@@ -131,6 +132,7 @@ class BaseIDConverter(AbstractConverter, abc.ABC):
 
     def __init__(
         self,
+        compiled_regex: re.Pattern,
         inheritable: bool = True,
         missing_intents_default: typing.Optional[AbstractConverter] = None,
         required_intents: intents.Intent = intents.Intent(0),
@@ -138,28 +140,34 @@ class BaseIDConverter(AbstractConverter, abc.ABC):
         super().__init__(
             inheritable=inheritable, missing_intents_default=missing_intents_default, required_intents=required_intents
         )
+        if not isinstance(compiled_regex, re.Pattern):
+            raise TypeError(f"Expected a compiled re.Pattern for `compiled_regex` but got {compiled_regex}")
+        self._id_regex = compiled_regex
 
-    def _match_id(self, value: str) -> typing.Optional[int]:
+    def _match_id(self, value: str) -> bases.Snowflake:
         if value.isdigit():
-            return int(value)
+            return bases.Snowflake(value)
         if result := self._id_regex.findall(value):
-            return result[0]
-        raise ValueError("Invalid mention or ID passed.")
+            return bases.Snowflake(result[0])
+        raise ValueError("Invalid mention or ID passed.")  # TODO: return None or raise ValueError here?
 
 
 class ChannelIDConverter(BaseIDConverter):
     def __init__(
         self,
+        compiled_regex: typing.Optional[re.Pattern] = None,
         inheritable: bool = True,
         missing_intents_default: typing.Optional[AbstractConverter] = None,
         required_intents: intents.Intent = intents.Intent(0),
     ) -> None:
         super().__init__(
-            inheritable=inheritable, missing_intents_default=missing_intents_default, required_intents=required_intents
+            compiled_regex=compiled_regex if compiled_regex else re.compile(r"<#(\d+)>"),
+            inheritable=inheritable,
+            missing_intents_default=missing_intents_default,
+            required_intents=required_intents,
         )
-        self._id_regex = re.compile(r"<#(\d+)>")
 
-    def convert(self, _: command_client.Context, argument: str) -> typing.Any:
+    def convert(self, _: command_client.Context, argument: str) -> bases.Snowflake:
         return self._match_id(argument)
 
 
@@ -174,37 +182,61 @@ class ChannelConverter(ChannelIDConverter, types=(channels.PartialChannel,)):
             return ctx.fabric.state_registry.get_mandatory_channel_by_id(match)  # TODO: cache
 
 
-class SnowflakeConverter(BaseIDConverter, types=(bases.UniqueEntity,)):
+class EmojiIDConverter(BaseIDConverter):
     def __init__(
         self,
+        compiled_regex: typing.Optional[re.Pattern] = None,
         inheritable: bool = True,
         missing_intents_default: typing.Optional[AbstractConverter] = None,
         required_intents: intents.Intent = intents.Intent(0),
     ) -> None:
         super().__init__(
-            inheritable=inheritable, missing_intents_default=missing_intents_default, required_intents=required_intents,
+            compiled_regex=compiled_regex if compiled_regex else re.compile(r"<a?:\w+:(\d+)>"),
+            inheritable=inheritable,
+            missing_intents_default=missing_intents_default,
+            required_intents=required_intents,
         )
-        self._id_regex = re.compile(r"<[(?:@!?)#&](\d+)>")
 
-    def convert(self, ctx: command_client.Context, argument: str) -> int:
+
+class GuildEmojiConverter(EmojiIDConverter, types=(emojis.GuildEmoji,)):
+    ...
+
+
+class SnowflakeConverter(BaseIDConverter, types=(bases.Snowflake,)):  # TODO: bases.Unique, ?
+    def __init__(
+        self,
+        compiled_regex: typing.Optional[re.Pattern] = None,
+        inheritable: bool = True,
+        missing_intents_default: typing.Optional[AbstractConverter] = None,
+        required_intents: intents.Intent = intents.Intent(0),
+    ) -> None:
+        super().__init__(
+            compiled_regex=compiled_regex if compiled_regex else re.compile(r"<[@&?!#]{1,3}(\d+)>"),
+            inheritable=inheritable,
+            missing_intents_default=missing_intents_default,
+            required_intents=required_intents,
+        )
+
+    def convert(self, ctx: command_client.Context, argument: str) -> bases.Snowflake:
         if match := self._match_id(argument):
-            return int(match)
+            return match
         raise ValueError("Invalid mention or ID supplied.")
 
 
 class UserConverter(BaseIDConverter, types=(users.User,)):
     def __init__(
         self,
+        compiled_regex: typing.Optional[re.Pattern] = None,
         inheritable: bool = False,
         missing_intents_default: typing.Optional[AbstractConverter] = None,
         required_intents: intents.Intent = intents.Intent.GUILD_MEMBERS,
     ) -> None:  # TODO: Intent.GUILD_MEMBERS and/or intents.GUILD_PRESENCES?
         super().__init__(
+            compiled_regex=compiled_regex if compiled_regex else re.compile(r"<@!?(\d+)>"),
             inheritable=inheritable,
-            missing_intents_default=missing_intents_default or SnowflakeConverter(),
+            missing_intents_default=missing_intents_default or SnowflakeConverter(),  # TODO: user ID converter?
             required_intents=required_intents,
         )
-        self._id_regex = re.compile(r"<@!?(\d+)>")
 
     def convert(self, ctx: command_client.Context, argument: str) -> users.User:
         if match := self._match_id(argument):
