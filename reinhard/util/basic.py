@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import enum
 import functools
 import typing
 
-from reinhard.util import errors
+from tanjun import errors
 
 from hikari.internal import more_collections
 
@@ -50,3 +51,47 @@ def command_error_relay(
         return wrapper
 
     return decorator
+
+
+def grid_permissions(permissions: enum.IntFlag) -> str:
+    max_lens = [-1, -1]
+    rows = []
+    colomn = []
+    for index, name in enumerate(permissions):
+        colomn.append(name)
+        if index % 2 != 0:
+            rows.append(colomn)
+        if len(name) > max_lens[index % 2]:
+            max_lens[index % 2] = len(name)
+    if colomn:
+        colomn.append("")
+        rows.append(colomn)
+
+    for index in range(len(max_lens)):
+        max_lens[index] += 2
+
+    return "\n".join(
+        f"{first.ljust(max_lens[0])} {second.ljust(max_lens[1])}" for first in rows[0] for second in rows[1]
+    )
+
+
+def basic_name_grid(flags: enum.IntFlag) -> str:
+    names = [name for name, flag in type(flags).__members__.items() if flag != 0 and (flag & flags) == flag]
+    names.sort()
+    if not names:
+        return ""
+
+    name_grid = []
+    line = ""
+    for name in names:
+        if line:
+            name_grid.append(f"`{line}`, `{name}`,")
+            line = ""
+        else:
+            line = name
+
+    if line:
+        name_grid.append(f"`{line}`")
+
+    name_grid[-1] = name_grid[-1].strip(",")
+    return "\n".join(name_grid)

@@ -9,11 +9,11 @@ from hikari import errors as hikari_errors
 from reinhard.util import constants
 
 if typing.TYPE_CHECKING:
-    from reinhard.util import command_client
-    from reinhard.util import errors
+    from tanjun import commands as _commands
+    from tanjun import errors as _errors
 
 
-async def error_hook(ctx: command_client.Context, exception: BaseException) -> None:
+async def error_hook(ctx: _commands.Context, exception: BaseException) -> None:
     with contextlib.suppress(hikari_errors.Forbidden, hikari_errors.NotFound):  # TODO: better permission checks
         await ctx.message.safe_reply(  # command_client.CommandPermissionError?
             embed=embeds.Embed(
@@ -24,7 +24,7 @@ async def error_hook(ctx: command_client.Context, exception: BaseException) -> N
         )
 
 
-async def on_conversion_error(ctx: command_client.Context, exception: errors.ConversionError) -> None:
+async def on_conversion_error(ctx: _commands.Context, exception: _errors.ConversionError) -> None:
     with contextlib.suppress(hikari_errors.Forbidden, hikari_errors.NotFound):
         message = str(exception)
         if exception.origins and (origin_message := str(exception.origins[0])) != message:

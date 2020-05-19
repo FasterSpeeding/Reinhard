@@ -13,8 +13,11 @@ from hikari import bases
 from hikari import embeds
 from hikari import errors
 from hikari import files
+from tanjun import clusters
+from tanjun import commands
+from tanjun import decorators
+from tanjun import parser
 
-from reinhard.util import command_client
 from reinhard.util import command_hooks
 from reinhard.util import constants
 from reinhard.util import paginators
@@ -23,17 +26,18 @@ if typing.TYPE_CHECKING:
     from hikari import applications as _applications
     from hikari import guilds as _guilds
     from hikari import messages as _messages
+    from tanjun import client
 
 
 exports = ["SudoCluster"]
 
 
-class SudoCluster(command_client.CommandCluster):
+class SudoCluster(clusters.Cluster):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(
             *args,
             **kwargs,
-            hooks=command_client.CommandHooks(
+            hooks=commands.Hooks(
                 on_error=command_hooks.error_hook, on_conversion_error=command_hooks.on_conversion_error
             ),
         )
@@ -56,22 +60,27 @@ class SudoCluster(command_client.CommandCluster):
             except errors.HTTPErrorResponse as exc:
                 self.logger.warning("Failed to fetch application object:\n  - %s", exc)
 
-    @command_client.command
-    async def error(self, ctx: command_client.Context) -> None:
+    @decorators.command
+    async def error(self, ctx: commands.Context) -> None:
         raise Exception("This is an exception, get used to it.")
 
-    def owner_check(self, ctx: command_client.Context) -> bool:
+    def owner_check(self, ctx: commands.Context) -> bool:
         if self.application.team:
             return any(ctx.message.author.id == member_id for member_id in self.application.team.members.keys())
         return ctx.message.author.id == self.application.owner.id
 
-    @command_client.command(greedy="args")
-    async def echo(self, ctx: command_client.Context, args: str) -> None:
+    @decorators.command(greedy="args")
+    async def echo(self, ctx: commands.Context, args: str) -> None:
         await ctx.message.reply(content=args)  # TODO: enforce greedy isn't empty resource
 
-    async def eval_python_code(
-        self, ctx: command_client.Context, code: str
-    ) -> typing.Tuple[typing.Sequence[str], int, bool]:
+    @staticmethod
+    def _yields_results(stdout: io.StringIO, stderr: io.StringIO):
+        yield "- /dev/stdout:"
+        yield from stdout.readlines(2034)
+        yield "- /dev/stderr:"
+        yield from stderr.readlines(2034)
+
+    async def eval_python_code(self, ctx: commands.Context, code: str) -> typing.Tuple[typing.Iterable[str], int, bool]:
         sub_ctx = {"ctx": ctx, "client": self}
         stdout = io.StringIO()
         stderr = io.StringIO()
@@ -91,17 +100,19 @@ class SudoCluster(command_client.CommandCluster):
                 finally:
                     exec_time = round((time.perf_counter() - start_time) * 1000)
 
-        result = []
-        if stdout := stdout.getvalue():
-            result.append("- /dev/stdout:")
-            result.extend(stdout.splitlines())
-        if stderr := stderr.getvalue():
-            result.append("- /dev/stderr:")
-            result.extend(stderr.splitlines())
-        return result or ["..."], exec_time, failed
+        stdout.seek(0)
+        stderr.seek(0)
+        return self._yields_results(stdout, stderr), exec_time, failed
 
-    @command_client.command(aliases=["exec", "sudo"])
-    async def eval(self, ctx: command_client.Context, suppress_response: bool = False) -> None:
+    @decorators.command(aliases=["exec", "sudo"])
+    @parser.parameter(
+        converters=(bool,),
+        default=False,
+        empty_default=True,
+        key="suppress_response",
+        names=("--suppress-response", "-s"),
+    )
+    async def eval(self, ctx: commands.Context, suppress_response: bool = False) -> None:
         code = re.findall(r"```(?:[\w]*\n?)([\s\S(^\\`{3})]*?)\n*```", ctx.message.content)
         if not code:
             await ctx.message.reply(content="Expected a python code block.")
@@ -112,7 +123,6 @@ class SudoCluster(command_client.CommandCluster):
         if suppress_response:  # TODO: if "--suppress-response" in args
             return
 
-        page_generator = paginators.string_paginator(result, wrapper="```python\n{}\n```", char_limit=2034)
         embed_generator = (
             (
                 "",
@@ -120,16 +130,19 @@ class SudoCluster(command_client.CommandCluster):
                     text=f"Time taken: {exec_time} ms"
                 ),
             )
-            for text, page in page_generator
+            for text, page in paginators.string_paginator(result, wrapper="```python\n{}\n```", char_limit=2034)
         )
         first_page = next(embed_generator)
         message = await ctx.message.reply(embed=first_page[1])
         await self.paginator_pool.register_message(
-            message, generator=embed_generator, first_entry=first_page, authors=[ctx.message.author.id]
+            message,
+            paginator=paginators.ResponsePaginator(
+                generator=embed_generator, first_entry=first_page, authors=[ctx.message.author.id]
+            ),
         )
 
-    @command_client.command()
-    async def steal(self, ctx: command_client.Context, target: bases.Snowflake, *args: str):
+    @decorators.command()
+    async def steal(self, ctx: commands.Context, target: bases.Snowflake, *args: str):
         """Used to steal emojis from messages content or reactions.
 
         Pass "r" as the last argument to steal from the message reactions.
@@ -222,3 +235,7 @@ class SudoCluster(command_client.CommandCluster):
             )
         else:
             await ctx.message.reply(content=f":thumbsup: ({count})")
+
+
+def setup(bot: client.Client):
+    bot.register_cluster(SudoCluster)

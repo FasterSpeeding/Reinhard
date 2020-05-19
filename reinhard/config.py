@@ -5,8 +5,7 @@ import typing
 
 from hikari import bases
 from hikari.internal import marshaller
-
-from reinhard.util import config
+from tanjun import configs
 
 
 @marshaller.marshallable()
@@ -21,7 +20,7 @@ class DatabaseConfig(marshaller.Deserializable):
 
 @marshaller.marshallable()
 @attr.s(slots=True, kw_only=True)
-class ExtendedOptions(config.CommandClientConfig):
+class ExtendedOptions(configs.ClientConfig):
     database: DatabaseConfig = marshaller.attrib(deserializer=DatabaseConfig.deserialize, factory=DatabaseConfig)
     emoji_guild: typing.Optional[bases.Snowflake] = marshaller.attrib(
         deserializer=bases.Snowflake, if_undefined=None, default=None

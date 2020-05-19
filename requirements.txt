@@ -1,4 +1,4 @@
 asyncpg==0.20.0
-hikari==1.0.1.dev137
 psutil==5.7.0
 pyyaml==5.3
+tanjun==2020.05.13.dev1
