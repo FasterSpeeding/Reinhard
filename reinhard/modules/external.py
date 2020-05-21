@@ -168,3 +168,35 @@ class UtilCluster(clusters.Cluster):
             #  data["pageInfo"]["totalResults"] will not reliably be `0` when no data is returned and they don't use 404
             #  for that so we'll just check to see if nothing is being returned.
             await ctx.message.safe_reply(content=f"Couldn't find `{query}`.")
+
+    @decorators.command  # TODO: https://lewd.bowsette.pictures/api/request
+    async def moe(self, ctx: commands.Context, source: typing.Optional[str] = None) -> None:
+        owner_id = self.application.team.owner_user_id if self.application.team else self.application.owner.id
+        params = {}
+        if source is not None:
+            params["source"] = source
+
+        async with aiohttp.ClientSession(
+            headers={"User-Agent": f"Reinhard (id:{self.user.id}; owner:{owner_id})"}
+        ) as session:
+            response = await session.get("http://api.cutegirls.moe/json", params=params)
+            if response.status == 404:
+                await ctx.message.reply(content="Couldn't find image with provided search parameters.")
+                return
+            elif response.status >= 300:
+                try:
+                    message = (await response.json())["message"]
+                except (ValueError, KeyError):
+                    await ctx.message.safe_reply(
+                        content=f"Failed to retrieve image from API which returned a {response.status}"
+                    )
+                else:
+                    await ctx.message.safe_reply(content=f"Server returned: {message}")
+                finally:
+                    return
+            try:
+                data = (await response.json())["data"]
+            except (ValueError, KeyError):
+                await ctx.message.reply(content="Image API returned invalid data.")
+            else:
+                await ctx.message.reply(content=f"{data['image']} (by {data.get('author') or 'unknown'})")
