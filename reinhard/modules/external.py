@@ -42,6 +42,12 @@ class UtilCluster(clusters.Cluster):
         self.user: typing.Optional[users.MyUser] = None
         self.paginator_pool = paginators.PaginatorPool(self.components)
 
+    def filter_error(self, content: str) -> str:
+        content.replace(self.components.config.token, "<REDACTED>")
+        for token in self.components.config.tokens.deserialize().values():
+            content.replace(token, "<REDACTED>")
+        return content
+
     async def load(self) -> None:
         self.application = await self.components.rest.fetch_my_application_info()
         self.user = await self.components.rest.fetch_me()
@@ -59,12 +65,21 @@ class UtilCluster(clusters.Cluster):
                 return  # TODO: handle all 4XX
             if response.status >= 500:
                 await ctx.message.safe_reply(content=f"Failed to fetch lyrics due to server error {response.status}")
+                self.logger.exception(
+                    "Received unexpected %s response from lyrics.tsu.sh\n %s", response.status, await response.text()
+                )
                 return
 
             try:
                 data = await response.json()
             except ValueError as exc:
-                await ctx.message.safe_reply(content=f"Invalid data returned by server: ```python\n{exc}```")
+                await ctx.message.safe_reply(content=f"Invalid data returned by server.")
+                self.logger.debug(
+                    "Received unexpected data from lyrics.tsu.sh of type %s\n %s",
+                    response.headers.get("Content-Type", "unknown"),
+                    await response.text(),
+                )
+                raise exc
             else:
                 icon = data["song"].get("icon")
                 title = data["song"]["full_title"]
@@ -85,6 +100,11 @@ class UtilCluster(clusters.Cluster):
                         generator=response_paginator, first_entry=(content, embed), authors=(ctx.message.author.id,)
                     ),
                 )
+
+    async def log_bad_youtube_response(self, response: aiohttp.ClientResponse) -> None:
+        self.logger.exception(
+            "Received unexpected %s response from youtube's api\n %s", response.status, await response.text()
+        )
 
     @decorators.command(
         greedy="query", aliases=("yt",), checks=(lambda ctx: bool(ctx.components.config.tokens.google),)
@@ -108,7 +128,7 @@ class UtilCluster(clusters.Cluster):
             "order": order,
             "part": "snippet",
             "q": query,
-            "safeSearch": "strict" if False else "none",  # TODO: channel.nsfw
+            "safeSearch": "none" if False else "strict",  # TODO: channel.nsfw
             "type": resource_type,
         }
         if region is not None:
@@ -116,7 +136,9 @@ class UtilCluster(clusters.Cluster):
         if language is not None:
             parameters["relevanceLanguage"] = language
 
-        async def get_next_page(parameters_: typing.MutableMapping[str, typing.Any]):
+        async def get_next_page(
+            parameters_: typing.MutableMapping[str, typing.Any]
+        ) -> typing.AsyncIterator[typing.Tuple[str, embeds.Embed]]:
             next_page_token = ""
             async with aiohttp.ClientSession(
                 headers={"User-Agent": f"Reinhard (id:{self.user.id}; owner:{owner_id})"}
@@ -127,6 +149,7 @@ class UtilCluster(clusters.Cluster):
                     if response.status == 404:
                         raise errors.CommandError(f"Couldn't find `{query}`.")
                     if response.status >= 500 and next_page_token == "":
+                        await self.log_bad_youtube_response(response)
                         raise errors.CommandError("Failed to reach youtube at this time, please try again later.")
                     if response.status >= 400 and next_page_token == "":
                         try:
@@ -137,15 +160,23 @@ class UtilCluster(clusters.Cluster):
                             )
                         else:
                             raise errors.CommandError(error)
+                        finally:
+                            await self.log_bad_youtube_response(response)
                     elif response.status >= 300:
+                        await self.log_bad_youtube_response(response)
                         return
 
                     try:
                         data = await response.json()
-                    except ValueError:
+                    except ValueError as exc:
+                        self.logger.exception(
+                            "Received unexpected data from youtube's api of type %s\n %s",
+                            response.headers.get("Content-Type", "unknown"),
+                            await response.text(),
+                        )
                         if next_page_token == "":
                             raise errors.CommandError("Youtube returned invalid data.")
-                        return
+                        raise exc
 
                     next_page_token = data.get("nextPageToken")
                     for page in data["items"]:
@@ -193,10 +224,19 @@ class UtilCluster(clusters.Cluster):
                 else:
                     await ctx.message.safe_reply(content=f"Server returned: {message}")
                 finally:
+                    self.logger.exception(
+                        "Received bad %s response from cutegirls.moe\n %s", response.status, await response.text()
+                    )
                     return
             try:
                 data = (await response.json())["data"]
-            except (ValueError, KeyError):
+            except (ValueError, KeyError) as exc:
+                self.logger.exception(
+                    "Received unexpected data from cutegirls.moe of type%s\n %s",
+                    response.headers.get("Content-Type", "unknown"),
+                    await response.text(),
+                )
                 await ctx.message.reply(content="Image API returned invalid data.")
+                raise exc
             else:
-                await ctx.message.reply(content=f"{data['image']} (by {data.get('author') or 'unknown'})")
+                await ctx.message.reply(content=f"{data['image']} (source {data.get('source') or 'unknown'})")
