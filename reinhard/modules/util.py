@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import typing
 
-import aiohttp
-
 from hikari import bases
 from hikari import colors
 from hikari import embeds
@@ -13,10 +11,10 @@ from tanjun import commands
 from tanjun import decorators
 from tanjun import errors
 
-from reinhard.util import basic
-from reinhard.util import command_hooks
-from reinhard.util import constants
-from reinhard.util import paginators
+from ..util import basic
+from ..util import command_hooks
+from ..util import constants
+from ..util import paginators
 
 if typing.TYPE_CHECKING:
     from hikari import applications
@@ -142,44 +140,3 @@ class UtilCluster(clusters.Cluster):
                 .set_thumbnail(image=user.avatar_url)
                 .set_footer(text=str(user.id), icon=user.default_avatar_url)
             )
-
-    @decorators.command(greedy="name")
-    async def lyrics(self, ctx: commands.Context, name: str) -> None:
-        owner = (
-            next(iter(self.application.team.members.values())).user if self.application.team else self.application.owner
-        )
-        async with aiohttp.ClientSession(
-            headers={"User-Agent": f"Reinhard (id:{self.user}; owner:{owner.id})"}
-        ) as session:
-            response = await session.get("https://lyrics.tsu.sh/v1", params={"q": name})
-            if response.status == 404:
-                await ctx.message.safe_reply(content=f"Couldn't find the lyrics for `{name}`")
-                return
-            if response.status >= 500:
-                await ctx.message.safe_reply(content=f"Failed to fetch lyrics due to server error {response.status}")
-                return
-
-            try:
-                data = await response.json()
-            except ValueError as exc:
-                await ctx.message.safe_reply(content=f"Invalid data returned by server: ```python\n{exc}```")
-            else:
-                icon = data["song"].get("icon")
-                title = data["song"]["full_title"]
-                response_paginator = (
-                    (
-                        "",
-                        embeds.Embed(description=page, color=constants.EMBED_COLOUR)
-                        .set_footer(text=f"Page {index}")
-                        .set_author(icon=icon, name=title),
-                    )
-                    for page, index in paginators.string_paginator(data["content"].splitlines() or ["..."])
-                )
-                content, embed = next(response_paginator)
-                message = await ctx.message.safe_reply(content=content, embed=embed)
-                await self.paginator_pool.register_message(
-                    message=message,
-                    paginator=paginators.ResponsePaginator(
-                        generator=response_paginator, first_entry=(content, embed), authors=(ctx.message.author.id,)
-                    ),
-                )

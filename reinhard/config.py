@@ -20,6 +20,12 @@ class DatabaseConfig(marshaller.Deserializable):
 
 @marshaller.marshallable()
 @attr.s(slots=True, kw_only=True)
+class ExternalTokens(marshaller.Deserializable):
+    google: typing.Optional[str] = marshaller.attrib(repr=False, deserializer=str, default=None)
+
+
+@marshaller.marshallable()
+@attr.s(slots=True, kw_only=True)
 class ExtendedOptions(configs.ClientConfig):
     database: DatabaseConfig = marshaller.attrib(deserializer=DatabaseConfig.deserialize, factory=DatabaseConfig)
     emoji_guild: typing.Optional[bases.Snowflake] = marshaller.attrib(
@@ -31,4 +37,7 @@ class ExtendedOptions(configs.ClientConfig):
         deserializer=lambda payload: [str(prefix) for prefix in payload],
         if_undefined=lambda: ["."],
         factory=lambda: ["."],
+    )
+    tokens: ExternalTokens = marshaller.attrib(
+        deserializer=ExternalTokens.deserialize, if_undefined=ExternalTokens, factory=ExternalTokens, repr=False
     )

@@ -18,9 +18,9 @@ from tanjun import commands
 from tanjun import decorators
 from tanjun import parser
 
-from reinhard.util import command_hooks
-from reinhard.util import constants
-from reinhard.util import paginators
+from .util import command_hooks
+from .util import constants
+from .util import paginators
 
 if typing.TYPE_CHECKING:
     from hikari import applications as _applications

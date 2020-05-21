@@ -1,37 +1,64 @@
 from __future__ import annotations
 
+import asyncio
+import datetime
 import typing
 
-from hikari.net import errors
-from hikari.orm.models import permissions as _permissions
-from hikari.orm.models import users as _users
+from hikari import errors as hikari_errors
+from hikari import events
+from hikari import permissions
+from tanjun import clusters
+from tanjun import decorators
+from tanjun import errors
 
-import reinhard.util.errors
-from reinhard.util import command_client
-from reinhard.util import command_hooks
-from reinhard import sql
+from ..util import command_hooks
+from ..util import ratelimiter
 
 if typing.TYPE_CHECKING:
     from hikari import bases as _bases
     from hikari import guilds as _guilds
+    from tanjun import commands
+
 
 exports = ["ModerationCluster"]
 
 
-class ModerationCluster(command_client.CommandCluster):  # TODO: state
+class ModerationCluster(clusters.Cluster):  # TODO: state
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.sql_scripts = sql.CachedScripts(pattern=".*star.*")
         self.current_user_id: typing.Optional[_bases.Snowflake] = None
-        for command in self.commands:
-            command.register_check(self.permission_check)
-            command.hooks.on_error = command_hooks.error_hook
+        self.message_limiter_pool = ratelimiter.ComplexBucketPool(
+            affinity=30, expire_after=datetime.timedelta(seconds=10)
+        )
+        self.message_limiter_results = {}
+        # for command in self.commands:
+        #     command.register_check(self.permission_check)
+        #     command.hooks.on_error = command_hooks.error_hook
 
     async def load(self) -> None:
         self.current_user_id = (await self.components.rest.fetch_me()).id
+        await super().load()
+
+    async def garbage_collect(self) -> None:
+        while True:
+            await asyncio.sleep(300)
+            self.logger.debug("Garbage collecting message rate-limiter.")
+            self.message_limiter_pool.garbage_collect()
+
+    @decorators.event(events.MessageCreateEvent)
+    async def on_message_create(self, event: events.MessageCreateEvent) -> None:
+        if not event.guild_id:
+            return
+
+        pool = self.message_limiter_pool.get_or_create_pool(event.guild_id)
+        pool.add_cool(event.author.id, call=ratelimiter.MessageCall(message=event))
+        if (level := pool.get_level(event.author.id)) >= 10:
+            self.message_limiter_results.setdefault(event.author.id, [])
+            self.message_limiter_results[event.author.id].append(f"{event.channel_id}:{event.id}:{level}")
+            self.logger.debug("Message rate limiter triggered in %s by %s level %s", event.channel_id, event.id, level)
 
     async def pre_execution(
-        self, ctx: command_client.Context, **members: _guilds.GuildMember
+        self, ctx: commands.Context, **members: _guilds.GuildMember
     ) -> bool:  # TODO: state or not state
         if not ctx.message.guild_id:
             return False
@@ -49,29 +76,29 @@ class ModerationCluster(command_client.CommandCluster):  # TODO: state
         own_position = guild.roles[me.roles[0]].position if me.roles else -1
         author_position = guild.roles[author.roles[0]].position if author.roles else -1
         if target_position >= own_position:
-            raise reinhard.util.errors.CommandError("I cannot target this user.")
+            raise errors.CommandError("I cannot target this user.")
         if target_position >= author_position:
-            raise reinhard.util.errors.CommandError("You cannot target this user.")
+            raise errors.CommandError("You cannot target this user.")
 
     @staticmethod
-    def is_guild(ctx: command_client.Context) -> bool:
+    def is_guild(ctx: commands.Context) -> bool:
         return bool(ctx.message.guild_id)
 
     @staticmethod
-    async def permission_check(ctx: command_client.Context) -> bool:
+    async def permission_check(ctx: commands.Context) -> bool:
         required_perms = ctx.command.meta.get("perms", 0)
         current_perms = await ctx.fetch_permissions()
 
-        return (current_perms & _permissions.Permission.ADMINISTRATOR == _permissions.Permission.ADMINISTRATOR) or (
+        return (current_perms & permissions.Permission.ADMINISTRATOR == permissions.Permission.ADMINISTRATOR) or (
             current_perms & required_perms
         ) == required_perms
 
-        # for permission in _permissions.Permission.__members__.values():
+        # for permission in permissions.Permission.__members__.values():
         #    print(permission)
         #    print(ctx.message.author.permissions & permission == permission)
 
-    @command_client.command(meta={"perms": _permissions.BAN_MEMBERS})
-    async def ban(self, ctx: command_client.Context, *users: _guilds.GuildMember) -> None:
+    # @decorators.command(meta={"perms": permissions.BAN_MEMBERS})
+    async def ban(self, ctx: commands.Context, *users: _guilds.GuildMember) -> None:
         result = ""
         for user in list({user.id: user for user in users}.values())[:25]:
             try:
@@ -81,19 +108,19 @@ class ModerationCluster(command_client.CommandCluster):  # TODO: state
 
                 await ctx.fabric.http_adapter.ban_member(member)
                 await self.role_position_check(ctx.message.author, member)
-            except errors.NotFoundHTTPError as exc:
+            except hikari_errors.NotFoundHTTPError as exc:
                 user_repr = f"{user.username}#{user.discriminator}" if user.is_resolved else user.id
                 result += f":red_circle: `{user_repr}`: {getattr(exc, 'message', exc)}\n"
-            except (reinhard.util.errors.CommandError, errors.HTTPError) as exc:
+            except (errors.CommandError, hikari_errors.HTTPError) as exc:
                 result += f":red_circle: `{member.username}#{member.discriminator}`: {getattr(exc, 'message', exc)}\n"
             else:
                 result += f":green_circle: `{member.username}#{member.discriminator}`\n"
         await ctx.reply(content=result)
 
-    @command_client.command(meta={"perms": _permissions.KICK_MEMBERS})
-    async def kick(self, ctx: command_client.Context, *users: _guilds.GuildMember) -> None:
-        await ctx.reply(content=str(users))
+    # @decorators.command(meta={"perms": permissions.KICK_MEMBERS})
+    async def kick(self, ctx: commands.Context, *users: _guilds.GuildMember) -> None:
+        await ctx.message.reply(content=str(users))
 
-    @command_client.command(meta={"perms": _permissions.MUTE_MEMBERS})
-    async def mute(self, ctx: command_client.Context, *members: _guilds.GuildMember) -> None:
+    # @decorators.command(meta={"perms": permissions.MUTE_MEMBERS})
+    async def mute(self, ctx: commands.Context, *members: _guilds.GuildMember) -> None:
         ...  # TODO: channel mute vs global and temp vers perm.

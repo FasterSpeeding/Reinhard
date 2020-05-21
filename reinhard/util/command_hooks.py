@@ -6,7 +6,7 @@ import typing
 from hikari import embeds
 from hikari import errors as hikari_errors
 
-from reinhard.util import constants
+from . import constants
 
 if typing.TYPE_CHECKING:
     from tanjun import commands as _commands

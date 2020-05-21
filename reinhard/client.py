@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import datetime
 import importlib
 import inspect
 import platform
-import random
 import time
 import typing
 
@@ -20,10 +20,11 @@ from tanjun import clusters
 from tanjun import commands
 from tanjun import decorators
 
-from reinhard import sql
-from reinhard.util import command_hooks
-from reinhard.util import constants
-from reinhard.util import paginators
+from . import sql
+from .util import command_hooks
+from .util import constants
+from .util import paginators
+from .util import ratelimiter
 
 if typing.TYPE_CHECKING:
     from hikari import users as _users
@@ -37,6 +38,8 @@ class CommandClient(client.Client):  # TODO: sql filter.
     process: psutil.Process
     sql_pool: typing.Optional[asyncpg.pool.Pool]
     sql_scripts: sql.CachedScripts
+    command_limiter: ratelimiter.BucketPool
+    garbage_collect_task: typing.Optional[asyncio.Task]
 
     def __init__(self, components: _components.Components, *, modules: typing.List[str] = None) -> None:
         if modules is None:
@@ -44,21 +47,20 @@ class CommandClient(client.Client):  # TODO: sql filter.
         super().__init__(
             components=components,
             hooks=commands.Hooks(
-                on_error=command_hooks.error_hook, on_conversion_error=command_hooks.on_conversion_error
+                on_error=command_hooks.error_hook, on_conversion_error=command_hooks.on_conversion_error,
             ),
+            global_hooks=commands.Hooks(pre_execution=self.command_limit_check, post_execution=self.add_command_call,),
             modules=modules,
         )
-        self.cpu_usage = None
-        self.memory_usage = None
-        self.total_memory = None
-        self.shard_count = random.randint(4, 64)
-        self.shard_index = random.randint(1, self.shard_count)
 
         self.current_user = None
         self.help_embeds = {}
         self.paginator_pool = paginators.PaginatorPool(self.components)
+        self.process = psutil.Process()
         self.sql_pool = None
         self.sql_scripts = sql.CachedScripts(pattern=r"[.*schema.sql]|[*prefix.sql]")
+        self.command_limiter = ratelimiter.BucketPool(affinity=15, expire_after=datetime.timedelta(seconds=10))
+        self.garbage_collect_task = None
 
     async def load(self) -> None:
         await super().load()
@@ -72,48 +74,44 @@ class CommandClient(client.Client):  # TODO: sql filter.
         self.current_user = await self.components.rest.fetch_me()
         async with self.sql_pool.acquire() as conn:
             await sql.initialise_schema(self.sql_scripts, conn)
+        self.garbage_collect_task = asyncio.create_task(self.garbage_collect())
 
     async def unload(self) -> None:
         await super().unload()
         await self.sql_pool.close()
 
-    def calculate_cpu_usage(self) -> float:
-        if self.cpu_usage is None:
-            self.cpu_usage = psutil.Process().cpu_percent() / psutil.cpu_count()
+    async def garbage_collect(self) -> None:
+        while True:
+            await asyncio.sleep(300)
+            self.logger.debug("Garbage collecting command rate-limiter.")
+            self.command_limiter.garbage_collect()
 
-        change = random.uniform(-0.5, 0.05)
-        if 0 < (new_usage := self.cpu_usage + change) < 100:
-            self.cpu_usage = new_usage
-        return self.cpu_usage
+    def command_limit_check(self, ctx: commands.Context, *_, **__) -> bool:
+        return self.command_limiter.get_level(ctx.message.author.id) <= 10
 
-    def calculate_memory_usage(self) -> typing.Tuple[int, float]:
-        if self.memory_usage is None:
-            process = psutil.Process()
-            self.memory_usage = process.memory_full_info().uss
-            self.total_memory = (self.memory_usage / process.memory_percent()) * 100
-        change = random.randint(-5000, 5000)
-
-        if 0 < (new_usage := self.memory_usage + change) < self.total_memory:
-            self.memory_usage = new_usage
-
-        return self.memory_usage, self.memory_usage / self.total_memory
+    def add_command_call(self, ctx: commands.Context) -> None:
+        self.command_limiter.add_cool(ctx.message.author.id, ratelimiter.CommandCall(ctx))
 
     @decorators.command
     async def about(self, ctx: commands.Context) -> None:
         """Get general information about this bot."""
-        memory_usage, memory_percent = self.calculate_memory_usage()
-        memory_usage = memory_usage / 1024 ** 2
+        start_date = datetime.datetime.fromtimestamp(self.process.create_time())
+        uptime = datetime.datetime.now() - start_date
+        memory_usage = self.process.memory_full_info().uss / 1024 ** 2
+        cpu_usage = self.process.cpu_percent() / psutil.cpu_count()
+        memory_percent = self.process.memory_percent()
+
         await ctx.message.reply(
             embed=embeds.Embed(description="An experimental pythonic Hikari bot.", color=constants.EMBED_COLOUR)
             .set_author(
-                name=f"Reinhard: Shard {self.shard_index} of {self.shard_count}",
+                name=f"Reinhard: Shard {ctx.shard_id} of {ctx.shard.shard_count}",
                 icon=self.current_user.avatar_url,
                 url=hikari_url,
             )
-            .add_field(name="Uptime", value="00:00", inline=True)  # str(uptime), inline=True)
+            .add_field(name="Uptime", value=str(uptime), inline=True)  # str(uptime), inline=True)
             .add_field(
                 name="Process",
-                value=f"{memory_usage:.2f} MiB ({memory_percent:.0f}%)\n{self.calculate_cpu_usage():.2f}% CPU",
+                value=f"{memory_usage:.2f} MiB ({memory_percent:.0f}%)\n{cpu_usage:.2f}% CPU",
                 inline=True,
             )
             .set_footer(
@@ -150,7 +148,7 @@ class CommandClient(client.Client):  # TODO: sql filter.
     def generate_help_embed(self) -> typing.Iterator[typing.Tuple[str, embeds.Embed]]:
         for cluster in (self, *self.clusters.values()):
             embed = embeds.Embed(
-                title=cluster.__class__.__name__,
+                title=type(cluster).__name__,
                 color=constants.EMBED_COLOUR,
                 description="Argument key: <required, multi-word..., --optional>",
             )
@@ -166,12 +164,10 @@ class CommandClient(client.Client):  # TODO: sql filter.
                 embed.add_field(
                     name=self._form_command_name(command), value=value, inline=False,
                 )
-            yield cluster.__class__.__name__, embed  # TODO: better name generation
+            yield type(cluster).__name__, embed  # TODO: better name generation
 
     @decorators.command(greedy="command")
-    async def help(
-        self, ctx: commands.Context, command: typing.Optional[str] = None
-    ) -> None:  # TODO: do we even support typing.Union?
+    async def help(self, ctx: commands.Context, command: typing.Optional[str] = None) -> None:
         """Get information about this bot's loaded commands."""
         if not self.help_embeds:
             self.help_embeds = dict(self.generate_help_embed())
@@ -221,7 +217,7 @@ class CommandClient(client.Client):  # TODO: sql filter.
     def _consume_client_loadable(self, loadable: typing.Any) -> bool:
         if inspect.isclass(loadable) and issubclass(loadable, clusters.AbstractCluster):
             cluster = loadable(self, self.components)
-            self.clusters[cluster.__class__.__name__] = cluster
+            self.clusters[type(cluster).__name__] = cluster
         elif isinstance(loadable, clusters.AbstractCluster):  # TODO: or executable?
             self.register_command(loadable)
         elif callable(loadable):
@@ -241,9 +237,7 @@ class CommandClient(client.Client):  # TODO: sql filter.
                     raise RuntimeError(f"`{item}` export not found in `{module_path}` module.") from exc
 
                 if not self._consume_client_loadable(item):
-                    self.logger.warning(
-                        "Invalid export `%s` found in `%s.exports`", item.__class__.__name__, module_path
-                    )
+                    self.logger.warning("Invalid export `%s` found in `%s.exports`", type(item).__name__, module_path)
 
             if not exports:
                 self.logger.warning("No exports found in %s", module_path)
