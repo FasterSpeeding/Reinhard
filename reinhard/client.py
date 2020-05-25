@@ -49,7 +49,7 @@ class CommandClient(client.Client):  # TODO: sql filter.
             hooks=commands.Hooks(
                 on_error=command_hooks.error_hook, on_conversion_error=command_hooks.on_conversion_error,
             ),
-            global_hooks=commands.Hooks(pre_execution=self.command_limit_check, post_execution=self.add_command_call,),
+            global_hooks=commands.Hooks(pre_execution=self.command_limit_hook),  # post_execution=self.add_command_call
             modules=modules,
         )
 
@@ -63,7 +63,6 @@ class CommandClient(client.Client):  # TODO: sql filter.
         self.garbage_collect_task = None
 
     async def load(self) -> None:
-        await super().load()
         self.sql_pool = await asyncpg.create_pool(
             password=self.components.config.database.password,
             host=self.components.config.database.host,
@@ -75,6 +74,7 @@ class CommandClient(client.Client):  # TODO: sql filter.
         async with self.sql_pool.acquire() as conn:
             await sql.initialise_schema(self.sql_scripts, conn)
         self.garbage_collect_task = asyncio.create_task(self.garbage_collect())
+        await super().load()
 
     async def unload(self) -> None:
         await super().unload()
@@ -86,10 +86,12 @@ class CommandClient(client.Client):  # TODO: sql filter.
             self.logger.debug("Garbage collecting command rate-limiter.")
             self.command_limiter.garbage_collect()
 
-    def command_limit_check(self, ctx: commands.Context, *_, **__) -> bool:
-        return self.command_limiter.get_level(ctx.message.author.id) <= 10
+    def command_limit_hook(self, ctx: commands.Context, *_, **__) -> bool:  # TODO: vargs and vkwargs?
+        if result := self.command_limiter.get_level(ctx.message.author.id) <= 10:  # TODO: count every call?
+            self.command_limiter.add_cool(ctx.message.author.id, ratelimiter.CommandCall(ctx))
+        return result
 
-    def add_command_call(self, ctx: commands.Context) -> None:
+    def add_command_call(self, ctx: commands.Context) -> None:  # TODO: before command?
         self.command_limiter.add_cool(ctx.message.author.id, ratelimiter.CommandCall(ctx))
 
     @decorators.command

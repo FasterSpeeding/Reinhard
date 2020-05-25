@@ -48,9 +48,9 @@ class SudoCluster(clusters.Cluster):
         self.paginator_pool = paginators.PaginatorPool(self.components)
 
     async def load(self) -> None:
-        await super().load()
         self.application = await self.components.rest.fetch_my_application_info()
         self.application_task = asyncio.create_task(self.update_application())
+        await super().load()
 
     async def update_application(self) -> None:
         while True:
@@ -58,7 +58,7 @@ class SudoCluster(clusters.Cluster):
             try:
                 self.application = await self.components.rest.fetch_my_application_info()
             except errors.HTTPErrorResponse as exc:
-                self.logger.warning("Failed to fetch application object:\n  - %s", exc)
+                self.logger.warning("Failed to fetch application object:\n - %r", exc)
 
     @decorators.command
     async def error(self, ctx: commands.Context) -> None:
@@ -69,9 +69,10 @@ class SudoCluster(clusters.Cluster):
             return any(ctx.message.author.id == member_id for member_id in self.application.team.members.keys())
         return ctx.message.author.id == self.application.owner.id
 
-    @decorators.command(greedy="args")
-    async def echo(self, ctx: commands.Context, args: str) -> None:
-        await ctx.message.reply(content=args)  # TODO: enforce greedy isn't empty resource
+    @decorators.command(parser=None)
+    async def echo(self, ctx: commands.Context) -> None:
+        if ctx.message.content:
+            await ctx.message.reply(content=ctx.message.content)  # TODO: enforce greedy isn't empty resource
 
     @staticmethod
     def _yields_results(stdout: io.StringIO, stderr: io.StringIO):
@@ -120,7 +121,7 @@ class SudoCluster(clusters.Cluster):
 
         result, exec_time, failed = await self.eval_python_code(ctx, code[0])
         color = constants.FAILED_COLOUR if failed else constants.PASS_COLOUR
-        if suppress_response:  # TODO: if "--suppress-response" in args
+        if suppress_response:
             return
 
         embed_generator = (

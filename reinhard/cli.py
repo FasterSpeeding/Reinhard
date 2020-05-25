@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 import typing
 
 import yaml
@@ -59,7 +60,8 @@ def main():
     logging.getLogger().addHandler(file_logger)
 
     bot_client = stateless.StatelessBot(config=config_obj)
-    client.CommandClient(
+    start_time = time.perf_counter()
+    command_client = client.CommandClient(
         bot_client,
         modules=[
             "reinhard.modules.sudo",
@@ -67,5 +69,11 @@ def main():
             "reinhard.modules.moderation",
             "reinhard.modules.external",
         ],
+    )
+    logging.getLogger().debug(
+        "Took %ss to initiate command client with %s clusters and %s commands.",
+        time.perf_counter() - start_time,
+        len(command_client.clusters),
+        sum(len(cluster.commands) for cluster in command_client.clusters.values()),
     )
     bot_client.run()

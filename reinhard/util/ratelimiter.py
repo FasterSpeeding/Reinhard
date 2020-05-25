@@ -99,7 +99,7 @@ class AbstractBucket(abc.ABC):
 @attr.attrs(eq=False, hash=True, init=False, slots=False)
 class SimpleBucket(AbstractBucket):
     def __init__(self, expire_after: datetime.timedelta) -> None:
-        super().__init__(calls=cache.ExpiringList(int(expire_after.total_seconds())))
+        super().__init__(calls=cache.ExpiringQueue(int(expire_after.total_seconds())))
 
     def add_call(self, call: AbstractCall) -> None:
         similarities = [other_call.similarity_check(call) for other_call in self.calls]
