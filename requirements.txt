@@ -1,4 +1,4 @@
 asyncpg==0.20.0
 psutil==5.7.0
 pyyaml==5.3
-https://gitlab.com/FasterSpeeding/tanjun
+git+https://gitlab.com/FasterSpeeding/tanjun
