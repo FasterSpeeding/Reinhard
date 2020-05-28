@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import io
+import json
 import re
 import textwrap
 import time
@@ -69,10 +70,17 @@ class SudoCluster(clusters.Cluster):
             return any(ctx.message.author.id == member_id for member_id in self.application.team.members.keys())
         return ctx.message.author.id == self.application.owner.id
 
-    @decorators.command(parser=None)
-    async def echo(self, ctx: commands.Context) -> None:
-        if ctx.message.content:
-            await ctx.message.reply(content=ctx.message.content)  # TODO: enforce greedy isn't empty resource
+    @decorators.command(greedy="content")
+    async def echo(self, ctx: commands.Context, content: str, embed: str = ...) -> None:
+        if embed is not ...:
+            try:
+                embed = embeds.Embed.deserialize(json.loads(embed))
+            except (TypeError, ValueError) as exc:
+                await ctx.message.safe_reply(content=f"Invalid embed passed: {exc}")
+                return
+
+        if content or embed:
+            await ctx.message.reply(content=content, embed=embed)  # TODO: enforce greedy isn't empty resource
 
     @staticmethod
     def _yields_results(stdout: io.StringIO, stderr: io.StringIO):
@@ -82,7 +90,7 @@ class SudoCluster(clusters.Cluster):
         yield from stderr.readlines(2034)
 
     async def eval_python_code(self, ctx: commands.Context, code: str) -> typing.Tuple[typing.Iterable[str], int, bool]:
-        sub_ctx = {"ctx": ctx, "client": self}
+        globals_ = {"ctx": ctx, "client": self}
         stdout = io.StringIO()
         stderr = io.StringIO()
         # contextlib.redirect_xxxxx doesn't work properly with contextlib.ExitStack
@@ -90,8 +98,8 @@ class SudoCluster(clusters.Cluster):
             with contextlib.redirect_stderr(stderr):
                 start_time = time.perf_counter()
                 try:
-                    exec(f"async def __callable__(ctx):\n{textwrap.indent(code, '   ')}", sub_ctx)
-                    result = await sub_ctx["__callable__"](ctx)
+                    exec(f"async def __callable__(ctx):\n{textwrap.indent(code, '   ')}", globals_)
+                    result = await globals_["__callable__"](ctx)
                     if asyncio.iscoroutine(result):
                         await result
                     failed = False

@@ -8,6 +8,7 @@ from hikari import embeds
 from hikari import errors as hikari_errors
 from tanjun import clusters
 from tanjun import commands
+from tanjun import converters
 from tanjun import decorators
 from tanjun import errors
 
@@ -60,6 +61,15 @@ class UtilCluster(clusters.Cluster):
             .add_field(name="RGB", value=str(color.rgb))
             .add_field(name="HEX", value=str(color.hex_code))
         )
+
+    # @decorators.command
+    async def copy(self, ctx: commands.Context, message: converters.BaseIDConverter, channel: typing.Optional[converters.BaseIDConverter] = None) -> None:
+        try:
+            message = await self.components.rest.fetch_message(message=message, channel=channel or ctx.message.channel_id)
+        except (hikari_errors.NotFound, hikari_errors.Forbidden) as exc:
+            await ctx.message.reply(content="Failed to get message.")
+        else:
+            ...  # TODO: Implement this to allow getting the embeds from a suppressed message.
 
     @decorators.command(checks=[lambda ctx: ctx.message.guild_id is not None])
     async def member(self, ctx: commands.Context, member: bases.Snowflake) -> None:
