@@ -63,9 +63,16 @@ class UtilCluster(clusters.Cluster):
         )
 
     # @decorators.command
-    async def copy(self, ctx: commands.Context, message: converters.BaseIDConverter, channel: typing.Optional[converters.BaseIDConverter] = None) -> None:
+    async def copy(
+        self,
+        ctx: commands.Context,
+        message: converters.BaseIDConverter,
+        channel: typing.Optional[converters.BaseIDConverter] = None,
+    ) -> None:
         try:
-            message = await self.components.rest.fetch_message(message=message, channel=channel or ctx.message.channel_id)
+            message = await self.components.rest.fetch_message(
+                message=message, channel=channel or ctx.message.channel_id
+            )
         except (hikari_errors.NotFound, hikari_errors.Forbidden) as exc:
             await ctx.message.reply(content="Failed to get message.")
         else:

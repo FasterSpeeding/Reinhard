@@ -52,9 +52,7 @@ class ExternalCluster(clusters.Cluster):
 
     @decorators.command(greedy="query")
     async def lyrics(self, ctx: commands.Context, query: str) -> None:
-        async with aiohttp.ClientSession(
-            headers={"User-Agent": self.user_agent}
-        ) as session:
+        async with aiohttp.ClientSession(headers={"User-Agent": self.user_agent}) as session:
             response = await session.get("https://lyrics.tsu.sh/v1", params={"q": query})
 
             if response.status == 404:
@@ -70,7 +68,7 @@ class ExternalCluster(clusters.Cluster):
 
             try:
                 data = await response.json()
-            except ValueError as exc:
+            except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError) as exc:
                 await ctx.message.safe_reply(content=f"Invalid data returned by server.")
                 self.logger.debug(
                     "Received unexpected data from lyrics.tsu.sh of type %s\n %s",
@@ -78,26 +76,26 @@ class ExternalCluster(clusters.Cluster):
                     await response.text(),
                 )
                 raise exc
-            else:
-                icon = data["song"].get("icon")
-                title = data["song"]["full_title"]
-                response_paginator = (
-                    (
-                        "",
-                        embeds.Embed(description=page, color=constants.EMBED_COLOUR)
-                        .set_footer(text=f"Page {index}")
-                        .set_author(icon=icon, name=title),
-                    )
-                    for page, index in paginators.string_paginator(data["content"].splitlines() or ["..."])
+
+            icon = data["song"].get("icon")
+            title = data["song"]["full_title"]
+            response_paginator = (
+                (
+                    "",
+                    embeds.Embed(description=page, color=constants.EMBED_COLOUR)
+                    .set_footer(text=f"Page {index}")
+                    .set_author(icon=icon, name=title),
                 )
-                content, embed = next(response_paginator)
-                message = await ctx.message.safe_reply(content=content, embed=embed)
-                await self.paginator_pool.register_message(
-                    message=message,
-                    paginator=paginators.ResponsePaginator(
-                        generator=response_paginator, first_entry=(content, embed), authors=(ctx.message.author.id,)
-                    ),
-                )
+                for page, index in paginators.string_paginator(data["content"].splitlines() or ["..."])
+            )
+            content, embed = next(response_paginator)
+            message = await ctx.message.safe_reply(content=content, embed=embed)
+            await self.paginator_pool.register_message(
+                message=message,
+                paginator=paginators.ResponsePaginator(
+                    generator=response_paginator, first_entry=(content, embed), authors=(ctx.message.author.id,)
+                ),
+            )
 
     async def log_bad_youtube_response(self, response: aiohttp.ClientResponse) -> None:
         self.logger.exception(
@@ -137,58 +135,7 @@ class ExternalCluster(clusters.Cluster):
         if language is not None:
             parameters["relevanceLanguage"] = language
 
-        async def get_next_page(
-            parameters_: typing.MutableMapping[str, typing.Any]
-        ) -> typing.AsyncIterator[typing.Tuple[str, embeds.Embed]]:
-            next_page_token = ""
-            async with aiohttp.ClientSession(
-                headers={"User-Agent": self.user_agent}
-            ) as session:
-                while response := await session.get(
-                    "https://www.googleapis.com/youtube/v3/search", params={"pageToken": next_page_token, **parameters_}
-                ):
-                    if response.status == 404:
-                        raise errors.CommandError(f"Couldn't find `{query}`.")
-
-                    if response.status >= 500 and next_page_token == "":
-                        await self.log_bad_youtube_response(response)
-                        raise errors.CommandError("Failed to reach youtube at this time, please try again later.")
-
-                    if response.status >= 400 and next_page_token == "":
-                        try:
-                            error = (await response.json())["error"]["message"]
-                        except (ValueError, KeyError):
-                            raise errors.CommandError(
-                                f"Received unexpected status code from youtube {response.status}."
-                            )
-                        else:
-                            raise errors.CommandError(error)
-                        finally:
-                            await self.log_bad_youtube_response(response)
-                    elif response.status >= 300:
-                        await self.log_bad_youtube_response(response)
-                        return
-
-                    try:
-                        data = await response.json()
-                    except ValueError as exc:
-                        self.logger.exception(
-                            "Received unexpected data from youtube's api of type %s\n %s",
-                            response.headers.get("Content-Type", "unknown"),
-                            await response.text(),
-                        )
-                        if next_page_token == "":
-                            raise errors.CommandError("Youtube returned invalid data.")
-                        raise exc
-
-                    for page in data["items"]:
-                        response_type = YOUTUBE_TYPES.get(page["id"]["kind"])
-                        yield f"{response_type[1]}{page['id'][response_type[0]]}", ...
-
-                    if (next_page_token := data.get("nextPageToken")) is None:
-                        break
-
-        paginator = get_next_page(parameters)
+        paginator = self._get_youtube_page(parameters)
         async for result in paginator:
             message = await ctx.message.reply(content=result[0], embed=result[1])
             await self.paginator_pool.register_message(
@@ -203,23 +150,70 @@ class ExternalCluster(clusters.Cluster):
             # for that so we'll just check to see if nothing is being returned.
             await ctx.message.safe_reply(content=f"Couldn't find `{query}`.")
 
+    async def _get_youtube_page(
+        self, parameters_: typing.MutableMapping[str, typing.Any]
+    ) -> typing.AsyncIterator[typing.Tuple[str, embeds.Embed]]:
+        next_page_token = ""
+        async with aiohttp.ClientSession(headers={"User-Agent": self.user_agent}) as session:
+            while response := await session.get(
+                "https://www.googleapis.com/youtube/v3/search", params={"pageToken": next_page_token, **parameters_}
+            ):
+                if response.status == 404:
+                    raise errors.CommandError(f"Couldn't find `{parameters_['q']}`.")
+
+                if response.status >= 500 and next_page_token == "":
+                    await self.log_bad_youtube_response(response)
+                    raise errors.CommandError("Failed to reach youtube at this time, please try again later.")
+
+                if response.status >= 400 and next_page_token == "":
+                    try:
+                        error = (await response.json())["error"]["message"]
+                    except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError, KeyError):
+                        raise errors.CommandError(f"Received unexpected status code from youtube {response.status}.")
+                    else:
+                        raise errors.CommandError(error)
+                    finally:
+                        await self.log_bad_youtube_response(response)
+                elif response.status >= 300:
+                    await self.log_bad_youtube_response(response)
+                    return
+
+                try:
+                    data = await response.json()
+                except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError) as exc:
+                    self.logger.exception(
+                        "Received unexpected data from youtube's api of type %s\n %s",
+                        response.headers.get("Content-Type", "unknown"),
+                        await response.text(),
+                    )
+                    if next_page_token == "":
+                        raise errors.CommandError("Youtube returned invalid data.")
+                    raise exc
+
+                for page in data["items"]:
+                    response_type = YOUTUBE_TYPES.get(page["id"]["kind"])
+                    yield f"{response_type[1]}{page['id'][response_type[0]]}", ...
+
+                if (next_page_token := data.get("nextPageToken")) is None:
+                    break
+
     @decorators.command  # TODO: https://lewd.bowsette.pictures/api/request
     async def moe(self, ctx: commands.Context, source: typing.Optional[str] = None) -> None:
         params = {}
         if source is not None:
             params["source"] = source
 
-        async with aiohttp.ClientSession(
-            headers={"User-Agent": self.user_agent}
-        ) as session:
+        async with aiohttp.ClientSession(headers={"User-Agent": self.user_agent}) as session:
             response = await session.get("http://api.cutegirls.moe/json", params=params)
+
             if response.status == 404:
                 await ctx.message.reply(content="Couldn't find image with provided search parameters.")
                 return
+
             elif response.status >= 300:
                 try:
                     message = (await response.json())["message"]
-                except (ValueError, KeyError):
+                except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError, KeyError):
                     await ctx.message.safe_reply(
                         content=f"Failed to retrieve image from API which returned a {response.status}"
                     )
@@ -230,9 +224,10 @@ class ExternalCluster(clusters.Cluster):
                         "Received bad %s response from cutegirls.moe\n %s", response.status, await response.text()
                     )
                     return
+
             try:
                 data = (await response.json())["data"]
-            except (ValueError, KeyError) as exc:
+            except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError, KeyError) as exc:
                 self.logger.exception(
                     "Received unexpected data from cutegirls.moe of type%s\n %s",
                     response.headers.get("Content-Type", "unknown"),
@@ -244,13 +239,11 @@ class ExternalCluster(clusters.Cluster):
                 await ctx.message.reply(content=f"{data['image']} (source {data.get('source') or 'unknown'})")
 
     async def query_nekos_life(self, endpoint: str, response_key: str, **kwargs: typing.Any) -> str:
-        async with aiohttp.ClientSession(
-            headers={"User-Agent": self.user_agent}
-        ) as session:
+        async with aiohttp.ClientSession(headers={"User-Agent": self.user_agent}) as session:
             response = await session.get(url := "https://nekos.life/api/v2" + endpoint)
             try:
                 data = await response.json()
-            except ValueError:
+            except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError):
                 data = None
 
             # Ok so here's a fun fact, whoever designed this api seems to have decided that it'd be appropriate to
@@ -273,8 +266,6 @@ class ExternalCluster(clusters.Cluster):
                 )
 
             if status_code >= 300:
-                raise errors.CommandError(
-                    f"Unable to fetch image due to unexpected error {data.get('msg', '')}"
-                )
+                raise errors.CommandError(f"Unable to fetch image due to unexpected error {data.get('msg', '')}")
 
             return data[response_key]
