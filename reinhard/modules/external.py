@@ -15,7 +15,7 @@ from ..util import constants
 from ..util import paginators
 
 
-exports = ["UtilCluster"]
+exports = ["ExternalCluster"]
 
 
 YOUTUBE_TYPES = {
