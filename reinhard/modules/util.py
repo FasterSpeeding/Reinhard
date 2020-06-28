@@ -77,37 +77,46 @@ class UtilCluster(clusters.Cluster):
             member = await ctx.components.rest.fetch_member(guild=ctx.message.guild_id, user=member)
         except (hikari_errors.NotFound, hikari_errors.BadRequest):
             await ctx.message.reply(content="Couldn't find member.")
+            return
+
+        guild = await ctx.components.rest.fetch_guild(guild=ctx.message.guild_id)
+        permissions = guild.roles[guild.id].permissions
+        roles = {}
+
+        for role_id in member.role_ids:
+            role = guild.roles[role_id]
+            permissions |= role.permissions
+            roles[role.position] = role
+
+        ordered_roles = dict(sorted(roles.items(), reverse=True))
+        roles = "\n".join(map("{0.name}: {0.id}".format, ordered_roles.values())) + "\n" if ordered_roles else ""
+
+        for role in ordered_roles.values():
+            if role.color:
+                color = role.color
+                break
         else:
-            guild = await ctx.components.rest.fetch_guild(guild=ctx.message.guild_id)
-            roles = guild.roles
-            permissions = roles[ctx.message.guild_id].permissions
-            role_list = {}
-            for role_id in member.role_ids:
-                role = roles[role_id]
-                permissions |= role.permissions
-                role_list[role.position] = f"{role.name}: {role.id}"
-            role_list = dict(sorted(role_list.items(), reverse=True)).values()
-            role_list = "\n".join(role_list) + "\n" if role_list else ""
-            color = (roles[member.role_ids[0]] if member.role_ids else roles[ctx.message.guild_id]).color
-            permissions = basic.basic_name_grid(permissions) or "NONE"
-            owner = member.user.id == guild.owner_id
-            await ctx.message.reply(
-                embed=embeds.Embed(
-                    description=(
-                        f"Boosting since: {member.premium_since or 'N/A'}\nColor: `{color}`\n"
-                        f"\nFlags: {member.user.flags}\nServer Owner {owner}\nIs bot: {member.user.is_system}\n"
-                        f"Is system user: {member.user.is_system}\nJoined Discord: {member.user.created_at}\n"
-                        f"Joined Server: {member.joined_at}\nNickname: {member.nickname}\n\n"
-                        f"Voice chat:\nIs server deafened: {member.is_deaf}\nIs server muted: {member.is_mute}\n\n"
-                        f"Roles:\n{role_list}everyone: {ctx.message.guild_id}\n\nPermissions:\n{permissions}"
-                    ),
-                    color=color,
-                    title=f"{member.user.username}#{member.user.discriminator}",
-                    url=f"https://discordapp.com/users/{member.user.id}",
-                )
-                .set_thumbnail(image=member.user.avatar_url)
-                .set_footer(text=str(member.user.id), icon=member.user.default_avatar_url)
+            color = None
+
+        permissions = basic.basic_name_grid(permissions) or "NONE"
+        is_owner = member.user.id == guild.owner_id
+        await ctx.message.reply(
+            embed=embeds.Embed(
+                description=(
+                    f"Boosting since: {member.premium_since or 'N/A'}\nColor: `{color}`\n"
+                    f"\nFlags: {member.user.flags}\nServer Owner {is_owner}\nIs bot: {member.user.is_system}\n"
+                    f"Is system user: {member.user.is_system}\nJoined Discord: {member.user.created_at}\n"
+                    f"Joined Server: {member.joined_at}\nNickname: {member.nickname}\n\n"
+                    f"Voice chat:\nIs server deafened: {member.is_deaf}\nIs server muted: {member.is_mute}\n\n"
+                    f"Roles:\n{roles}everyone: {ctx.message.guild_id}\n\nPermissions:\n{permissions}"
+                ),
+                color=color,
+                title=f"{member.user.username}#{member.user.discriminator}",
+                url=f"https://discordapp.com/users/{member.user.id}",
             )
+            .set_thumbnail(image=member.user.avatar_url)
+            .set_footer(text=str(member.user.id), icon=member.user.default_avatar_url)
+        )
 
     @decorators.command(checks=[lambda ctx: ctx.message.guild_id is not None])
     async def role(self, ctx: commands.Context, role: bases.Snowflake) -> None:
