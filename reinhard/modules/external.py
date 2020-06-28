@@ -25,7 +25,7 @@ YOUTUBE_TYPES = {
 }
 
 
-class UtilCluster(clusters.Cluster):
+class ExternalCluster(clusters.Cluster):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(
             *args,

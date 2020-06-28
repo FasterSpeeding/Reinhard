@@ -85,9 +85,11 @@ class SudoCluster(clusters.Cluster):
     @staticmethod
     def _yields_results(stdout: io.StringIO, stderr: io.StringIO):
         yield "- /dev/stdout:"
-        yield from stdout.readlines(2034)
+        while lines := stdout.readlines(25):
+            yield from lines
         yield "- /dev/stderr:"
-        yield from stderr.readlines(2034)
+        while lines := stderr.readlines(25):
+            yield from lines
 
     async def eval_python_code(self, ctx: commands.Context, code: str) -> typing.Tuple[typing.Iterable[str], int, bool]:
         globals_ = {"ctx": ctx, "client": self}

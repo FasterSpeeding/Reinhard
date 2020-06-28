@@ -157,7 +157,7 @@ class ExpiringQueue(typing.Sequence):
         self.garbage_collect()
         return any(value == item for (value, _) in self._data)
 
-    def __getitem__(self, item) -> None:
+    def __getitem__(self, item) -> typing.Any:
         self.garbage_collect()
         return self._data[item][0]
 
