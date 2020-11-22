@@ -1,43 +1,112 @@
 from __future__ import annotations
 
-import attr
+__all__: typing.Sequence[str] = ["DatabaseConfig", "Tokens", "FullConfig"]
+
+import abc
+import logging
+import pathlib
 import typing
 
-from hikari import bases
-from hikari.internal import marshaller
-from tanjun import configs
+import yaml
+from hikari import snowflakes
+
+ConfigT = typing.TypeVar("ConfigT", bound="Config")
 
 
-@marshaller.marshallable()
-@attr.s(slots=True, kw_only=True)
-class DatabaseConfig(marshaller.Deserializable):
-    password: str = marshaller.attrib(repr=False, deserializer=str)
-    database: str = marshaller.attrib(repr=False, deserializer=str, if_undefined=lambda: "postgres", default="postgres")
-    host: str = marshaller.attrib(repr=False, deserializer=str, if_undefined=lambda: "localhost", default="localhost")
-    port: int = marshaller.attrib(repr=False, deserializer=int, if_undefined=lambda: 5432, factory=lambda: 5432)
-    user: str = marshaller.attrib(repr=False, deserializer=str, if_undefined=lambda: "postgres", default="postgres")
+class Config(abc.ABC):
+    __slots__: typing.Sequence[str] = ()
+
+    @classmethod
+    @abc.abstractmethod
+    def from_mapping(cls: typing.Type[ConfigT], mapping: typing.Mapping[str, typing.Any], /) -> ConfigT:
+        raise NotImplementedError
 
 
-@marshaller.marshallable()
-@attr.s(slots=True, kw_only=True)
-class ExternalTokens(marshaller.Deserializable):
-    google: typing.Optional[str] = marshaller.attrib(repr=False, deserializer=str, default=None)
+class DatabaseConfig(Config):
+    __slots__: typing.Sequence[str] = ("password", "database", "host", "port", "user")
+
+    def __init__(
+        self,
+        password: str,
+        /,
+        *,
+        database: str = "postgres",
+        host: str = "localhost",
+        port: int = 5432,
+        user: str = "postgres",
+    ) -> None:
+        self.password = password
+        self.database = database
+        self.host = host
+        self.port = port
+        self.user = user
+
+    @classmethod
+    def from_mapping(cls, mapping: typing.Mapping[str, typing.Any], /) -> DatabaseConfig:
+        return cls(
+            str(mapping["password"]),
+            database=str(mapping["database"]) if "database" in mapping else "postgres",
+            host=str(mapping["host"]) if "host" in mapping else "localhost",
+            port=int(mapping["port"]) if "port" in mapping else 5432,
+            user=str(mapping["user"]) if "user" in mapping else "postgres",
+        )
 
 
-@marshaller.marshallable()
-@attr.s(slots=True, kw_only=True)
-class ExtendedOptions(configs.ClientConfig):
-    database: DatabaseConfig = marshaller.attrib(deserializer=DatabaseConfig.deserialize, factory=DatabaseConfig)
-    emoji_guild: typing.Optional[bases.Snowflake] = marshaller.attrib(
-        deserializer=bases.Snowflake, if_undefined=None, default=None
+class Tokens(Config):
+    __slots__: typing.Sequence[str] = (
+        "bot",
+        "google",
     )
-    file_log_level: str = marshaller.attrib(deserializer=str, if_undefined=lambda: "WARNING", default="WARNING")
-    log_level: str = marshaller.attrib(deserializer=str, if_undefined=lambda: "INFO", default="INFO")
-    prefixes: typing.List[str] = marshaller.attrib(
-        deserializer=lambda payload: [str(prefix) for prefix in payload],
-        if_undefined=lambda: ["."],
-        factory=lambda: ["."],
-    )
-    tokens: ExternalTokens = marshaller.attrib(
-        deserializer=ExternalTokens.deserialize, if_undefined=ExternalTokens, factory=ExternalTokens, repr=False
-    )
+
+    def __init__(self, bot: str, *, google: typing.Optional[str] = None) -> None:
+        self.bot = bot
+        self.google = google
+
+    @classmethod
+    def from_mapping(cls, mapping: typing.Mapping[str, typing.Any], /) -> Tokens:
+        return cls(bot=str(mapping["bot"]), google=str(mapping["google"]) if "google" in mapping else None)
+
+
+class FullConfig(Config):
+    __slots__: typing.Sequence[str] = ("database", "emoji_guild", "log_level", "prefixes", "tokens")
+
+    def __init__(
+        self,
+        *,
+        database: DatabaseConfig,
+        emoji_guild: typing.Optional[snowflakes.Snowflake] = None,
+        log_level: typing.Union[str, int] = logging.INFO,
+        prefixes: typing.Iterable[str] = ("r.",),
+        tokens: Tokens,
+    ) -> None:
+        self.database = database
+        self.emoji_guild = emoji_guild
+        self.log_level = log_level.upper() if isinstance(log_level, str) else log_level
+        self.prefixes = set(prefixes)
+        self.tokens = tokens
+
+    @classmethod
+    def from_mapping(cls, mapping: typing.Mapping[str, typing.Any], /) -> FullConfig:
+        log_level = mapping.get("log_level", logging.DEBUG)
+        if not isinstance(log_level, (str, int)):
+            raise ValueError("Invalid log level found in config")
+
+        return cls(
+            database=DatabaseConfig.from_mapping(mapping["database"]),
+            emoji_guild=snowflakes.Snowflake(mapping["emoji_guild"]) if "emoji_guild" in mapping else None,
+            log_level=log_level,
+            prefixes=list(map(str, mapping["prefixes"])) if "prefixes" in mapping else ("r.",),
+            tokens=Tokens.from_mapping(mapping["tokens"]),
+        )
+
+
+def get_config_from_file(file: typing.Optional[pathlib.Path] = None) -> FullConfig:
+    if file is None:
+        file = pathlib.Path("config.json")
+        file = pathlib.Path("config.yaml") if not file.exists() else file
+
+        if not file.exists():
+            raise RuntimeError("Couldn't find valid yaml or json configuration file")
+
+    data = file.read_text()
+    return FullConfig.from_mapping(yaml.safe_load(data))

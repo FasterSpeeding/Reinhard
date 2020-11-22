@@ -1,27 +1,27 @@
 from __future__ import annotations
 
 import os
-import re
 import pathlib
+import re
 import typing
 
 import asyncpg
 
 
-def script_getter_factory(key: str):  # Could just make this retrieve the file.
+def script_getter_factory(key: str) -> property:  # Could just make this retrieve the file.
     """
     A script_getter factory that allows for pre-setting the script key/name. This is used to map out expected script
     using explicit properties and to handle errors for when the modules aren't loaded.
     """
 
-    def script_getter(self: CachedScripts) -> str:
+    def get_script(self: CachedScripts) -> str:
         """Used to get a loaded script using it's key/name."""
         try:
             return self.scripts[key]
         except KeyError:
             raise AttributeError(f"Unable to get unloaded script '{key}'.") from None
 
-    return property(script_getter)
+    return property(get_script)
 
 
 class CachedScripts:
@@ -29,7 +29,7 @@ class CachedScripts:
 
     scripts: typing.MutableMapping[str, str]
 
-    def __init__(self, root_dir: typing.Optional[str] = "./reinhard/sql", pattern: str = None) -> None:
+    def __init__(self, root_dir: typing.Optional[str] = "./reinhard/sql", pattern: str = ".") -> None:
         self.scripts = {}
         if root_dir is not None:
             self.load_all_sql_files(root_dir, pattern)
@@ -44,13 +44,16 @@ class CachedScripts:
         """
         if not file_path.lower().endswith(".sql"):
             raise ValueError("File must be of type 'sql'")
+
         with open(file_path, "r") as file:
             name = os.path.basename(file.name)[:-4]
+
             if name in self.scripts:
-                raise RuntimeError("Script '{name}' already loaded.")  # TODO: allow overwriting?
+                raise RuntimeError(f"Script {name!r} already loaded.")  # TODO: allow overwriting?
+
             self.scripts[name] = file.read()
 
-    def load_all_sql_files(self, root_dir: str = "./reinhard/sql", pattern: str = None) -> None:
+    def load_all_sql_files(self, root_dir: str = "./reinhard/sql", pattern: str = ".") -> None:
         """
         Load all the sql files from location recursively.
 
@@ -62,7 +65,7 @@ class CachedScripts:
         """
         root_dir = pathlib.Path(root_dir)
         for file in root_dir.rglob("*"):
-            if file.is_file() and file.name.endswith(".sql") and not pattern or re.match(pattern, file.name):
+            if file.is_file() and file.name.endswith(".sql") and re.match(pattern, file.name):
                 self.load_sql_file(str(file.absolute()))
 
     create_post_star = script_getter_factory("create_post_star")

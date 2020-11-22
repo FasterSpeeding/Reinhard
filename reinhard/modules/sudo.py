@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+__all__: typing.Sequence[str] = ["SudoComponent"]
+
 import asyncio
 import contextlib
 import io
@@ -10,88 +12,109 @@ import time
 import traceback
 import typing
 
-from hikari import bases
 from hikari import embeds
-from hikari import errors
+from hikari import errors as hikari_errors
 from hikari import files
-from tanjun import clusters
+from hikari import undefined
+from tanjun import checks
 from tanjun import commands
-from tanjun import decorators
-from tanjun import parser
+from tanjun import components
+from tanjun import errors as tanjun_errors
+from tanjun import hooks
+from tanjun import parsing
+from yuyo import backoff
+from yuyo import paginaton
 
-from .util import command_hooks
-from .util import constants
-from .util import paginators
+from reinhard.util import command_hooks
+from reinhard.util import constants
+from reinhard.util import rest_manager
 
 if typing.TYPE_CHECKING:
-    from hikari import applications as _applications
-    from hikari import guilds as _guilds
-    from hikari import messages as _messages
-    from tanjun import client
+    from hikari import messages as messages
+    from hikari import presences
+    from hikari import snowflakes
+    from tanjun import context
+    from tanjun import traits as tanjun_Traits
 
 
-exports = ["SudoCluster"]
+__exports__ = ["SudoComponent"]
 
 
-class SudoCluster(clusters.Cluster):
-    def __init__(self, *args, **kwargs) -> None:
+class SudoComponent(components.Component):
+    __slots__: typing.Sequence[str] = ("emoji_guild", "owner_check", "paginator_pool")
+
+    def __init__(self, *, emoji_guild: typing.Optional[snowflakes.Snowflake] = None) -> None:
         super().__init__(
-            *args,
-            **kwargs,
-            hooks=commands.Hooks(
-                on_error=command_hooks.error_hook, on_conversion_error=command_hooks.on_conversion_error
-            ),
+            hooks=hooks.Hooks(error=command_hooks.error_hook, conversion_error=command_hooks.on_conversion_error),
         )
-        self.application: typing.Optional[_applications.Application] = None
-        self.application_task = None  # todo: annotation?
+        self.emoji_guild = emoji_guild
+        self.owner_check = checks.IsApplicationOwner()
+        self.paginator_pool: typing.Optional[paginaton.PaginatorPool] = None
         for command in self.commands:
-            command.register_check(self.owner_check)
-        self.paginator_pool = paginators.PaginatorPool(self.components)
+            if isinstance(command, commands.Command):
+                command.add_check(self.owner_check)
 
-    async def load(self) -> None:
-        self.application = await self.components.rest.fetch_my_application_info()
-        self.application_task = asyncio.create_task(self.update_application())
-        await super().load()
+    def bind_client(self, client: tanjun_Traits.Client, /) -> None:
+        super().bind_client(client)
+        self.paginator_pool = paginaton.PaginatorPool(client.rest, client.dispatch)
 
-    async def update_application(self) -> None:
-        while True:
-            await asyncio.sleep(1800)
-            try:
-                self.application = await self.components.rest.fetch_my_application_info()
-            except errors.HTTPErrorResponse as exc:
-                self.logger.warning("Failed to fetch application object:\n - %r", exc)
+    async def close(self) -> None:
+        await super().close()
+        self.owner_check.close()
 
-    @decorators.command
-    async def error(self, ctx: commands.Context) -> None:
+    async def open(self) -> None:
+        if self.client is None:
+            raise RuntimeError("Cannot open this component before binding it to a client.")
+
+        await self.owner_check.open(self.client)
+        await super().open()
+
+    @components.command("error")
+    async def error(self, _: context.Context) -> None:
         raise Exception("This is an exception, get used to it.")
 
-    def owner_check(self, ctx: commands.Context) -> bool:
-        if self.application.team:
-            return any(ctx.message.author.id == member_id for member_id in self.application.team.members.keys())
-        return ctx.message.author.id == self.application.owner.id
-
-    @decorators.command(greedy="content")
-    async def echo(self, ctx: commands.Context, content: str, embed: str = ...) -> None:
-        if embed is not ...:
+    @parsing.option("raw_embed", "--embed", "-e", converters=(json.loads,), default=undefined.UNDEFINED)
+    @parsing.greedy_argument("content", converters=(str,), default=undefined.UNDEFINED)
+    @components.command("echo")
+    async def echo(
+        self,
+        ctx: context.Context,
+        content: undefined.UndefinedOr[str],
+        raw_embed: undefined.UndefinedOr[typing.Dict[str, typing.Any]] = undefined.UNDEFINED,
+    ) -> None:
+        embed: undefined.UndefinedOr[embeds.Embed] = undefined.UNDEFINED
+        retry = backoff.Backoff(max_retries=5)
+        error_manager = rest_manager.HikariErrorManager(
+            retry, break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
+        )
+        if raw_embed is not undefined.UNDEFINED:
             try:
-                embed = embeds.Embed.deserialize(json.loads(embed))
+                embed = ctx.client.rest.entity_factory.deserialize_embed(raw_embed)
             except (TypeError, ValueError) as exc:
-                await ctx.message.safe_reply(content=f"Invalid embed passed: {exc}")
+                async for _ in retry:
+                    with error_manager:
+                        await ctx.message.reply(content=f"Invalid embed passed: {str(exc)[:1970]}")
+                        break
+
                 return
 
         if content or embed:
-            await ctx.message.reply(content=content, embed=embed)  # TODO: enforce greedy isn't empty resource
+            retry.reset()
+            async for _ in retry:
+                with error_manager:
+                    await ctx.message.reply(content=content, embed=embed)
+                    break
 
     @staticmethod
-    def _yields_results(stdout: io.StringIO, stderr: io.StringIO):
-        yield "- /dev/stdout:"
-        while lines := stdout.readlines(25):
-            yield from lines
-        yield "- /dev/stderr:"
-        while lines := stderr.readlines(25):
-            yield from lines
+    def _yields_results(*args: io.StringIO) -> typing.Iterator[str]:
+        for name, stream in zip("stdout stderr".split(), args):
+            yield f"- /dev/{name}:"
+            while lines := stream.readlines(25):
+                yield from (line[:-1] for line in lines)
 
-    async def eval_python_code(self, ctx: commands.Context, code: str) -> typing.Tuple[typing.Iterable[str], int, bool]:
+    CallbackT = typing.Callable[..., typing.Coroutine[typing.Any, typing.Any, typing.Any]]
+
+    async def eval_python_code(self, ctx: context.Context, code: str) -> typing.Tuple[typing.Iterable[str], int, bool]:
         globals_ = {"ctx": ctx, "client": self}
         stdout = io.StringIO()
         stderr = io.StringIO()
@@ -101,11 +124,13 @@ class SudoCluster(clusters.Cluster):
                 start_time = time.perf_counter()
                 try:
                     exec(f"async def __callable__(ctx):\n{textwrap.indent(code, '   ')}", globals_)
-                    result = await globals_["__callable__"](ctx)
-                    if asyncio.iscoroutine(result):
+                    callback = typing.cast(self.CallbackT, globals_["__callable__"])
+
+                    if asyncio.iscoroutine(result := await callback(ctx)):
                         await result
+
                     failed = False
-                except Exception:
+                except BaseException:
                     traceback.print_exc()
                     failed = True
                 finally:
@@ -115,53 +140,48 @@ class SudoCluster(clusters.Cluster):
         stderr.seek(0)
         return self._yields_results(stdout, stderr), exec_time, failed
 
-    @decorators.command(aliases=["exec", "sudo"])
-    @parser.parameter(
-        converters=(bool,),
-        default=False,
-        empty_default=True,
-        key="suppress_response",
-        names=("--suppress-response", "-s"),
+    @parsing.option(
+        "suppress_response", "--suppress-response", "-s", converters=(bool,), default=False, empty_value=True,
     )
-    async def eval(self, ctx: commands.Context, suppress_response: bool = False) -> None:
+    @components.command("eval", "exec", "sudo")
+    async def eval(self, ctx: context.Context, suppress_response: bool = False) -> None:
+        assert ctx.message.content is not None  # This shouldn't ever be the case in a command client.
         code = re.findall(r"```(?:[\w]*\n?)([\s\S(^\\`{3})]*?)\n*```", ctx.message.content)
         if not code:
-            await ctx.message.reply(content="Expected a python code block.")
-            return
+            raise tanjun_errors.CommandError("Expected a python code block.")
 
         result, exec_time, failed = await self.eval_python_code(ctx, code[0])
         color = constants.FAILED_COLOUR if failed else constants.PASS_COLOUR
         if suppress_response:
             return
 
+        string_paginator = paginaton.string_paginator(iter(result), wrapper="```python\n{}\n```", char_limit=2034)
         embed_generator = (
             (
-                "",
+                undefined.UNDEFINED,
                 embeds.Embed(color=color, description=text, title=f"Eval page {page}").set_footer(
                     text=f"Time taken: {exec_time} ms"
                 ),
             )
-            for text, page in paginators.string_paginator(result, wrapper="```python\n{}\n```", char_limit=2034)
+            async for text, page in string_paginator
         )
-        first_page = next(embed_generator)
-        message = await ctx.message.reply(embed=first_page[1])
-        await self.paginator_pool.register_message(
-            message,
-            paginator=paginators.ResponsePaginator(
-                generator=embed_generator, first_entry=first_page, authors=[ctx.message.author.id]
-            ),
+        response_paginator = paginaton.Paginator(
+            ctx.client.rest, ctx.message.channel_id, embed_generator, authors=[ctx.message.author.id]
         )
+        message = await response_paginator.open()
+        self.paginator_pool.add_paginator(message, response_paginator)
 
-    @decorators.command()
-    async def steal(self, ctx: commands.Context, target: bases.Snowflake, *args: str):
+    # @components.command
+    async def steal(self, ctx: context.Context, target: snowflakes.Snowflake, *args: str) -> None:
         """Used to steal emojis from messages content or reactions.
 
         Pass "r" as the last argument to steal from the message reactions.
         Pass "u" or "c" or "s" to steal from a user custom status.
         """
-        if not self.components.config.emoji_guild:
-            await ctx.message.reply(content="The target emoji guild not set for this bot.")
+        if not self.emoji_guild:
+            await ctx.message.reply(content="Target emoji guild isn't set for this bot.")
             return
+
         channel = None
         user = None
         # if False and args and args.split(" ")[-1].lower() in ("c", "u", "s"):  # TODO: state
@@ -181,8 +201,8 @@ class SudoCluster(clusters.Cluster):
             return
 
         try:
-            message = await ctx.components.rest.fetch_message(channel, target)
-        except (errors.Forbidden, errors.NotFound) as exc:
+            message = await ctx.client.rest.rest.fetch_message(channel, target)
+        except (hikari_errors.ForbiddenError, hikari_errors.NotFoundError) as exc:
             await ctx.message.reply(content=str(exc))
             return
 
@@ -192,7 +212,7 @@ class SudoCluster(clusters.Cluster):
                 yield emoji_name, f"{emoji_id}.{'gif' if animated else 'png'}"
 
         def attributed_with_emoji(
-            objs: typing.Sequence[typing.Union[_messages.Reaction, _guilds.PresenceActivity]]
+            objs: typing.Sequence[typing.Union[messages.Reaction, presences.Activity]]
         ) -> typing.Tuple[str, str]:
             for obj in objs:
                 if not obj.emoji or not obj.emoji.id:
@@ -202,6 +222,7 @@ class SudoCluster(clusters.Cluster):
         if args and args.split(" ")[-1].lower() == "r":
             # Form a generator of the emojis from the message's reactions.
             results = attributed_with_emoji(message.reactions)
+
         elif user:
             if not user.presence:
                 await ctx.message.reply(content="Target user is currently invisible.")
@@ -229,13 +250,10 @@ class SudoCluster(clusters.Cluster):
         for name, path in results:
             url = f"https://cdn.discordapp.com/emojis/{path}?v=1"
             try:
-                await self.components.rest.create_guild_emoji(
-                    guild=self.components.config.emoji_guild,
-                    reason=reason,
-                    name=name,
-                    image=files.WebResourceStream("", url),
+                await ctx.client.rest.rest.create_emoji(
+                    guild=self.emoji_guild, reason=reason, name=name, image=files.URL(url),
                 )
-            except (errors.Forbidden, errors.BadRequest) as exc:
+            except (hikari_errors.ForbiddenError, hikari_errors.BadRequestError) as exc:
                 exceptions.append(f"{name}|{url}: {exc}")
             finally:
                 count += 1
@@ -246,7 +264,3 @@ class SudoCluster(clusters.Cluster):
             )
         else:
             await ctx.message.reply(content=f":thumbsup: ({count})")
-
-
-def setup(bot: client.Client):
-    bot.register_cluster(SudoCluster)

@@ -6,7 +6,20 @@ import typing
 
 from tanjun import errors
 
-from hikari.internal import more_collections
+if typing.TYPE_CHECKING:
+    import datetime
+    import types
+
+
+def pretify_date(date: datetime.datetime) -> str:
+    return date.strftime("%a %d %b %Y %H:%M:%S %Z")
+
+
+def raise_command_error(message: str, /) -> typing.Callable[[typing.Any], typing.NoReturn]:
+    def raise_command_error_(_: typing.Any) -> typing.NoReturn:
+        raise errors.CommandError(message) from None
+
+    return raise_command_error_
 
 
 class CommandErrorRelay:
@@ -25,28 +38,29 @@ class CommandErrorRelay:
     def __enter__(self) -> None:
         ...
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(
+        self,
+        exc_type: typing.Optional[typing.Type[BaseException]],
+        exc_val: typing.Optional[BaseException],
+        exc_tb: typing.Optional[types.TracebackType],
+    ) -> None:
         if exc_type in self.errors:
             raise errors.CommandError(
-                (self.error_responses or more_collections.EMPTY_DICT).get(exc_type)
-                or str(getattr(exc_val, "message", exc_val))
+                (self.error_responses or {}).get(exc_type) or str(getattr(exc_val, "message", exc_val))
             )  # f"{exc_type.__name__}: {exc_val}"
 
 
 def command_error_relay(
-    _errors: typing.Union[BaseException, typing.Tuple[typing.Type[BaseException], ...]],
+    errors_: typing.Union[BaseException, typing.Tuple[typing.Type[BaseException], ...]],
     errors_responses: typing.Optional[typing.MutableMapping[typing.Type[BaseException], str]] = None,
-):
-    def decorator(func: typing.Callable[[...], typing.Coroutine[typing.Any, typing.Any, typing.Any]]):
+) -> typing.Callable[..., typing.Coroutine[typing.Any, typing.Any, typing.Any]]:
+    def decorator(func: typing.Callable[..., typing.Coroutine[typing.Any, typing.Any, typing.Any]]):
         @functools.wraps(func)
-        async def wrapper(*args, **kwargs):
+        async def wrapper(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
             try:
                 return await func(*args, **kwargs)
-            except _errors as exc:
-                raise errors.CommandError(
-                    (errors_responses or more_collections.EMPTY_DICT).get(type(exc))
-                    or str(getattr(exc, "message", exc))
-                )
+            except errors_ as exc:
+                raise errors.CommandError((errors_responses or {}).get(type(exc)) or str(getattr(exc, "message", exc)))
 
         return wrapper
 
@@ -71,7 +85,7 @@ def grid_permissions(permissions: enum.IntFlag) -> str:
         max_lens[index] += 2
 
     return "\n".join(
-        f"{first.ljust(max_lens[0])} {second.ljust(max_lens[1])}" for first in rows[0] for second in rows[1]
+        f"{first.ljust(max_lens[0])} | {second.ljust(max_lens[1])}" for first in rows[0] for second in rows[1]
     )
 
 
