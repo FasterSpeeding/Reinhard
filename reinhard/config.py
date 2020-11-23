@@ -90,7 +90,7 @@ class FullConfig(Config):
 
     @classmethod
     def from_mapping(cls, mapping: typing.Mapping[str, typing.Any], /) -> FullConfig:
-        log_level = mapping.get("log_level", logging.DEBUG)
+        log_level = mapping.get("log_level", logging.INFO)
         if not isinstance(log_level, (str, int)):
             raise ValueError("Invalid log level found in config")
 
