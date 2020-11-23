@@ -4,12 +4,14 @@ import typing
 
 import asyncpg
 from tanjun import clients
+from tanjun import hooks
 
 from reinhard import sql
 from reinhard.modules import basic
 from reinhard.modules import external
 from reinhard.modules import sudo
 from reinhard.modules import util
+from reinhard.util import command_hooks
 
 if typing.TYPE_CHECKING:
     from hikari import traits as hikari_traits
@@ -34,10 +36,16 @@ class Client(clients.Client):
         user: str,
         database: str,
         port: int,
-        hooks: typing.Optional[tanjun_traits.Hooks] = None,
         prefixes: typing.Optional[typing.Iterable[str]] = None,
     ) -> None:
-        super().__init__(dispatch, rest, shard, cache, hooks=hooks, prefixes=prefixes)
+        super().__init__(
+            dispatch,
+            rest,
+            shard,
+            cache,
+            hooks=hooks.Hooks(parser_error=command_hooks.on_parser_error, error=command_hooks.on_error),
+            prefixes=prefixes,
+        )
         self._password = password
         self._host = host
         self._user = user

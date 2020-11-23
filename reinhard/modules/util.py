@@ -12,13 +12,11 @@ from hikari import users
 from tanjun import components
 from tanjun import conversion
 from tanjun import errors as tanjun_errors
-from tanjun import hooks
 from tanjun import parsing
-from tanjun import traits
+from tanjun import traits as tanjun_traits
 from yuyo import backoff
 
 from reinhard.util import basic
-from reinhard.util import command_hooks
 from reinhard.util import constants
 from reinhard.util import help as help_util
 from reinhard.util import rest_manager
@@ -35,10 +33,8 @@ __exports__ = ["UtilComponent"]
 class UtilComponent(components.Component):
     __slots__: typing.Sequence[str] = ("own_user",)
 
-    def __init__(self) -> None:
-        super().__init__(
-            hooks=hooks.Hooks(error=command_hooks.error_hook, conversion_error=command_hooks.on_conversion_error),
-        )
+    def __init__(self, *, hooks: typing.Optional[tanjun_traits.Hooks] = None) -> None:
+        super().__init__(hooks=hooks)
         self.own_user: typing.Optional[users.OwnUser] = None
 
     async def open(self) -> None:
@@ -62,7 +58,9 @@ class UtilComponent(components.Component):
     @help_util.with_command_doc("Get a visual representation of a color or role's color.")
     @parsing.greedy_argument("color", converters=(conversion.ColorConverter, conversion.SnowflakeConverter))
     @components.command("color", "colour")
-    async def color(self, ctx: traits.Context, color_or_role: typing.Union[colors.Color, snowflakes.Snowflake]) -> None:
+    async def color(
+        self, ctx: tanjun_traits.Context, color_or_role: typing.Union[colors.Color, snowflakes.Snowflake]
+    ) -> None:
         retry = backoff.Backoff(max_retries=5)
         error_manager = rest_manager.HikariErrorManager(
             retry, break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
@@ -120,7 +118,7 @@ class UtilComponent(components.Component):
     @parsing.argument("member", converters=(conversion.MemberConverter, conversion.SnowflakeConverter), default=None)
     @components.command("member", checks=[lambda ctx: ctx.message.guild_id is not None])
     async def member(
-        self, ctx: traits.Context, member: typing.Union[guilds.Member, snowflakes.Snowflake, None]
+        self, ctx: tanjun_traits.Context, member: typing.Union[guilds.Member, snowflakes.Snowflake, None]
     ) -> None:
         assert ctx.message.guild_id is not None  # This is asserted by a previous check.
         retry = backoff.Backoff(max_retries=5)
@@ -228,7 +226,7 @@ class UtilComponent(components.Component):
     @help_util.with_command_doc("Get information about a role in the current guild.")
     @parsing.argument("role", converters=(conversion.RoleConverter, conversion.SnowflakeConverter))
     @components.command("role", checks=[lambda ctx: ctx.message.guild_id is not None])
-    async def role(self, ctx: traits.Context, role: typing.Union[guilds.Role, snowflakes.Snowflake]) -> None:
+    async def role(self, ctx: tanjun_traits.Context, role: typing.Union[guilds.Role, snowflakes.Snowflake]) -> None:
         retry = backoff.Backoff(max_retries=5)
         error_manager = rest_manager.HikariErrorManager(
             retry, break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
@@ -284,7 +282,9 @@ class UtilComponent(components.Component):
     @help_util.with_command_doc("Get information about a Discord user.")
     @parsing.argument("user", converters=(conversion.UserConverter, conversion.SnowflakeConverter), default=None)
     @components.command("user")
-    async def user(self, ctx: traits.Context, user: typing.Union[users.User, snowflakes.Snowflake, None]) -> None:
+    async def user(
+        self, ctx: tanjun_traits.Context, user: typing.Union[users.User, snowflakes.Snowflake, None]
+    ) -> None:
         retry = backoff.Backoff(max_retries=5)
         error_manager = rest_manager.HikariErrorManager(retry, break_on=(hikari_errors.ForbiddenError,)).with_rule(
             (hikari_errors.BadRequestError, hikari_errors.NotFoundError),
@@ -335,7 +335,9 @@ class UtilComponent(components.Component):
     @help_util.with_command_doc("Get a user's avatar.")
     @parsing.argument("user", converters=(conversion.UserConverter, conversion.SnowflakeConverter), default=None)
     @components.command("avatar", "pfp")
-    async def avatar(self, ctx: traits.Context, user: typing.Union[snowflakes.Snowflake, users.User, None]) -> None:
+    async def avatar(
+        self, ctx: tanjun_traits.Context, user: typing.Union[snowflakes.Snowflake, users.User, None]
+    ) -> None:
         retry = backoff.Backoff(max_retries=5, maximum=2.0)
         error_manager = rest_manager.HikariErrorManager(retry).with_rule(
             (hikari_errors.NotFoundError, hikari_errors.BadRequestError), basic.raise_command_error("User not found.")

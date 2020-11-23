@@ -124,7 +124,7 @@ def generate_command_embeds(
     command: traits.ExecutableCommand, /, *, prefix: str = ""
 ) -> typing.Optional[typing.AsyncIterator[embeds_.Embed]]:
     if not command.names:
-        return
+        return None
 
     if (command_description := get_command_doc(command)) is None:
         return None

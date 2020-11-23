@@ -15,12 +15,10 @@ from hikari import undefined
 from tanjun import components
 from tanjun import context
 from tanjun import errors as tanjun_errors
-from tanjun import hooks
 from tanjun import parsing
 from yuyo import backoff
 from yuyo import paginaton
 
-from reinhard.util import command_hooks
 from reinhard.util import constants
 from reinhard.util import help as help_util
 from reinhard.util import rest_manager
@@ -104,10 +102,10 @@ class YoutubePaginator(typing.AsyncIterator[typing.Tuple[str, undefined.Undefine
 class ExternalComponent(components.Component):
     __slots__: typing.Sequence[str] = ("google_token", "logger", "paginator_pool", "user_agent")
 
-    def __init__(self, *, google_token: typing.Optional[str] = None,) -> None:
-        super().__init__(
-            hooks=hooks.Hooks(error=command_hooks.error_hook, conversion_error=command_hooks.on_conversion_error),
-        )
+    def __init__(
+        self, *, google_token: typing.Optional[str] = None, hooks: typing.Optional[tanjun_traits.Hooks] = None
+    ) -> None:
+        super().__init__(hooks=hooks)
         self.google_token = google_token
         self.logger = logging.Logger("hikari.reinhard.external")
         self.paginator_pool: typing.Optional[paginaton.PaginatorPool] = None

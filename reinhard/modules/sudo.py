@@ -21,12 +21,10 @@ from tanjun import checks
 from tanjun import commands
 from tanjun import components
 from tanjun import errors as tanjun_errors
-from tanjun import hooks
 from tanjun import parsing
 from yuyo import backoff
 from yuyo import paginaton
 
-from reinhard.util import command_hooks
 from reinhard.util import constants
 from reinhard.util import help as help_util
 from reinhard.util import rest_manager
@@ -36,7 +34,7 @@ if typing.TYPE_CHECKING:
     from hikari import presences
     from hikari import snowflakes
     from tanjun import context
-    from tanjun import traits as tanjun_Traits
+    from tanjun import traits as tanjun_traits
 
 
 __exports__ = ["SudoComponent"]
@@ -47,10 +45,13 @@ __exports__ = ["SudoComponent"]
 class SudoComponent(components.Component):
     __slots__: typing.Sequence[str] = ("emoji_guild", "owner_check", "paginator_pool")
 
-    def __init__(self, *, emoji_guild: typing.Optional[snowflakes.Snowflake] = None) -> None:
-        super().__init__(
-            hooks=hooks.Hooks(error=command_hooks.error_hook, conversion_error=command_hooks.on_conversion_error),
-        )
+    def __init__(
+        self,
+        *,
+        emoji_guild: typing.Optional[snowflakes.Snowflake] = None,
+        hooks: typing.Optional[tanjun_traits.Hooks] = None,
+    ) -> None:
+        super().__init__(hooks=hooks)
         self.emoji_guild = emoji_guild
         self.owner_check = checks.IsApplicationOwner()
         self.paginator_pool: typing.Optional[paginaton.PaginatorPool] = None
@@ -58,7 +59,7 @@ class SudoComponent(components.Component):
             if isinstance(command, commands.Command):
                 command.add_check(self.owner_check)
 
-    def bind_client(self, client: tanjun_Traits.Client, /) -> None:
+    def bind_client(self, client: tanjun_traits.Client, /) -> None:
         super().bind_client(client)
         self.paginator_pool = paginaton.PaginatorPool(client.rest, client.dispatch)
 

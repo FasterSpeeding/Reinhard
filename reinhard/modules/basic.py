@@ -38,8 +38,8 @@ __exports__ = ["BasicComponent"]
 class BasicComponent(components.Component):
     __slots__: typing.Sequence[str] = ("current_user", "help_embeds", "paginator_pool", "process")
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, *, hooks: typing.Optional[tanjun_traits.Hooks] = None) -> None:
+        super().__init__(hooks=hooks)
         self.current_user: typing.Optional[users.OwnUser] = None
         self.help_embeds: typing.Mapping[str, typing.Sequence[embeds_.Embed]] = {}
         self.paginator_pool: typing.Optional[paginaton.PaginatorPool] = None
