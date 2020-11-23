@@ -10,6 +10,9 @@ import typing
 import yaml
 from hikari import snowflakes
 
+if typing.TYPE_CHECKING:
+    from hikari.impl import bot
+
 ConfigT = typing.TypeVar("ConfigT", bound="Config")
 
 
@@ -75,7 +78,7 @@ class FullConfig(Config):
         *,
         database: DatabaseConfig,
         emoji_guild: typing.Optional[snowflakes.Snowflake] = None,
-        log_level: typing.Union[str, int] = logging.INFO,
+        log_level: bot.LoggerLevelT = logging.INFO,
         prefixes: typing.Iterable[str] = ("r.",),
         tokens: Tokens,
     ) -> None:

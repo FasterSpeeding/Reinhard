@@ -22,6 +22,7 @@ from yuyo import paginaton
 
 from reinhard.util import command_hooks
 from reinhard.util import constants
+from reinhard.util import help as help_util
 from reinhard.util import rest_manager
 
 if typing.TYPE_CHECKING:
@@ -98,6 +99,8 @@ class YoutubePaginator(typing.AsyncIterator[typing.Tuple[str, undefined.Undefine
             asyncio.ensure_future(self._client.close())
 
 
+@help_util.with_component_name("External Component")
+@help_util.with_component_doc("A utility used for getting data from 3rd party APIs.")
 class ExternalComponent(components.Component):
     __slots__: typing.Sequence[str] = ("google_token", "logger", "paginator_pool", "user_agent")
 
@@ -116,12 +119,14 @@ class ExternalComponent(components.Component):
         self.paginator_pool = paginaton.PaginatorPool(client.rest, client.dispatch)
 
     async def close(self) -> None:
-        assert self.paginator_pool is not None
-        await self.paginator_pool.close()
+        if self.paginator_pool is not None:
+            await self.paginator_pool.close()
+
         await self.close()
+        await super().close()
 
     async def open(self) -> None:
-        if self.client is None:
+        if self.client is None or self.paginator_pool is None:
             raise RuntimeError("Cannot open this component without binding a client.")
 
         retry = backoff.Backoff(max_retries=4)
@@ -146,15 +151,15 @@ class ExternalComponent(components.Component):
             me = await self.client.rest.rest.fetch_my_user()
 
         self.user_agent = f"Reinhard discord bot (id:{me.id}; owner:{owner_id})"
-        assert self.paginator_pool is not None
         await self.paginator_pool.open()
         await super().open()
 
-    @components.command("lyrics", parser=None)
-    async def lyrics(self, ctx: context.Context) -> None:
+    @help_util.with_parameter_doc("query", "The required argument of a query to search up a song by.")
+    @help_util.with_command_doc("Get a song's lyrics.")
+    @parsing.greedy_argument("query")
+    @components.command("lyrics")
+    async def lyrics(self, ctx: context.Context, query: str) -> None:
         async with aiohttp.ClientSession(headers={"User-Agent": self.user_agent}) as session:
-            query = ctx.content
-
             retry = backoff.Backoff(max_retries=5)
             error_manager = rest_manager.AIOHTTPStatusHandler(
                 retry, on_404=f"Couldn't find the lyrics for `{query[:1960]}`"
@@ -216,26 +221,27 @@ class ExternalComponent(components.Component):
             assert self.paginator_pool is not None
             self.paginator_pool.add_paginator(message, response_paginator)
 
+    @help_util.with_command_doc("Get a youtube video.")
     @parsing.option(
-        "safe_search", "--safe", "-s", "--safe-search", converters=(distutils.util.strtobool,), default=True
+        "safe_search", "--safe", "-s", "--safe-search", converters=(distutils.util.strtobool,), default=None
     )
-    @parsing.option("order", "-o", "--order", converters=(str,), default="relevance")
-    @parsing.option("language", "-l", "--language", converters=(str,), default=None)
-    @parsing.option("region", "-r", "--region", converters=(str,), default=None)
-    @parsing.option("resource_type", "-rt", "--type", "-t", "--resource-type", converters=(str,), default="video")
-    @parsing.greedy_argument("query", converters=(str,))
+    @parsing.option("order", "-o", "--order", default="relevance")
+    @parsing.option("language", "-l", "--language", default=None)
+    @parsing.option("region", "-r", "--region", default=None)
+    @parsing.option("resource_type", "-rt", "--type", "-t", "--resource-type", default="video")
+    @parsing.greedy_argument("query")
     @components.command("youtube", "yt")
-    async def youtube(
+    async def youtube(  # TODO: fully document
         self,
         ctx: context.Context,
         query: str,
-        resource_type: str = "video",
-        region: typing.Optional[str] = None,
-        language: typing.Optional[str] = None,
-        order: str = "relevance",
-        safe_search: bool = True,
+        resource_type: str,
+        region: typing.Optional[str],
+        language: typing.Optional[str],
+        order: str,
+        safe_search: typing.Optional[bool],
     ) -> None:
-        if not safe_search:
+        if safe_search is not False:
             ...
 
         resource_type = resource_type.lower()
@@ -243,7 +249,6 @@ class ExternalComponent(components.Component):
             raise tanjun_errors.CommandError("Resource type must be one of 'channel', 'playist' or 'video'.")
 
         assert self.google_token is not None
-        print(resource_type)
         parameters: typing.MutableMapping[str, typing.Union[str, int]] = {
             "key": self.google_token,
             "maxResults": 50,
@@ -296,6 +301,9 @@ class ExternalComponent(components.Component):
             assert self.paginator_pool is not None
             self.paginator_pool.add_paginator(message, response_paginator)
 
+    @help_util.with_parameter_doc("--source | -s", "The optional argument of a show's title.")
+    @help_util.with_command_doc("Get a random cute anime image.")
+    @parsing.option("source", "--source", "-s", default=None)
     @components.command("moe")  # TODO: https://lewd.bowsette.pictures/api/request
     async def moe(self, ctx: tanjun_traits.Context, source: typing.Optional[str] = None) -> None:
         params = {}

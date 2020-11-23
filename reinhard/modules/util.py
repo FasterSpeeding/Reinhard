@@ -20,6 +20,7 @@ from yuyo import backoff
 from reinhard.util import basic
 from reinhard.util import command_hooks
 from reinhard.util import constants
+from reinhard.util import help as help_util
 from reinhard.util import rest_manager
 
 if typing.TYPE_CHECKING:
@@ -29,6 +30,8 @@ if typing.TYPE_CHECKING:
 __exports__ = ["UtilComponent"]
 
 
+@help_util.with_component_doc("Component used for getting miscellaneous Discord information.")
+@help_util.with_component_name("Utility Component")
 class UtilComponent(components.Component):
     __slots__: typing.Sequence[str] = ("own_user",)
 
@@ -55,6 +58,8 @@ class UtilComponent(components.Component):
 
         await super().open()
 
+    @help_util.with_parameter_doc("color", "A required argument of either a text colour representation or a role's ID.")
+    @help_util.with_command_doc("Get a visual representation of a color or role's color.")
     @parsing.greedy_argument("color", converters=(conversion.ColorConverter, conversion.SnowflakeConverter))
     @components.command("color", "colour")
     async def color(self, ctx: traits.Context, color_or_role: typing.Union[colors.Color, snowflakes.Snowflake]) -> None:
@@ -106,6 +111,12 @@ class UtilComponent(components.Component):
     #     else:
     #         ...  # TODO: Implement this to allow getting the embeds from a suppressed message.
 
+    @help_util.with_parameter_doc(
+        "member",
+        "The optional argument of a member mention or ID. "
+        "If not supplied then this command will target the member triggering it.",
+    )
+    @help_util.with_command_doc("Get information about a member in the current guild.")
     @parsing.argument("member", converters=(conversion.MemberConverter, conversion.SnowflakeConverter), default=None)
     @components.command("member", checks=[lambda ctx: ctx.message.guild_id is not None])
     async def member(
@@ -213,6 +224,8 @@ class UtilComponent(components.Component):
     def filter_role(role_id: snowflakes.Snowflake) -> typing.Callable[[guilds.Role], bool]:
         return lambda role: role.id == role_id
 
+    @help_util.with_parameter_doc("role", "The required argument of a role ID.")
+    @help_util.with_command_doc("Get information about a role in the current guild.")
     @parsing.argument("role", converters=(conversion.RoleConverter, conversion.SnowflakeConverter))
     @components.command("role", checks=[lambda ctx: ctx.message.guild_id is not None])
     async def role(self, ctx: traits.Context, role: typing.Union[guilds.Role, snowflakes.Snowflake]) -> None:
@@ -263,6 +276,12 @@ class UtilComponent(components.Component):
                 await ctx.message.reply(embed=embed)
                 break
 
+    @help_util.with_parameter_doc(
+        "user",
+        "The optional argument of the mention or ID of the user to target. "
+        "If not supplied then this command will target the user triggering it.",
+    )
+    @help_util.with_command_doc("Get information about a Discord user.")
     @parsing.argument("user", converters=(conversion.UserConverter, conversion.SnowflakeConverter), default=None)
     @components.command("user")
     async def user(self, ctx: traits.Context, user: typing.Union[users.User, snowflakes.Snowflake, None]) -> None:
@@ -302,6 +321,42 @@ class UtilComponent(components.Component):
         )
         retry.reset()
         error_manager.clear_rules(break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError))
+
+        async for _ in retry:
+            with error_manager:
+                await ctx.message.reply(embed=embed)
+                break
+
+    @help_util.with_parameter_doc(
+        "user",
+        "The optional argument of a mention or ID of the user to get the avatar for. "
+        "If this isn't provided then this command will target the user who triggered it.",
+    )
+    @help_util.with_command_doc("Get a user's avatar.")
+    @parsing.argument("user", converters=(conversion.UserConverter, conversion.SnowflakeConverter), default=None)
+    @components.command("avatar", "pfp")
+    async def avatar(self, ctx: traits.Context, user: typing.Union[snowflakes.Snowflake, users.User, None]) -> None:
+        retry = backoff.Backoff(max_retries=5, maximum=2.0)
+        error_manager = rest_manager.HikariErrorManager(retry).with_rule(
+            (hikari_errors.NotFoundError, hikari_errors.BadRequestError), basic.raise_command_error("User not found.")
+        )
+
+        if user is None:
+            user = ctx.message.author
+
+        elif isinstance(user, snowflakes.Snowflake):
+            async for _ in retry:
+                with error_manager:
+                    user = await ctx.client.rest.rest.fetch_user(user)
+                    break
+
+            else:
+                raise tanjun_errors.CommandError("Couldn't fetch user in time.")
+
+        retry.reset()
+        error_manager.clear_rules(break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError))
+        avatar = user.avatar_url or user.default_avatar_url
+        embed = embeds.Embed(title=str(user), url=str(avatar)).set_image(avatar)
 
         async for _ in retry:
             with error_manager:

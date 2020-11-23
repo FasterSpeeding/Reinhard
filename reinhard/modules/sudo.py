@@ -4,6 +4,7 @@ __all__: typing.Sequence[str] = ["SudoComponent"]
 
 import asyncio
 import contextlib
+import distutils.util
 import io
 import json
 import re
@@ -27,6 +28,7 @@ from yuyo import paginaton
 
 from reinhard.util import command_hooks
 from reinhard.util import constants
+from reinhard.util import help as help_util
 from reinhard.util import rest_manager
 
 if typing.TYPE_CHECKING:
@@ -40,6 +42,8 @@ if typing.TYPE_CHECKING:
 __exports__ = ["SudoComponent"]
 
 
+@help_util.with_component_name("Sudo Component")
+@help_util.with_component_doc("Component used by this bot's owner.")
 class SudoComponent(components.Component):
     __slots__: typing.Sequence[str] = ("emoji_guild", "owner_check", "paginator_pool")
 
@@ -59,22 +63,31 @@ class SudoComponent(components.Component):
         self.paginator_pool = paginaton.PaginatorPool(client.rest, client.dispatch)
 
     async def close(self) -> None:
-        await super().close()
+        if self.paginator_pool is not None:
+            await self.paginator_pool.close()
+
         self.owner_check.close()
+        await super().close()
 
     async def open(self) -> None:
-        if self.client is None:
+        if self.client is None or self.paginator_pool is None:
             raise RuntimeError("Cannot open this component before binding it to a client.")
 
         await self.owner_check.open(self.client)
+        await self.paginator_pool.open()
         await super().open()
 
+    @help_util.with_command_doc("Command used for testing the current error handling")
     @components.command("error")
     async def error(self, _: context.Context) -> None:
         raise Exception("This is an exception, get used to it.")
 
+    @help_util.with_parameter_doc(
+        "--embed | -e", "An optional argument used to specify the json of a embed for the bot to send."
+    )
+    @help_util.with_command_doc("Command used for getting the bot to mirror a response.")
     @parsing.option("raw_embed", "--embed", "-e", converters=(json.loads,), default=undefined.UNDEFINED)
-    @parsing.greedy_argument("content", converters=(str,), default=undefined.UNDEFINED)
+    @parsing.greedy_argument("content", default=undefined.UNDEFINED)
     @components.command("echo")
     async def echo(
         self,
@@ -140,8 +153,17 @@ class SudoComponent(components.Component):
         stderr.seek(0)
         return self._yields_results(stdout, stderr), exec_time, failed
 
+    @help_util.with_parameter_doc(
+        "--suppress-response | -s", "A optional argument used to disable the bot's post-eval response."
+    )
+    @help_util.with_command_doc("Dynamically evaluate a script in the bot's environment.")
     @parsing.option(
-        "suppress_response", "--suppress-response", "-s", converters=(bool,), default=False, empty_value=True,
+        "suppress_response",
+        "--suppress-response",
+        "-s",
+        converters=(distutils.util.strtobool,),
+        default=False,
+        empty_value=True,
     )
     @components.command("eval", "exec", "sudo")
     async def eval(self, ctx: context.Context, suppress_response: bool = False) -> None:
