@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import pathlib
 
+# from hikari import intents  # TODO: handle intents in config
 from hikari.impl import bot as bot_module
 
 from reinhard import client as client_module

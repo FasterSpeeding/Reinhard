@@ -47,7 +47,7 @@ class BasicComponent(components.Component):
 
     def bind_client(self, client: tanjun_traits.Client, /) -> None:
         super().bind_client(client)
-        self.paginator_pool = paginaton.PaginatorPool(client.rest, client.dispatch)
+        self.paginator_pool = paginaton.PaginatorPool(client.rest_service, client.dispatch_service)
 
     async def close(self) -> None:
         if self.paginator_pool is not None:
@@ -76,7 +76,9 @@ class BasicComponent(components.Component):
         embed = (
             embeds_.Embed(description="An experimental pythonic Hikari bot.", color=constants.EMBED_COLOUR)
             .set_author(
-                name=f"Reinhard: Shard {ctx.shard.id} of {ctx.client.shards.shard_count}", icon=avatar, url=hikari_url,
+                name=f"Reinhard: Shard {ctx.shard.id} of {ctx.client.shard_service.shard_count}",
+                icon=avatar,
+                url=hikari_url,
             )
             .add_field(name="Uptime", value=str(uptime), inline=True)
             .add_field(
@@ -137,7 +139,7 @@ class BasicComponent(components.Component):
             )
 
         paginator = paginaton.Paginator(
-            ctx.client.rest, ctx.message.channel_id, embed_generator, authors=(ctx.message.author,)
+            ctx.client.rest_service, ctx.message.channel_id, embed_generator, authors=(ctx.message.author,)
         )
         message = await paginator.open()
         self.paginator_pool.add_paginator(message, paginator)

@@ -15,9 +15,11 @@ def pretify_date(date: datetime.datetime) -> str:
     return date.strftime("%a %d %b %Y %H:%M:%S %Z")
 
 
-def raise_command_error(message: str, /) -> typing.Callable[[typing.Any], typing.NoReturn]:
+def raise_error(
+    message: typing.Optional[str], /, error_type: typing.Type[BaseException] = errors.CommandError
+) -> typing.Callable[[typing.Any], typing.NoReturn]:
     def raise_command_error_(_: typing.Any) -> typing.NoReturn:
-        raise errors.CommandError(message) from None
+        raise error_type(message) from None
 
     return raise_command_error_
 

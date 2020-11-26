@@ -7,10 +7,10 @@ import typing
 from hikari import colors
 from hikari import embeds
 from hikari import errors as hikari_errors
+from hikari import guilds
 from hikari import snowflakes
 from hikari import users
 from tanjun import components
-from tanjun import conversion
 from tanjun import errors as tanjun_errors
 from tanjun import parsing
 from tanjun import traits as tanjun_traits
@@ -18,12 +18,9 @@ from yuyo import backoff
 
 from reinhard.util import basic
 from reinhard.util import constants
+from reinhard.util import conversion
 from reinhard.util import help as help_util
 from reinhard.util import rest_manager
-
-if typing.TYPE_CHECKING:
-    from hikari import guilds
-
 
 __exports__ = ["UtilComponent"]
 
@@ -46,39 +43,26 @@ class UtilComponent(components.Component):
 
         async for _ in retry:
             with error_manager:
-                self.own_user = await self.client.rest.rest.fetch_my_user()
+                self.own_user = await self.client.rest_service.rest.fetch_my_user()
                 break
 
         else:
-            self.own_user = await self.client.rest.rest.fetch_my_user()
+            self.own_user = await self.client.rest_service.rest.fetch_my_user()
 
         await super().open()
 
     @help_util.with_parameter_doc("color", "A required argument of either a text colour representation or a role's ID.")
     @help_util.with_command_doc("Get a visual representation of a color or role's color.")
-    @parsing.greedy_argument("color", converters=(conversion.ColorConverter, conversion.SnowflakeConverter))
+    @parsing.greedy_argument("color", converters=(conversion.ColorConverter, conversion.RESTFulRoleConverter))
     @components.command("color", "colour")
-    async def color(
-        self, ctx: tanjun_traits.Context, color_or_role: typing.Union[colors.Color, snowflakes.Snowflake]
-    ) -> None:
+    async def color(self, ctx: tanjun_traits.Context, color_or_role: typing.Union[colors.Color, guilds.Role]) -> None:
         retry = backoff.Backoff(max_retries=5)
         error_manager = rest_manager.HikariErrorManager(
             retry, break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
-        ).with_rule((KeyError,), basic.raise_command_error("Failed to find role."))
+        ).with_rule((KeyError,), basic.raise_error("Failed to find role."))
 
-        if isinstance(color_or_role, snowflakes.Snowflake):
-            if ctx.message.guild_id is None:
-                raise tanjun_errors.CommandError("Cannot get a role's colour in a DM channel.")
-
-            async for _ in retry:
-                with error_manager:
-                    role = (await ctx.client.rest.rest.fetch_roles(ctx.message.guild_id))[color_or_role]
-                    break
-
-            else:
-                raise tanjun_errors.CommandError("Couldn't fetch role in time")
-
-            color_or_role = role.color
+        if isinstance(color_or_role, guilds.Role):
+            color_or_role = color_or_role.color
 
         embed = (
             embeds.Embed(color=color_or_role)
@@ -115,41 +99,21 @@ class UtilComponent(components.Component):
         "If not supplied then this command will target the member triggering it.",
     )
     @help_util.with_command_doc("Get information about a member in the current guild.")
-    @parsing.argument("member", converters=(conversion.MemberConverter, conversion.SnowflakeConverter), default=None)
+    @parsing.argument("member", converters=(conversion.RESTFulMemberConverter,), default=None)
     @components.command("member", checks=[lambda ctx: ctx.message.guild_id is not None])
-    async def member(
-        self, ctx: tanjun_traits.Context, member: typing.Union[guilds.Member, snowflakes.Snowflake, None]
-    ) -> None:
+    async def member(self, ctx: tanjun_traits.Context, member: typing.Union[guilds.Member, None]) -> None:
         assert ctx.message.guild_id is not None  # This is asserted by a previous check.
-        retry = backoff.Backoff(max_retries=5)
-        error_manager = rest_manager.HikariErrorManager(retry, break_on=(hikari_errors.ForbiddenError,)).with_rule(
-            (hikari_errors.BadRequestError, hikari_errors.NotFoundError,),
-            basic.raise_command_error("Couldn't find member."),
-        )
-
-        if member is None and ctx.message.member:
+        assert ctx.message.member is not None  # This is always the case for messages made in guilds.
+        if member is None:
             member = ctx.message.member
 
-        elif member is None:
-            member = ctx.message.author.id
-
-        if isinstance(member, snowflakes.Snowflake):
-            async for _ in retry:
-                with error_manager:
-                    member = await ctx.client.rest.rest.fetch_member(guild=ctx.message.guild_id, user=member)
-                    break
-
-            else:
-                if retry.is_depleted:
-                    raise tanjun_errors.CommandError("Couldn't get member in time")
-
-                return
-
-        retry.reset()
-        error_manager.clear_rules(break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError,))
+        retry = backoff.Backoff(max_retries=5)
+        error_manager = rest_manager.HikariErrorManager(
+            retry, break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError,)
+        )
         async for _ in retry:
             with error_manager:
-                guild = await ctx.client.rest.rest.fetch_guild(guild=ctx.message.guild_id)
+                guild = await ctx.client.rest_service.rest.fetch_guild(guild=ctx.message.guild_id)
                 break
 
         else:
@@ -224,28 +188,9 @@ class UtilComponent(components.Component):
 
     @help_util.with_parameter_doc("role", "The required argument of a role ID.")
     @help_util.with_command_doc("Get information about a role in the current guild.")
-    @parsing.argument("role", converters=(conversion.RoleConverter, conversion.SnowflakeConverter))
+    @parsing.argument("role", converters=(conversion.RESTFulRoleConverter,))
     @components.command("role", checks=[lambda ctx: ctx.message.guild_id is not None])
-    async def role(self, ctx: tanjun_traits.Context, role: typing.Union[guilds.Role, snowflakes.Snowflake]) -> None:
-        retry = backoff.Backoff(max_retries=5)
-        error_manager = rest_manager.HikariErrorManager(
-            retry, break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
-        ).with_rule((StopAsyncIteration,), basic.raise_command_error("Couldn't find role."),)
-        assert ctx.message.guild_id is not None  # This is asserted by a previous check.
-
-        if isinstance(role, snowflakes.Snowflake):
-            async for _ in retry:
-                with error_manager:
-                    roles = await ctx.client.rest.rest.fetch_roles(ctx.message.guild_id)
-                    role = next(filter(self.filter_role(role), roles))
-                    break
-
-            else:
-                if retry.is_depleted:
-                    raise tanjun_errors.CommandError("Couldn't get role in time")
-
-                return
-
+    async def role(self, ctx: tanjun_traits.Context, role: guilds.Role) -> None:
         permissions = basic.basic_name_grid(role.permissions) or "None"
         role_information = [f"Created: {basic.pretify_date(role.created_at)}", f"Position: {role.position}"]
 
@@ -261,8 +206,10 @@ class UtilComponent(components.Component):
         if role.is_mentionable:
             role_information.append("Can be mentioned")
 
-        retry.reset()
-        error_manager.clear_rules(break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError))
+        retry = backoff.Backoff(max_retries=5, maximum=2.0)
+        error_manager = rest_manager.HikariErrorManager(
+            retry, break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
+        )
         embed = embeds.Embed(
             color=role.color,
             title=role.name,
@@ -280,30 +227,11 @@ class UtilComponent(components.Component):
         "If not supplied then this command will target the user triggering it.",
     )
     @help_util.with_command_doc("Get information about a Discord user.")
-    @parsing.argument("user", converters=(conversion.UserConverter, conversion.SnowflakeConverter), default=None)
+    @parsing.argument("user", converters=(conversion.RESTFulUserConverter,), default=None)
     @components.command("user")
-    async def user(
-        self, ctx: tanjun_traits.Context, user: typing.Union[users.User, snowflakes.Snowflake, None]
-    ) -> None:
-        retry = backoff.Backoff(max_retries=5)
-        error_manager = rest_manager.HikariErrorManager(retry, break_on=(hikari_errors.ForbiddenError,)).with_rule(
-            (hikari_errors.BadRequestError, hikari_errors.NotFoundError),
-            basic.raise_command_error("Couldn't find user."),
-        )
+    async def user(self, ctx: tanjun_traits.Context, user: typing.Union[users.User, None]) -> None:
         if user is None:
             user = ctx.message.author
-
-        elif isinstance(user, snowflakes.Snowflake):
-            async for _ in retry:
-                with error_manager:
-                    user = await ctx.client.rest.rest.fetch_user(user)
-                    break
-
-            else:
-                if retry.is_depleted:
-                    raise tanjun_errors.CommandError("Couldn't fetch user in time")
-
-                return
 
         flags = basic.basic_name_grid(user.flags) or "NONE"
         embed = (
@@ -319,9 +247,10 @@ class UtilComponent(components.Component):
             .set_thumbnail(user.avatar_url)
             .set_footer(text=str(user.id), icon=user.default_avatar_url)
         )
-        retry.reset()
-        error_manager.clear_rules(break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError))
-
+        retry = backoff.Backoff(max_retries=5)
+        error_manager = rest_manager.HikariErrorManager(
+            retry, break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
+        )
         async for _ in retry:
             with error_manager:
                 await ctx.message.reply(embed=embed)
@@ -333,30 +262,17 @@ class UtilComponent(components.Component):
         "If this isn't provided then this command will target the user who triggered it.",
     )
     @help_util.with_command_doc("Get a user's avatar.")
-    @parsing.argument("user", converters=(conversion.UserConverter, conversion.SnowflakeConverter), default=None)
+    @parsing.argument("user", converters=(conversion.RESTFulUserConverter,), default=None)
     @components.command("avatar", "pfp")
-    async def avatar(
-        self, ctx: tanjun_traits.Context, user: typing.Union[snowflakes.Snowflake, users.User, None]
-    ) -> None:
-        retry = backoff.Backoff(max_retries=5, maximum=2.0)
-        error_manager = rest_manager.HikariErrorManager(retry).with_rule(
-            (hikari_errors.NotFoundError, hikari_errors.BadRequestError), basic.raise_command_error("User not found.")
-        )
+    async def avatar(self, ctx: tanjun_traits.Context, user: typing.Union[users.User, None]) -> None:
 
         if user is None:
             user = ctx.message.author
 
-        elif isinstance(user, snowflakes.Snowflake):
-            async for _ in retry:
-                with error_manager:
-                    user = await ctx.client.rest.rest.fetch_user(user)
-                    break
-
-            else:
-                raise tanjun_errors.CommandError("Couldn't fetch user in time.")
-
-        retry.reset()
-        error_manager.clear_rules(break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError))
+        retry = backoff.Backoff(max_retries=5, maximum=2.0)
+        error_manager = rest_manager.HikariErrorManager(
+            retry, break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
+        )
         avatar = user.avatar_url or user.default_avatar_url
         embed = embeds.Embed(title=str(user), url=str(avatar)).set_image(avatar)
 

@@ -11,10 +11,10 @@ from reinhard.util import constants
 from reinhard.util import rest_manager
 
 if typing.TYPE_CHECKING:
-    from tanjun import context
+    from tanjun import traits
 
 
-async def on_error(ctx: context.Context, exception: BaseException) -> None:
+async def on_error(ctx: traits.Context, exception: BaseException) -> None:
     retry = backoff.Backoff(max_retries=5)
     # TODO: better permission checks
     error_manager = rest_manager.HikariErrorManager(
@@ -32,7 +32,7 @@ async def on_error(ctx: context.Context, exception: BaseException) -> None:
             break
 
 
-async def on_parser_error(ctx: context.Context, exception: tanjun_errors.ParserError) -> None:
+async def on_parser_error(ctx: traits.Context, exception: tanjun_errors.ParserError) -> None:
     retry = backoff.Backoff(max_retries=5)
     # TODO: better permission checks
     error_manager = rest_manager.HikariErrorManager(

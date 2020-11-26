@@ -99,7 +99,7 @@ async def generate_help_embeds(
     component_doc = get_component_doc(component)
     component_name = get_component_name(component)
 
-    if component_doc is None:
+    if component_doc is None or component_name is None:
         return None
 
     command_docs: typing.MutableSequence[str] = []

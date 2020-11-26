@@ -3,7 +3,6 @@ from __future__ import annotations
 __all__: typing.Sequence[str] = ["ExternalComponent"]
 
 import asyncio
-import distutils.util
 import html
 import logging
 import typing
@@ -114,7 +113,7 @@ class ExternalComponent(components.Component):
 
     def bind_client(self, client: tanjun_traits.Client, /) -> None:
         super().bind_client(client)
-        self.paginator_pool = paginaton.PaginatorPool(client.rest, client.dispatch)
+        self.paginator_pool = paginaton.PaginatorPool(client.rest_service, client.dispatch_service)
 
     async def close(self) -> None:
         if self.paginator_pool is not None:
@@ -131,22 +130,22 @@ class ExternalComponent(components.Component):
         error_manger = rest_manager.HikariErrorManager(retry)
         async for _ in retry:
             with error_manger:
-                application = await self.client.rest.rest.fetch_application()
+                application = await self.client.rest_service.rest.fetch_application()
                 break
 
         else:
-            application = await self.client.rest.rest.fetch_application()
+            application = await self.client.rest_service.rest.fetch_application()
 
         owner_id = application.team.owner_id if application.team else application.owner.id
         retry.reset()
 
         async for _ in retry:
             with error_manger:
-                me = await self.client.rest.rest.fetch_my_user()
+                me = await self.client.rest_service.rest.fetch_my_user()
                 break
 
         else:
-            me = await self.client.rest.rest.fetch_my_user()
+            me = await self.client.rest_service.rest.fetch_my_user()
 
         self.user_agent = f"Reinhard discord bot (id:{me.id}; owner:{owner_id})"
         await self.paginator_pool.open()
@@ -203,7 +202,7 @@ class ExternalComponent(components.Component):
                 async for page, index in paginaton.string_paginator(iter(data["content"].splitlines() or ["..."]))
             )
             response_paginator = paginaton.Paginator(
-                ctx.client.rest,
+                ctx.client.rest_service,
                 ctx.message.channel_id,
                 pages,
                 authors=(ctx.message.author.id,),
@@ -220,9 +219,7 @@ class ExternalComponent(components.Component):
             self.paginator_pool.add_paginator(message, response_paginator)
 
     @help_util.with_command_doc("Get a youtube video.")
-    @parsing.option(
-        "safe_search", "--safe", "-s", "--safe-search", converters=(distutils.util.strtobool,), default=None
-    )
+    @parsing.option("safe_search", "--safe", "-s", "--safe-search", converters=(bool,), default=None)
     @parsing.option("order", "-o", "--order", default="relevance")
     @parsing.option("language", "-l", "--language", default=None)
     @parsing.option("region", "-r", "--region", default=None)
@@ -264,7 +261,7 @@ class ExternalComponent(components.Component):
             parameters["relevanceLanguage"] = language
 
         response_paginator = paginaton.Paginator(
-            ctx.client.rest,
+            ctx.client.rest_service,
             ctx.message.channel_id,
             YoutubePaginator(parameters, self.user_agent),
             authors=[ctx.message.author.id],
