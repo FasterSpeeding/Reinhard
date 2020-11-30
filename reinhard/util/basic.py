@@ -49,7 +49,7 @@ class CommandErrorRelay:
         if exc_type in self.errors:
             raise errors.CommandError(
                 (self.error_responses or {}).get(exc_type) or str(getattr(exc_val, "message", exc_val))
-            )  # f"{exc_type.__name__}: {exc_val}"
+            ) from None  # f"{exc_type.__name__}: {exc_val}"
 
 
 def command_error_relay(

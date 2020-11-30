@@ -41,7 +41,7 @@ async def on_parser_error(ctx: traits.Context, exception: tanjun_errors.ParserEr
 
     message = str(exception)
 
-    if isinstance(exception, tanjun_errors.ConversionError):
+    if isinstance(exception, tanjun_errors.ConversionError) and exception.errors:
         message += ": " + ", ".join(map("`{}`".format, exception.errors))
 
     async for _ in retry:

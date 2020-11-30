@@ -15,8 +15,7 @@ import typing
 from hikari import embeds
 from hikari import errors as hikari_errors
 from hikari import undefined
-from tanjun import checks
-from tanjun import commands
+from tanjun import checks as checks_
 from tanjun import components
 from tanjun import errors as tanjun_errors
 from tanjun import parsing
@@ -45,16 +44,14 @@ class SudoComponent(components.Component):
     def __init__(
         self,
         *,
+        checks: typing.Optional[typing.Iterable[tanjun_traits.CheckT]] = None,
         emoji_guild: typing.Optional[snowflakes.Snowflake] = None,
         hooks: typing.Optional[tanjun_traits.Hooks] = None,
     ) -> None:
-        super().__init__(hooks=hooks)
+        self.owner_check = checks_.ApplicationOwnerCheck()
+        super().__init__(checks=(*checks, self.owner_check) if checks else (self.owner_check,), hooks=hooks)
         self.emoji_guild = emoji_guild
-        self.owner_check = checks.IsApplicationOwner()
         self.paginator_pool: typing.Optional[paginaton.PaginatorPool] = None
-        for command in self.commands:
-            if isinstance(command, commands.Command):
-                command.add_check(self.owner_check)
 
     def bind_client(self, client: tanjun_traits.Client, /) -> None:
         super().bind_client(client)

@@ -114,9 +114,10 @@ class RESTFulRoleConverter(RoleConverter):
 
         # Else match by name.
         except ValueError:
+            argument = argument.casefold()
 
             def predicate(role: guilds.Role) -> bool:
-                return role.name == argument
+                return role.name.casefold() == argument
 
         retry = backoff.Backoff(max_retries=5)
         error_manager = (

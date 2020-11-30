@@ -56,11 +56,6 @@ class UtilComponent(components.Component):
     @parsing.greedy_argument("color", converters=(conversion.ColorConverter, conversion.RESTFulRoleConverter))
     @components.command("color", "colour")
     async def color(self, ctx: tanjun_traits.Context, color_or_role: typing.Union[colors.Color, guilds.Role]) -> None:
-        retry = backoff.Backoff(max_retries=5)
-        error_manager = rest_manager.HikariErrorManager(
-            retry, break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
-        ).with_rule((KeyError,), basic.raise_error("Failed to find role."))
-
         if isinstance(color_or_role, guilds.Role):
             color_or_role = color_or_role.color
 
@@ -69,8 +64,10 @@ class UtilComponent(components.Component):
             .add_field(name="RGB", value=str(color_or_role.rgb))
             .add_field(name="HEX", value=str(color_or_role.hex_code))
         )
-        retry.reset()
-        error_manager.clear_rules(break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError))
+        retry = backoff.Backoff(max_retries=5)
+        error_manager = rest_manager.HikariErrorManager(
+            break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
+        )
 
         async for _ in retry:
             with error_manager:
@@ -131,7 +128,7 @@ class UtilComponent(components.Component):
             roles[role.position] = role
 
         ordered_roles = dict(sorted(roles.items(), reverse=True))
-        roles = "\n".join(map("{0.name}: {0.id}".format, ordered_roles.values())) + "\n" if ordered_roles else ""
+        roles = "\n".join(map("{0.name}: {0.id}".format, ordered_roles.values()))
 
         for role in ordered_roles.values():
             if role.color:
@@ -140,7 +137,7 @@ class UtilComponent(components.Component):
         else:
             color = colors.Color(0)
 
-        permissions = basic.basic_name_grid(permissions) or "NONE"
+        permissions_grid = basic.basic_name_grid(permissions) or "None"
         member_information = [
             f"Color: {color}",
             f"Joined Discord: {basic.pretify_date(member.user.created_at)}",
@@ -162,11 +159,7 @@ class UtilComponent(components.Component):
         # TODO: this embed will go over the character limit easily
         embed = (
             embeds.Embed(
-                description=(
-                    "\n".join(member_information)
-                    + f"\n\nFlags: {member.user.flags}\n\nRoles:\n{roles}everyone: {ctx.message.guild_id}\n\n"
-                    f"Permissions:\n{permissions}"
-                ),
+                description="\n".join(member_information) + f"\n\nRoles:\n{roles}\n\nPermissions:\n{permissions_grid}",
                 color=color,
                 title=f"{member.user.username}#{member.user.discriminator}",
                 url=f"https://discordapp.com/users/{member.user.id}",
@@ -227,7 +220,9 @@ class UtilComponent(components.Component):
         "If not supplied then this command will target the user triggering it.",
     )
     @help_util.with_command_doc("Get information about a Discord user.")
-    @parsing.argument("user", converters=(conversion.RESTFulUserConverter,), default=None)
+    @parsing.argument(
+        "user", converters=(conversion.RESTFulUserConverter, conversion.RESTFulMemberConverter), default=None
+    )
     @components.command("user")
     async def user(self, ctx: tanjun_traits.Context, user: typing.Union[users.User, None]) -> None:
         if user is None:
@@ -262,7 +257,9 @@ class UtilComponent(components.Component):
         "If this isn't provided then this command will target the user who triggered it.",
     )
     @help_util.with_command_doc("Get a user's avatar.")
-    @parsing.argument("user", converters=(conversion.RESTFulUserConverter,), default=None)
+    @parsing.argument(
+        "user", converters=(conversion.RESTFulUserConverter, conversion.RESTFulMemberConverter), default=None
+    )
     @components.command("avatar", "pfp")
     async def avatar(self, ctx: tanjun_traits.Context, user: typing.Union[users.User, None]) -> None:
 
@@ -279,4 +276,34 @@ class UtilComponent(components.Component):
         async for _ in retry:
             with error_manager:
                 await ctx.message.reply(embed=embed)
+                break
+
+    @parsing.argument("message_id", (snowflakes.Snowflake,))
+    @parsing.option("channel_id", "--channel", "-c", converters=(snowflakes.Snowflake,), default=None)
+    @components.command("mentions")
+    async def mentions(
+        self,
+        ctx: tanjun_traits.Context,
+        message_id: snowflakes.Snowflake,
+        channel_id: typing.Optional[snowflakes.Snowflake],
+    ) -> None:
+        if channel_id is None:
+            channel_id = ctx.message.channel_id
+
+        retry = backoff.Backoff()
+        error_handler = rest_manager.HikariErrorManager(retry).with_rule(
+            (hikari_errors.NotFoundError, hikari_errors.ForbiddenError, hikari_errors.BadRequestError),
+            basic.raise_error("Message not found."),
+        )
+        async for _ in retry:
+            with error_handler:
+                message = await ctx.client.rest_service.rest.fetch_message(channel_id, message_id)
+                break
+
+        retry.reset()
+        error_handler.clear_rules(break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError))
+        async for _ in retry:
+            with error_handler:
+                mentions = ", ".join(map(str, message.mentions.users.values())) if message.mentions.users else None
+                await ctx.message.reply(f"Mentions: {mentions}" if mentions else "No mentions.")
                 break
