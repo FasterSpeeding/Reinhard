@@ -54,6 +54,7 @@ class UtilComponent(components.Component):
     @help_util.with_parameter_doc("color", "A required argument of either a text colour representation or a role's ID.")
     @help_util.with_command_doc("Get a visual representation of a color or role's color.")
     @parsing.greedy_argument("color", converters=(conversion.ColorConverter, conversion.RESTFulRoleConverter))
+    @parsing.with_parser
     @components.command("color", "colour")
     async def color(self, ctx: tanjun_traits.Context, color_or_role: typing.Union[colors.Color, guilds.Role]) -> None:
         if isinstance(color_or_role, guilds.Role):
@@ -66,7 +67,7 @@ class UtilComponent(components.Component):
         )
         retry = backoff.Backoff(max_retries=5)
         error_manager = rest_manager.HikariErrorManager(
-            break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
+            retry, break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
         )
 
         async for _ in retry:
@@ -97,6 +98,7 @@ class UtilComponent(components.Component):
     )
     @help_util.with_command_doc("Get information about a member in the current guild.")
     @parsing.argument("member", converters=(conversion.RESTFulMemberConverter,), default=None)
+    @parsing.with_parser
     @components.command("member", checks=[lambda ctx: ctx.message.guild_id is not None])
     async def member(self, ctx: tanjun_traits.Context, member: typing.Union[guilds.Member, None]) -> None:
         assert ctx.message.guild_id is not None  # This is asserted by a previous check.
@@ -182,6 +184,7 @@ class UtilComponent(components.Component):
     @help_util.with_parameter_doc("role", "The required argument of a role ID.")
     @help_util.with_command_doc("Get information about a role in the current guild.")
     @parsing.argument("role", converters=(conversion.RESTFulRoleConverter,))
+    @parsing.with_parser
     @components.command("role", checks=[lambda ctx: ctx.message.guild_id is not None])
     async def role(self, ctx: tanjun_traits.Context, role: guilds.Role) -> None:
         permissions = basic.basic_name_grid(role.permissions) or "None"
@@ -223,6 +226,7 @@ class UtilComponent(components.Component):
     @parsing.argument(
         "user", converters=(conversion.RESTFulUserConverter, conversion.RESTFulMemberConverter), default=None
     )
+    @parsing.with_parser
     @components.command("user")
     async def user(self, ctx: tanjun_traits.Context, user: typing.Union[users.User, None]) -> None:
         if user is None:
@@ -260,6 +264,7 @@ class UtilComponent(components.Component):
     @parsing.argument(
         "user", converters=(conversion.RESTFulUserConverter, conversion.RESTFulMemberConverter), default=None
     )
+    @parsing.with_parser
     @components.command("avatar", "pfp")
     async def avatar(self, ctx: tanjun_traits.Context, user: typing.Union[users.User, None]) -> None:
 
@@ -280,6 +285,7 @@ class UtilComponent(components.Component):
 
     @parsing.argument("message_id", (snowflakes.Snowflake,))
     @parsing.option("channel_id", "--channel", "-c", converters=(snowflakes.Snowflake,), default=None)
+    @parsing.with_parser
     @components.command("mentions")
     async def mentions(
         self,

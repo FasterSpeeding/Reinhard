@@ -105,6 +105,7 @@ class BasicComponent(components.Component):
     @help_util.with_command_doc("Get information about the commands in this bot.")
     @parsing.option("command_name", "--command", "-c", default=None)
     @parsing.option("component_name", "--component", default=None)
+    @parsing.with_parser
     @components.command("help")  # TODO: specify a group or command
     async def help(
         self, ctx: tanjun_traits.Context, command_name: typing.Optional[str], component_name: typing.Optional[str]

@@ -109,7 +109,8 @@ class ExternalComponent(components.Component):
         self.logger = logging.Logger("hikari.reinhard.external")
         self.paginator_pool: typing.Optional[paginaton.PaginatorPool] = None
         self.user_agent = ""
-        self.youtube.add_check(lambda _: bool(self.google_token),)
+        youtube_command = next(filter(lambda command: "youtube" in command.names, self.commands))
+        youtube_command.add_check(lambda _: bool(self.google_token),)
 
     def bind_client(self, client: tanjun_traits.Client, /) -> None:
         super().bind_client(client)
@@ -154,6 +155,7 @@ class ExternalComponent(components.Component):
     @help_util.with_parameter_doc("query", "The required argument of a query to search up a song by.")
     @help_util.with_command_doc("Get a song's lyrics.")
     @parsing.greedy_argument("query")
+    @parsing.with_parser
     @components.command("lyrics")
     async def lyrics(self, ctx: context.Context, query: str) -> None:
         async with aiohttp.ClientSession(headers={"User-Agent": self.user_agent}) as session:
@@ -225,6 +227,7 @@ class ExternalComponent(components.Component):
     @parsing.option("region", "-r", "--region", default=None)
     @parsing.option("resource_type", "-rt", "--type", "-t", "--resource-type", default="video")
     @parsing.greedy_argument("query")
+    @parsing.with_parser
     @components.command("youtube", "yt")
     async def youtube(  # TODO: fully document
         self,
@@ -299,6 +302,7 @@ class ExternalComponent(components.Component):
     @help_util.with_parameter_doc("--source | -s", "The optional argument of a show's title.")
     @help_util.with_command_doc("Get a random cute anime image.")
     @parsing.option("source", "--source", "-s", default=None)
+    @parsing.with_parser
     @components.command("moe")  # TODO: https://lewd.bowsette.pictures/api/request
     async def moe(self, ctx: tanjun_traits.Context, source: typing.Optional[str] = None) -> None:
         params = {}

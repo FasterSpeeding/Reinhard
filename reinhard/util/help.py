@@ -21,7 +21,7 @@ if typing.TYPE_CHECKING:
     from tanjun import traits
 
 
-_CommandT = typing.TypeVar("_CommandT", bound="traits.ExecutableCommand")
+_CommandT = typing.TypeVar("_CommandT", bound="traits.CommandDescriptor")
 _ComponentT = typing.TypeVar("_ComponentT", bound="traits.Component")
 DOC_ATTRIBUTE: typing.Final[str] = "__reinhard_doc__"
 DOC_FLAG: typing.Final[str] = "doc"

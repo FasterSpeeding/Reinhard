@@ -83,6 +83,7 @@ class SudoComponent(components.Component):
     @help_util.with_command_doc("Command used for getting the bot to mirror a response.")
     @parsing.option("raw_embed", "--embed", "-e", converters=(json.loads,), default=undefined.UNDEFINED)
     @parsing.greedy_argument("content", default=undefined.UNDEFINED)
+    @parsing.with_parser
     @components.command("echo")
     async def echo(
         self,
@@ -153,6 +154,7 @@ class SudoComponent(components.Component):
     @parsing.option(
         "suppress_response", "--suppress-response", "-s", converters=(bool,), default=False, empty_value=True,
     )
+    @parsing.with_parser
     @components.command("eval", "exec", "sudo")
     async def eval(self, ctx: context.Context, suppress_response: bool = False) -> None:
         assert ctx.message.content is not None  # This shouldn't ever be the case in a command client.
@@ -180,6 +182,22 @@ class SudoComponent(components.Component):
         )
         message = await response_paginator.open()
         self.paginator_pool.add_paginator(message, response_paginator)
+
+    @components.command("commands")
+    async def commands_command(self, ctx: context.Context) -> None:
+        commands = (
+            f"  {type(component).__name__}: " + ", ".join(map(repr, component.commands))
+            for component in ctx.client.components
+        )
+        await ctx.message.reply(f"Loaded commands\n" + "\n".join(commands))
+
+    @components.group("note")
+    async def note(self, ctx: context.Context) -> None:
+        await ctx.message.reply("You have zero tags")
+
+    @note.with_command("test")
+    async def note_test(self, ctx: context.Context) -> None:
+        await ctx.message.reply("It worked!!!")
 
     async def steal(self, ctx: context.Context, target: snowflakes.Snowflake, *args: str) -> None:
         # TODO: emoji steal command
