@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from hikari import intents  # TODO: handle intents in config
+# from hikari import intents as intents_  # TODO: handle intents in config
 from hikari.impl import bot as bot_module
 
 from reinhard import client as client_module
@@ -9,7 +9,7 @@ from reinhard import config as config_
 
 def main() -> None:
     config = config_.load_config()
-    bot = bot_module.BotApp(config.tokens.bot, logs=config.log_level, intents=intents.Intents.ALL)
+    bot = bot_module.BotApp(config.tokens.bot, logs=config.log_level)
     client = client_module.Client(
         bot,
         password=config.database.password,

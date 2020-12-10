@@ -240,7 +240,7 @@ class UtilComponent(components.Component):
                 colour=constants.embed_colour(),
                 description=(
                     f"Bot: {user.is_system}\nSystem bot: {user.is_system}\n"
-                    f"Joined Discord: {basic.pretify_date(user.created_at)}\n\nFlags\n{flags}"
+                    f"Joined Discord: {basic.pretify_date(user.created_at)}\n\nFlags: {int(user.flags)}\n{flags}"
                 ),
                 title=f"{user.username}#{user.discriminator}",
                 url=f"https://discordapp.com/users/{user.id}",

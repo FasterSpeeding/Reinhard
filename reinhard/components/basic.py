@@ -28,6 +28,7 @@ if typing.TYPE_CHECKING:
     from hikari import messages
     from hikari import users
     from tanjun import traits as tanjun_traits
+    from hikari import traits as hikari_traits
 
 
 __exports__ = ["BasicComponent"]
@@ -73,8 +74,12 @@ class BasicComponent(components.Component):
         memory_percent = self.process.memory_percent()
         avatar = self.current_user.avatar_url or self.current_user.default_avatar_url if self.current_user else None
 
+        description = (
+            "An experimental pythonic Hikari bot.\n "
+            "The source can be found on [Github](https://github.com/FasterSpeeding/Reinhard)."
+        )
         embed = (
-            embeds_.Embed(description="An experimental pythonic Hikari bot.", colour=constants.embed_colour())
+            embeds_.Embed(description=description, colour=constants.embed_colour())
             .set_author(
                 name=f"Reinhard: Shard {ctx.shard.id} of {ctx.client.shard_service.shard_count}",
                 icon=avatar,
@@ -171,4 +176,70 @@ class BasicComponent(components.Component):
         async for _ in retry:
             with error_handler:
                 await message.edit(f"PONG\n - REST: {time_taken:.0f}ms\n - Gateway: {heartbeat_latency:.0f}ms")
+                break
+
+    _about_lines: typing.Sequence[typing.Tuple[str, typing.Callable[[hikari_traits.CacheAware], int]]] = (
+        ("Guild channels: {0}", lambda c: len(c.cache.get_guild_channels_view())),
+        ("Emojis: {0}", lambda c: len(c.cache.get_emojis_view())),
+        ("Available Guilds: {0}", lambda c: len(c.cache.get_available_guilds_view()),),
+        ("Unavailable Guilds: {0}", lambda c: len(c.cache.get_unavailable_guilds_view())),
+        ("Invites: {0}", lambda c: len(c.cache.get_invites_view())),
+        ("Members: {0}", lambda c: sum(len(record) for record in c.cache.get_members_view().values())),
+        ("Messages: {0}", lambda c: len(c.cache.get_messages_view())),
+        ("Presences: {0}", lambda c: sum(len(record) for record in c.cache.get_presences_view().values())),
+        ("Roles: {0}", lambda c: len(c.cache.get_roles_view())),
+        ("Users: {0}", lambda c: len(c.cache.get_users_view())),
+        ("Voice states: {0}", lambda c: sum(len(record) for record in c.cache.get_voice_states_view().values())),
+    )
+
+    @components.as_command("cache", checks=(lambda ctx: bool(ctx.client.cache_service),))
+    async def cache(self, ctx: tanjun_traits.Context) -> None:
+        """Get general information about this bot."""
+        assert ctx.client.cache_service  # this is asserted by a check
+        start_date = datetime.datetime.fromtimestamp(self.process.create_time())
+        uptime = datetime.datetime.now() - start_date
+        memory_usage = self.process.memory_full_info().uss / 1024 ** 2
+        cpu_usage = self.process.cpu_percent() / psutil.cpu_count()
+        memory_percent = self.process.memory_percent()
+
+        cache_stats_lines = []
+
+        storage_start_time = time.perf_counter()
+        for line_template, callback in self._about_lines:
+            line_start_time = time.perf_counter()
+            line = line_template.format(callback(ctx.client.cache_service))
+            cache_stats_lines.append((line, f"{time.perf_counter() - line_start_time:.3g} s"))
+
+        storage_time_taken = time.perf_counter() - storage_start_time
+        largest_line = max(len(line) for line, _ in cache_stats_lines)
+        cache_stats = "\n".join(
+            line + " " * (largest_line + 2 - len(line)) + time_taken for line, time_taken in cache_stats_lines
+        )
+
+        # TODO: try cache first + backoff
+        avatar = (await ctx.client.rest_service.rest.fetch_my_user()).avatar_url
+
+        embed = (
+            embeds_.Embed(description="An experimental pythonic Hikari bot.", color=0x55CDFC)
+            .set_author(name=f"Hikari: testing client", icon=avatar, url=hikari_url)
+            .add_field(name="Uptime", value=str(uptime), inline=True)
+            .add_field(
+                name="Process",
+                value=f"{memory_usage:.2f} MiB ({memory_percent:.0f}%)\n{cpu_usage:.2f}% CPU",
+                inline=True,
+            )
+            .add_field(name=f"Standard cache stats", value=f"```{cache_stats}```")
+            .set_footer(
+                icon="http://i.imgur.com/5BFecvA.png",
+                text=f"Made with Hikari v{hikari_version} (python {platform.python_version()})",
+            )
+        )
+
+        retry = backoff.Backoff(max_retries=5)
+        error_handler = rest_manager.HikariErrorManager(
+            retry, break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
+        )
+        async for _ in retry:
+            with error_handler:
+                await ctx.message.reply(f"{storage_time_taken:.3g} s", embed=embed)
                 break
