@@ -63,7 +63,7 @@ class BasicComponent(components.Component):
         await super().open()
 
     @help_util.with_command_doc("Get basic information about the current bot instance.")
-    @components.command("about")
+    @components.as_command("about")
     async def about(self, ctx: tanjun_traits.Context) -> None:
         """Get general information about this bot."""
         start_date = datetime.datetime.fromtimestamp(self.process.create_time())
@@ -74,7 +74,7 @@ class BasicComponent(components.Component):
         avatar = self.current_user.avatar_url or self.current_user.default_avatar_url if self.current_user else None
 
         embed = (
-            embeds_.Embed(description="An experimental pythonic Hikari bot.", color=constants.EMBED_COLOUR)
+            embeds_.Embed(description="An experimental pythonic Hikari bot.", colour=constants.embed_colour())
             .set_author(
                 name=f"Reinhard: Shard {ctx.shard.id} of {ctx.client.shard_service.shard_count}",
                 icon=avatar,
@@ -103,10 +103,10 @@ class BasicComponent(components.Component):
                 break
 
     @help_util.with_command_doc("Get information about the commands in this bot.")
-    @parsing.option("command_name", "--command", "-c", default=None)
-    @parsing.option("component_name", "--component", default=None)
+    @parsing.with_option("command_name", "--command", "-c", default=None)
+    @parsing.with_option("component_name", "--component", default=None)
     @parsing.with_parser
-    @components.command("help")  # TODO: specify a group or command
+    @components.as_command("help")  # TODO: specify a group or command
     async def help(
         self, ctx: tanjun_traits.Context, command_name: typing.Optional[str], component_name: typing.Optional[str]
     ) -> None:
@@ -146,8 +146,8 @@ class BasicComponent(components.Component):
         self.paginator_pool.add_paginator(message, paginator)
 
     @help_util.with_command_doc("Get the bot's current delay.")
-    @components.command("ping")
-    async def ping(self, ctx: tanjun_traits.Context) -> None:
+    @components.as_command("ping")
+    async def ping(self, ctx: tanjun_traits.Context, /) -> None:
         retry = backoff.Backoff(max_retries=5)
         error_handler = rest_manager.HikariErrorManager(
             retry, break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)

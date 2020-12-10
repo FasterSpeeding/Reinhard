@@ -4,7 +4,7 @@ __all__: typing.Sequence[str] = ["UtilComponent"]
 
 import typing
 
-from hikari import colors
+from hikari import colours
 from hikari import embeds
 from hikari import errors as hikari_errors
 from hikari import guilds
@@ -51,19 +51,21 @@ class UtilComponent(components.Component):
 
         await super().open()
 
-    @help_util.with_parameter_doc("color", "A required argument of either a text colour representation or a role's ID.")
+    @help_util.with_parameter_doc(
+        "colour", "A required argument of either a text colour representation or a role's ID."
+    )
     @help_util.with_command_doc("Get a visual representation of a color or role's color.")
-    @parsing.greedy_argument("color", converters=(conversion.ColorConverter, conversion.RESTFulRoleConverter))
+    @parsing.with_greedy_argument("colour", converters=(conversion.ColorConverter, conversion.RESTFulRoleConverter))
     @parsing.with_parser
-    @components.command("color", "colour")
-    async def color(self, ctx: tanjun_traits.Context, color_or_role: typing.Union[colors.Color, guilds.Role]) -> None:
-        if isinstance(color_or_role, guilds.Role):
-            color_or_role = color_or_role.color
+    @components.as_command("color", "colour")
+    async def colour(self, ctx: tanjun_traits.Context, colour: typing.Union[colours.Colour, guilds.Role]) -> None:
+        if isinstance(colour, guilds.Role):
+            colour = colour.colour
 
         embed = (
-            embeds.Embed(color=color_or_role)
-            .add_field(name="RGB", value=str(color_or_role.rgb))
-            .add_field(name="HEX", value=str(color_or_role.hex_code))
+            embeds.Embed(colour=colour)
+            .add_field(name="RGB", value=str(colour.rgb))
+            .add_field(name="HEX", value=str(colour.hex_code))
         )
         retry = backoff.Backoff(max_retries=5)
         error_manager = rest_manager.HikariErrorManager(
@@ -75,7 +77,7 @@ class UtilComponent(components.Component):
                 await ctx.message.reply(embed=embed)
                 break
 
-    # # @decorators.command
+    # # @decorators.as_command
     # async def copy(
     #     self,
     #     ctx: commands.Context,
@@ -97,9 +99,9 @@ class UtilComponent(components.Component):
         "If not supplied then this command will target the member triggering it.",
     )
     @help_util.with_command_doc("Get information about a member in the current guild.")
-    @parsing.argument("member", converters=(conversion.RESTFulMemberConverter,), default=None)
+    @parsing.with_greedy_argument("member", converters=(conversion.RESTFulMemberConverter,), default=None)
     @parsing.with_parser
-    @components.command("member", checks=[lambda ctx: ctx.message.guild_id is not None])
+    @components.as_command("member", checks=[lambda ctx: ctx.message.guild_id is not None])
     async def member(self, ctx: tanjun_traits.Context, member: typing.Union[guilds.Member, None]) -> None:
         assert ctx.message.guild_id is not None  # This is asserted by a previous check.
         assert ctx.message.member is not None  # This is always the case for messages made in guilds.
@@ -133,15 +135,15 @@ class UtilComponent(components.Component):
         roles = "\n".join(map("{0.name}: {0.id}".format, ordered_roles.values()))
 
         for role in ordered_roles.values():
-            if role.color:
-                color = role.color
+            if role.colour:
+                colour = role.colour
                 break
         else:
-            color = colors.Color(0)
+            colour = colours.Colour(0)
 
         permissions_grid = basic.basic_name_grid(permissions) or "None"
         member_information = [
-            f"Color: {color}",
+            f"Color: {colour}",
             f"Joined Discord: {basic.pretify_date(member.user.created_at)}",
             f"Joined Server: {basic.pretify_date(member.joined_at)}",
         ]
@@ -162,7 +164,7 @@ class UtilComponent(components.Component):
         embed = (
             embeds.Embed(
                 description="\n".join(member_information) + f"\n\nRoles:\n{roles}\n\nPermissions:\n{permissions_grid}",
-                color=color,
+                colour=colour,
                 title=f"{member.user.username}#{member.user.discriminator}",
                 url=f"https://discordapp.com/users/{member.user.id}",
             )
@@ -183,15 +185,15 @@ class UtilComponent(components.Component):
 
     @help_util.with_parameter_doc("role", "The required argument of a role ID.")
     @help_util.with_command_doc("Get information about a role in the current guild.")
-    @parsing.argument("role", converters=(conversion.RESTFulRoleConverter,))
+    @parsing.with_argument("role", converters=(conversion.RESTFulRoleConverter,))
     @parsing.with_parser
-    @components.command("role", checks=[lambda ctx: ctx.message.guild_id is not None])
+    @components.as_command("role", checks=[lambda ctx: ctx.message.guild_id is not None])
     async def role(self, ctx: tanjun_traits.Context, role: guilds.Role) -> None:
         permissions = basic.basic_name_grid(role.permissions) or "None"
         role_information = [f"Created: {basic.pretify_date(role.created_at)}", f"Position: {role.position}"]
 
-        if role.color:
-            role_information.append(f"Color: `{role.color}`")
+        if role.colour:
+            role_information.append(f"Color: `{role.colour}`")
 
         if role.is_hoisted:
             role_information.append("Member list hoisted")
@@ -207,7 +209,7 @@ class UtilComponent(components.Component):
             retry, break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
         )
         embed = embeds.Embed(
-            color=role.color,
+            colour=role.colour,
             title=role.name,
             description="\n".join(role_information) + f"\n\nPermissions:\n{permissions}",
         )
@@ -223,11 +225,11 @@ class UtilComponent(components.Component):
         "If not supplied then this command will target the user triggering it.",
     )
     @help_util.with_command_doc("Get information about a Discord user.")
-    @parsing.argument(
+    @parsing.with_greedy_argument(
         "user", converters=(conversion.RESTFulUserConverter, conversion.RESTFulMemberConverter), default=None
     )
     @parsing.with_parser
-    @components.command("user")
+    @components.as_command("user")
     async def user(self, ctx: tanjun_traits.Context, user: typing.Union[users.User, None]) -> None:
         if user is None:
             user = ctx.message.author
@@ -235,7 +237,7 @@ class UtilComponent(components.Component):
         flags = basic.basic_name_grid(user.flags) or "NONE"
         embed = (
             embeds.Embed(
-                color=constants.EMBED_COLOUR,
+                colour=constants.embed_colour(),
                 description=(
                     f"Bot: {user.is_system}\nSystem bot: {user.is_system}\n"
                     f"Joined Discord: {basic.pretify_date(user.created_at)}\n\nFlags\n{flags}"
@@ -261,11 +263,11 @@ class UtilComponent(components.Component):
         "If this isn't provided then this command will target the user who triggered it.",
     )
     @help_util.with_command_doc("Get a user's avatar.")
-    @parsing.argument(
+    @parsing.with_greedy_argument(
         "user", converters=(conversion.RESTFulUserConverter, conversion.RESTFulMemberConverter), default=None
     )
     @parsing.with_parser
-    @components.command("avatar", "pfp")
+    @components.as_command("avatar", "pfp")
     async def avatar(self, ctx: tanjun_traits.Context, user: typing.Union[users.User, None]) -> None:
 
         if user is None:
@@ -276,17 +278,17 @@ class UtilComponent(components.Component):
             retry, break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
         )
         avatar = user.avatar_url or user.default_avatar_url
-        embed = embeds.Embed(title=str(user), url=str(avatar)).set_image(avatar)
+        embed = embeds.Embed(title=str(user), url=str(avatar), colour=constants.embed_colour()).set_image(avatar)
 
         async for _ in retry:
             with error_manager:
                 await ctx.message.reply(embed=embed)
                 break
 
-    @parsing.argument("message_id", (snowflakes.Snowflake,))
-    @parsing.option("channel_id", "--channel", "-c", converters=(snowflakes.Snowflake,), default=None)
+    @parsing.with_argument("message_id", (snowflakes.Snowflake,))
+    @parsing.with_option("channel_id", "--channel", "-c", converters=(snowflakes.Snowflake,), default=None)
     @parsing.with_parser
-    @components.command("mentions")
+    @components.as_command("mentions")
     async def mentions(
         self,
         ctx: tanjun_traits.Context,

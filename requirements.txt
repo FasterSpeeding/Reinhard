@@ -2,5 +2,5 @@ asyncpg==0.20.0
 sphobjinv==2.0.1
 psutil==5.7.0
 pyyaml==5.3
-git+https://gitlab.com/FasterSpeeding/tanjun
-hikari-yuyo~=0.0.3.a0
+hikari-tanjun~=1.0.1.a1
+hikari-yuyo~=0.0.3.a1

@@ -4,6 +4,7 @@ __all__: typing.Sequence[str] = ["DatabaseConfig", "Tokens", "FullConfig"]
 
 import abc
 import logging
+import os
 import pathlib
 import typing
 
@@ -113,3 +114,13 @@ def get_config_from_file(file: typing.Optional[pathlib.Path] = None) -> FullConf
 
     data = file.read_text()
     return FullConfig.from_mapping(yaml.safe_load(data))
+
+
+def load_config() -> FullConfig:
+    config_location = os.getenv("REINHARD_CONFIG_FILE")
+    config_path = pathlib.Path(config_location) if config_location else None
+
+    if config_path and not config_path.exists():
+        raise RuntimeError("Invalid configuration given in environment variables")
+
+    return get_config_from_file(config_path)

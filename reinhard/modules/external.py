@@ -154,9 +154,9 @@ class ExternalComponent(components.Component):
 
     @help_util.with_parameter_doc("query", "The required argument of a query to search up a song by.")
     @help_util.with_command_doc("Get a song's lyrics.")
-    @parsing.greedy_argument("query")
+    @parsing.with_greedy_argument("query")
     @parsing.with_parser
-    @components.command("lyrics")
+    @components.as_command("lyrics")
     async def lyrics(self, ctx: context.Context, query: str) -> None:
         async with aiohttp.ClientSession(headers={"User-Agent": self.user_agent}) as session:
             retry = backoff.Backoff(max_retries=5)
@@ -182,7 +182,7 @@ class ExternalComponent(components.Component):
 
                 async for _ in retry:
                     with hikari_error_manager:
-                        await ctx.message.reply(content=f"Invalid data returned by server.")
+                        await ctx.message.reply(content="Invalid data returned by server.")
                         break
 
                 self.logger.debug(
@@ -197,7 +197,7 @@ class ExternalComponent(components.Component):
             pages = (
                 (
                     undefined.UNDEFINED,
-                    embeds.Embed(description=html.unescape(page), color=constants.EMBED_COLOUR)
+                    embeds.Embed(description=html.unescape(page), colour=constants.embed_colour())
                     .set_footer(text=f"Page {index + 1}")
                     .set_author(icon=icon, name=html.unescape(title)),
                 )
@@ -221,14 +221,14 @@ class ExternalComponent(components.Component):
             self.paginator_pool.add_paginator(message, response_paginator)
 
     @help_util.with_command_doc("Get a youtube video.")
-    @parsing.option("safe_search", "--safe", "-s", "--safe-search", converters=(bool,), default=None)
-    @parsing.option("order", "-o", "--order", default="relevance")
-    @parsing.option("language", "-l", "--language", default=None)
-    @parsing.option("region", "-r", "--region", default=None)
-    @parsing.option("resource_type", "-rt", "--type", "-t", "--resource-type", default="video")
-    @parsing.greedy_argument("query")
+    @parsing.with_option("safe_search", "--safe", "-s", "--safe-search", converters=(bool,), default=None)
+    @parsing.with_option("order", "-o", "--order", default="relevance")
+    @parsing.with_option("language", "-l", "--language", default=None)
+    @parsing.with_option("region", "-r", "--region", default=None)
+    @parsing.with_option("resource_type", "-rt", "--type", "-t", "--resource-type", default="video")
+    @parsing.with_greedy_argument("query")
     @parsing.with_parser
-    @components.command("youtube", "yt")
+    @components.as_command("youtube", "yt")
     async def youtube(  # TODO: fully document
         self,
         ctx: context.Context,
@@ -301,9 +301,9 @@ class ExternalComponent(components.Component):
 
     @help_util.with_parameter_doc("--source | -s", "The optional argument of a show's title.")
     @help_util.with_command_doc("Get a random cute anime image.")
-    @parsing.option("source", "--source", "-s", default=None)
+    @parsing.with_option("source", "--source", "-s", default=None)
     @parsing.with_parser
-    @components.command("moe")  # TODO: https://lewd.bowsette.pictures/api/request
+    @components.as_command("moe")  # TODO: https://lewd.bowsette.pictures/api/request
     async def moe(self, ctx: tanjun_traits.Context, source: typing.Optional[str] = None) -> None:
         params = {}
         if source is not None:

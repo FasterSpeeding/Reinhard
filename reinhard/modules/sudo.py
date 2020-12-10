@@ -73,7 +73,7 @@ class SudoComponent(components.Component):
         await super().open()
 
     @help_util.with_command_doc("Command used for testing the current error handling")
-    @components.command("error")
+    @components.as_command("error")
     async def error(self, _: context.Context) -> None:
         raise Exception("This is an exception, get used to it.")
 
@@ -81,10 +81,12 @@ class SudoComponent(components.Component):
         "--embed | -e", "An optional argument used to specify the json of a embed for the bot to send."
     )
     @help_util.with_command_doc("Command used for getting the bot to mirror a response.")
-    @parsing.option("raw_embed", "--embed", "-e", converters=(json.loads,), default=undefined.UNDEFINED)
-    @parsing.greedy_argument("content", default=undefined.UNDEFINED)
+    @parsing.with_option(
+        "raw_embed", "--embed", "-e", converters=(json.loads,), default=undefined.UNDEFINED, empty_value={}
+    )
+    @parsing.with_greedy_argument("content", default=undefined.UNDEFINED)
     @parsing.with_parser
-    @components.command("echo")
+    @components.as_command("echo")
     async def echo(
         self,
         ctx: context.Context,
@@ -99,6 +101,10 @@ class SudoComponent(components.Component):
         if raw_embed is not undefined.UNDEFINED:
             try:
                 embed = ctx.client.rest_service.entity_factory.deserialize_embed(raw_embed)
+
+                if not embed.colour:
+                    embed.colour = constants.embed_colour()
+
             except (TypeError, ValueError) as exc:
                 async for _ in retry:
                     with error_manager:
@@ -151,11 +157,11 @@ class SudoComponent(components.Component):
         "--suppress-response | -s", "A optional argument used to disable the bot's post-eval response."
     )
     @help_util.with_command_doc("Dynamically evaluate a script in the bot's environment.")
-    @parsing.option(
+    @parsing.with_option(
         "suppress_response", "--suppress-response", "-s", converters=(bool,), default=False, empty_value=True,
     )
     @parsing.with_parser
-    @components.command("eval", "exec", "sudo")
+    @components.as_command("eval", "exec", "sudo")
     async def eval(self, ctx: context.Context, suppress_response: bool = False) -> None:
         assert ctx.message.content is not None  # This shouldn't ever be the case in a command client.
         code = re.findall(r"```(?:[\w]*\n?)([\s\S(^\\`{3})]*?)\n*```", ctx.message.content)
@@ -163,7 +169,7 @@ class SudoComponent(components.Component):
             raise tanjun_errors.CommandError("Expected a python code block.")
 
         result, exec_time, failed = await self.eval_python_code(ctx, code[0])
-        color = constants.FAILED_COLOUR if failed else constants.PASS_COLOUR
+        colour = constants.FAILED_COLOUR if failed else constants.PASS_COLOUR
         if suppress_response:
             return
 
@@ -171,7 +177,7 @@ class SudoComponent(components.Component):
         embed_generator = (
             (
                 undefined.UNDEFINED,
-                embeds.Embed(color=color, description=text, title=f"Eval page {page}").set_footer(
+                embeds.Embed(colour=colour, description=text, title=f"Eval page {page}").set_footer(
                     text=f"Time taken: {exec_time} ms"
                 ),
             )
@@ -183,21 +189,31 @@ class SudoComponent(components.Component):
         message = await response_paginator.open()
         self.paginator_pool.add_paginator(message, response_paginator)
 
-    @components.command("commands")
+    @components.as_command("commands")
     async def commands_command(self, ctx: context.Context) -> None:
         commands = (
             f"  {type(component).__name__}: " + ", ".join(map(repr, component.commands))
             for component in ctx.client.components
         )
-        await ctx.message.reply(f"Loaded commands\n" + "\n".join(commands))
+        retry = backoff.Backoff(max_retries=5)
+        error_manager = rest_manager.HikariErrorManager(
+            retry, break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
+        )
+        async for _ in retry:
+            with error_manager:
+                await ctx.message.reply("Loaded commands\n" + "\n".join(commands))
 
-    @components.group("note")
+    @components.as_group("note", "notes")
     async def note(self, ctx: context.Context) -> None:
         await ctx.message.reply("You have zero tags")
 
-    @note.with_command("test")
-    async def note_test(self, ctx: context.Context) -> None:
-        await ctx.message.reply("It worked!!!")
+    @note.with_command("add")
+    async def note_add(self, ctx: context.Context) -> None:
+        await ctx.message.reply("todo")
+
+    @note.with_command("remove")
+    async def note_remove(self, ctx: context.Context) -> None:
+        await ctx.message.reply("todo")
 
     async def steal(self, ctx: context.Context, target: snowflakes.Snowflake, *args: str) -> None:
         # TODO: emoji steal command

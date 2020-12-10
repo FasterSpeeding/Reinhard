@@ -6,6 +6,7 @@ import asyncpg
 from tanjun import clients
 from tanjun import hooks
 
+from reinhard import config as config_
 from reinhard import sql
 from reinhard.modules import basic
 from reinhard.modules import external
@@ -16,8 +17,6 @@ from reinhard.util import command_hooks
 if typing.TYPE_CHECKING:
     from hikari import traits as hikari_traits
     from tanjun import traits as tanjun_traits
-
-    from reinhard import config as config_
 
 
 class Client(clients.Client):
@@ -43,7 +42,7 @@ class Client(clients.Client):
             rest,
             shard,
             cache,
-            hooks=hooks.Hooks(parser_error=command_hooks.on_parser_error, error=command_hooks.on_error),
+            hooks=hooks.Hooks(parser_error=command_hooks.on_parser_error, on_error=command_hooks.on_error),
             prefixes=prefixes,
         )
         self._password = password
@@ -64,7 +63,10 @@ class Client(clients.Client):
         await super().open()
 
 
-def add_components(client: tanjun_traits.Client, config: config_.FullConfig) -> None:
+def add_components(client: tanjun_traits.Client, /, *, config: typing.Optional[config_.FullConfig] = None) -> None:
+    if config is None:
+        config = config_.load_config()
+
     client.add_component(basic.BasicComponent())
     client.add_component(external.ExternalComponent(google_token=config.tokens.google))
     client.add_component(sudo.SudoComponent(emoji_guild=config.emoji_guild))

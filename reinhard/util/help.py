@@ -14,8 +14,9 @@ __all__: typing.Sequence[str] = [
 import typing
 
 from hikari import embeds as embeds_
-from tanjun import traits
 from yuyo import paginaton
+
+from reinhard.util import constants
 
 if typing.TYPE_CHECKING:
     from tanjun import traits
@@ -113,7 +114,9 @@ async def generate_help_embeds(
 
     pages = paginaton.string_paginator(iter(command_docs), wrapper=f"{component_doc}\n {'{}'}")
     embeds = (
-        embeds_.Embed(title=f"{component_name}", description=content).set_footer(text=f"page {page + 1}")
+        embeds_.Embed(title=f"{component_name}", description=content, colour=constants.embed_colour()).set_footer(
+            text=f"page {page + 1}"
+        )
         async for content, page in pages
     )
 
@@ -146,6 +149,8 @@ def generate_command_embeds(
 
     pages = paginaton.string_paginator(iter(lines))
     return (
-        embeds_.Embed(title=f"{prefix}{command_names}", description=content).set_footer(text=f"page {page + 1}")
+        embeds_.Embed(
+            title=f"{prefix}{command_names}", description=content, colour=constants.embed_colour()
+        ).set_footer(text=f"page {page + 1}")
         async for content, page in pages
     )

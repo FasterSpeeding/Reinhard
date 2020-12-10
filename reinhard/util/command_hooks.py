@@ -22,7 +22,7 @@ async def on_error(ctx: traits.Context, exception: BaseException) -> None:
     )
     embed = embeds.Embed(
         title=f"An unexpected {type(exception).__name__} occurred",
-        color=constants.FAILED_COLOUR,
+        colour=constants.FAILED_COLOUR,
         description=f"```python\n{str(exception)[:1950]}```",
     )
 
