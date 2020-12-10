@@ -8,10 +8,10 @@ from tanjun import hooks
 
 from reinhard import config as config_
 from reinhard import sql
-from reinhard.modules import basic
-from reinhard.modules import external
-from reinhard.modules import sudo
-from reinhard.modules import util
+from reinhard.components import basic
+from reinhard.components import external
+from reinhard.components import sudo
+from reinhard.components import util
 from reinhard.util import command_hooks
 
 if typing.TYPE_CHECKING:
