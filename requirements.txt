@@ -2,5 +2,5 @@ asyncpg==0.20.0
 sphobjinv==2.0.1
 psutil==5.7.0
 pyyaml==5.3
-hikari-tanjun~=1.0.1.a1
+hikari-tanjun~=1.0.1.a2
 hikari-yuyo~=0.0.3.a1
