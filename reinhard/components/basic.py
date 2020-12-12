@@ -212,7 +212,8 @@ class BasicComponent(components.Component):
             cache_stats_lines.append((line, (time.perf_counter() - line_start_time) * 1_000))
 
         storage_time_taken = time.perf_counter() - storage_start_time
-        left_pad = math.floor(math.log(max(num for _, num in cache_stats_lines), 10)) + 1
+        # This also accounts for the decimal place and 4 decimal places
+        left_pad = math.floor(math.log(max(num for _, num in cache_stats_lines), 10)) + 6
         largest_line = max(len(line) for line, _ in cache_stats_lines)
         cache_stats = "\n".join(
             line + " " * (largest_line + 2 - len(line)) + "{0:0{left_pad}.4f} ms".format(time_taken, left_pad=left_pad)
