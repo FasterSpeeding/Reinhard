@@ -4,6 +4,7 @@ __all__: typing.Sequence[str] = ["BasicComponent"]
 
 import datetime
 import itertools
+import math
 import platform
 import time
 import typing
@@ -26,9 +27,9 @@ from reinhard.util import rest_manager
 
 if typing.TYPE_CHECKING:
     from hikari import messages
+    from hikari import traits as hikari_traits
     from hikari import users
     from tanjun import traits as tanjun_traits
-    from hikari import traits as hikari_traits
 
 
 __exports__ = ["BasicComponent"]
@@ -208,12 +209,14 @@ class BasicComponent(components.Component):
         for line_template, callback in self._about_lines:
             line_start_time = time.perf_counter()
             line = line_template.format(callback(ctx.client.cache_service))
-            cache_stats_lines.append((line, f"{time.perf_counter() - line_start_time:.3g} s"))
+            cache_stats_lines.append((line, (time.perf_counter() - line_start_time) * 1_000))
 
         storage_time_taken = time.perf_counter() - storage_start_time
+        left_pad = math.floor(math.log(max(num for _, num in cache_stats_lines), 10)) + 1
         largest_line = max(len(line) for line, _ in cache_stats_lines)
         cache_stats = "\n".join(
-            line + " " * (largest_line + 2 - len(line)) + time_taken for line, time_taken in cache_stats_lines
+            line + " " * (largest_line + 2 - len(line)) + "{0:0{left_pad}.4f} ms".format(time_taken, left_pad=left_pad)
+            for line, time_taken in cache_stats_lines
         )
 
         # TODO: try cache first + backoff
@@ -241,5 +244,5 @@ class BasicComponent(components.Component):
         )
         async for _ in retry:
             with error_handler:
-                await ctx.message.reply(f"{storage_time_taken:.3g} s", embed=embed)
+                await ctx.message.reply(f"{storage_time_taken * 1_000:.4g} ms", embed=embed)
                 break
