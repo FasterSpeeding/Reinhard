@@ -26,9 +26,6 @@ if typing.TYPE_CHECKING:
     from tanjun import traits as tanjun_traits
 
 
-__exports__ = ["ExternalComponent"]
-
-
 YOUTUBE_TYPES = {
     "youtube#video": ("videoId", "https://youtube.com/watch?v="),
     "youtube#channel": ("channelId", "https://www.youtube.com/channel/"),
@@ -117,11 +114,9 @@ class ExternalComponent(components.Component):
         self.paginator_pool = paginaton.PaginatorPool(client.rest_service, client.dispatch_service)
 
     async def close(self) -> None:
+        await super().close()
         if self.paginator_pool is not None:
             await self.paginator_pool.close()
-
-        await self.close()
-        await super().close()
 
     async def open(self) -> None:
         if self.client is None or self.paginator_pool is None:

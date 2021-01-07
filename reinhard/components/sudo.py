@@ -32,7 +32,6 @@ if typing.TYPE_CHECKING:
     from tanjun import traits as tanjun_traits
 
 
-__exports__ = ["SudoComponent"]
 CallbackT = typing.Callable[..., typing.Coroutine[typing.Any, typing.Any, typing.Any]]
 
 
@@ -58,11 +57,11 @@ class SudoComponent(components.Component):
         self.paginator_pool = paginaton.PaginatorPool(client.rest_service, client.dispatch_service)
 
     async def close(self) -> None:
+        await super().close()
         if self.paginator_pool is not None:
             await self.paginator_pool.close()
 
         self.owner_check.close()
-        await super().close()
 
     async def open(self) -> None:
         if self.client is None or self.paginator_pool is None:

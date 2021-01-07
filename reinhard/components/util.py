@@ -22,8 +22,6 @@ from reinhard.util import conversion
 from reinhard.util import help as help_util
 from reinhard.util import rest_manager
 
-__exports__ = ["UtilComponent"]
-
 
 @help_util.with_component_doc("Component used for getting miscellaneous Discord information.")
 @help_util.with_component_name("Utility Component")

@@ -32,9 +32,6 @@ if typing.TYPE_CHECKING:
     from tanjun import traits as tanjun_traits
 
 
-__exports__ = ["BasicComponent"]
-
-
 @help_util.with_component_name("Basic Component")
 @help_util.with_component_doc("Commands provided to give information about this bot.")
 class BasicComponent(components.Component):
@@ -52,10 +49,9 @@ class BasicComponent(components.Component):
         self.paginator_pool = paginaton.PaginatorPool(client.rest_service, client.dispatch_service)
 
     async def close(self) -> None:
+        await super().close()
         if self.paginator_pool is not None:
             await self.paginator_pool.close()
-
-        await super().close()
 
     async def open(self) -> None:
         if self.client is None or self.paginator_pool is None:
@@ -89,7 +85,7 @@ class BasicComponent(components.Component):
             .add_field(name="Uptime", value=str(uptime), inline=True)
             .add_field(
                 name="Process",
-                value=f"{memory_usage:.2f} MiB ({memory_percent:.0f}%)\n{cpu_usage:.2f}% CPU",
+                value=f"{memory_usage:.2f} MB ({memory_percent:.0f}%)\n{cpu_usage:.2f}% CPU",
                 inline=True,
             )
             .set_footer(
