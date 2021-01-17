@@ -28,7 +28,7 @@ async def on_error(ctx: traits.Context, exception: BaseException) -> None:
 
     async for _ in retry:
         with error_manager:
-            await ctx.message.reply(embed=embed,)
+            await ctx.message.respond(embed=embed)
             break
 
 
@@ -46,5 +46,5 @@ async def on_parser_error(ctx: traits.Context, exception: tanjun_errors.ParserEr
 
     async for _ in retry:
         with error_manager:
-            await ctx.message.reply(content=message)
+            await ctx.message.respond(content=message)
             break

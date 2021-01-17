@@ -107,7 +107,7 @@ class SudoComponent(components.Component):
             except (TypeError, ValueError) as exc:
                 async for _ in retry:
                     with error_manager:
-                        await ctx.message.reply(content=f"Invalid embed passed: {str(exc)[:1970]}")
+                        await ctx.message.respond(content=f"Invalid embed passed: {str(exc)[:1970]}")
                         break
 
                 return
@@ -116,7 +116,7 @@ class SudoComponent(components.Component):
             retry.reset()
             async for _ in retry:
                 with error_manager:
-                    await ctx.message.reply(content=content, embed=embed)
+                    await ctx.message.respond(content=content, embed=embed)
                     break
 
     @staticmethod
@@ -200,19 +200,19 @@ class SudoComponent(components.Component):
         )
         async for _ in retry:
             with error_manager:
-                await ctx.message.reply("Loaded commands\n" + "\n".join(commands))
+                await ctx.message.respond("Loaded commands\n" + "\n".join(commands))
 
     @components.as_group("note", "notes")
     async def note(self, ctx: context.Context) -> None:
-        await ctx.message.reply("You have zero tags")
+        await ctx.message.respond("You have zero tags")
 
     @note.with_command("add")
     async def note_add(self, ctx: context.Context) -> None:
-        await ctx.message.reply("todo")
+        await ctx.message.respond("todo")
 
     @note.with_command("remove")
     async def note_remove(self, ctx: context.Context) -> None:
-        await ctx.message.reply("todo")
+        await ctx.message.respond("todo")
 
     async def steal(self, ctx: context.Context, target: snowflakes.Snowflake, *args: str) -> None:
         # TODO: emoji steal command

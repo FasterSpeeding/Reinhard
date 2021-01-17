@@ -101,7 +101,7 @@ class BasicComponent(components.Component):
 
         async for _ in retry:
             with error_handler:
-                await ctx.message.reply(embed=embed)
+                await ctx.message.respond(embed=embed)
                 break
 
     @help_util.with_command_doc("Get information about the commands in this bot.")
@@ -159,7 +159,7 @@ class BasicComponent(components.Component):
         async for _ in retry:
             with error_handler:
                 start_time = time.perf_counter()
-                message = await ctx.message.reply(content="Nyaa master!!!")
+                message = await ctx.message.respond(content="Nyaa master!!!")
                 break
 
         # Assume we can't access the channel anymore if this is still None.
@@ -241,5 +241,5 @@ class BasicComponent(components.Component):
         )
         async for _ in retry:
             with error_handler:
-                await ctx.message.reply(f"{storage_time_taken * 1_000:.4g} ms", embed=embed)
+                await ctx.message.respond(f"{storage_time_taken * 1_000:.4g} ms", embed=embed)
                 break

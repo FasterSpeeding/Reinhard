@@ -165,7 +165,7 @@ class ExternalComponent(components.Component):
                     break
 
             else:
-                raise tanjun_errors.CommandError("Couldn't get response in time") from None
+                raise tanjun_errors.CommandError("Couldn't get the lyrics in time") from None
 
             try:
                 data = await response.json()
@@ -177,7 +177,7 @@ class ExternalComponent(components.Component):
 
                 async for _ in retry:
                     with hikari_error_manager:
-                        await ctx.message.reply(content="Invalid data returned by server.")
+                        await ctx.message.respond(content="Invalid data returned by server.")
                         break
 
                 self.logger.debug(
@@ -285,7 +285,7 @@ class ExternalComponent(components.Component):
             )
             async for _ in retry:
                 with error_manager:
-                    await ctx.message.reply(content="Youtube returned invalid data.")
+                    await ctx.message.respond(content="Youtube returned invalid data.")
                     break
 
             raise
@@ -316,7 +316,7 @@ class ExternalComponent(components.Component):
                     break
 
             else:
-                raise tanjun_errors.CommandError("Couldn't get response in time") from None
+                raise tanjun_errors.CommandError("Couldn't get an image in time") from None
 
             hikari_error_manager = rest_manager.HikariErrorManager(
                 retry, break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
@@ -325,17 +325,17 @@ class ExternalComponent(components.Component):
 
             try:
                 data = (await response.json())["data"]
-            except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError, KeyError) as exc:
+            except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, LookupError, ValueError) as exc:
                 async for _ in retry:
                     with hikari_error_manager:
-                        await ctx.message.reply(content="Image API returned invalid data.")
+                        await ctx.message.respond(content="Image API returned invalid data.")
                         break
 
                 raise exc
 
             async for _ in retry:
                 with hikari_error_manager:
-                    await ctx.message.reply(content=f"{data['image']} (source {data.get('source') or 'unknown'})")
+                    await ctx.message.respond(content=f"{data['image']} (source {data.get('source') or 'unknown'})")
                     break
 
     async def query_nekos_life(self, endpoint: str, response_key: str, **kwargs: typing.Any) -> str:
@@ -354,7 +354,7 @@ class ExternalComponent(components.Component):
             # actual 5xx response.
             try:
                 status_code = int(data["msg"])
-            except (KeyError, ValueError, TypeError):
+            except (LookupError, ValueError, TypeError):
                 status_code = response.status
 
             if status_code == 404:

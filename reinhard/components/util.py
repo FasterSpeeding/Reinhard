@@ -72,7 +72,7 @@ class UtilComponent(components.Component):
 
         async for _ in retry:
             with error_manager:
-                await ctx.message.reply(embed=embed)
+                await ctx.message.respond(embed=embed)
                 break
 
     # # @decorators.as_command
@@ -87,7 +87,7 @@ class UtilComponent(components.Component):
     #             message=message, channel=channel or ctx.message.channel_id
     #         )
     #     except (hikari_errors.NotFound, hikari_errors.Forbidden) as exc:
-    #         await ctx.message.reply(content="Failed to get message.")
+    #         await ctx.message.respond(content="Failed to get message.")
     #     else:
     #         ...  # TODO: Implement this to allow getting the embeds from a suppressed message.
 
@@ -174,7 +174,7 @@ class UtilComponent(components.Component):
 
         async for _ in retry:
             with error_manager:
-                await ctx.message.reply(embed=embed)
+                await ctx.message.respond(embed=embed)
                 break
 
     @staticmethod
@@ -214,7 +214,7 @@ class UtilComponent(components.Component):
 
         async for _ in retry:
             with error_manager:
-                await ctx.message.reply(embed=embed)
+                await ctx.message.respond(embed=embed)
                 break
 
     @help_util.with_parameter_doc(
@@ -252,7 +252,7 @@ class UtilComponent(components.Component):
         )
         async for _ in retry:
             with error_manager:
-                await ctx.message.reply(embed=embed)
+                await ctx.message.respond(embed=embed)
                 break
 
     @help_util.with_parameter_doc(
@@ -280,7 +280,7 @@ class UtilComponent(components.Component):
 
         async for _ in retry:
             with error_manager:
-                await ctx.message.reply(embed=embed)
+                await ctx.message.respond(embed=embed)
                 break
 
     @parsing.with_argument("message_id", (snowflakes.Snowflake,))
@@ -311,5 +311,5 @@ class UtilComponent(components.Component):
         async for _ in retry:
             with error_handler:
                 mentions = ", ".join(map(str, message.mentions.users.values())) if message.mentions.users else None
-                await ctx.message.reply(f"Mentions: {mentions}" if mentions else "No mentions.")
+                await ctx.message.respond(f"Mentions: {mentions}" if mentions else "No mentions.")
                 break
