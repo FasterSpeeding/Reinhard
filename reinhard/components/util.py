@@ -16,7 +16,7 @@ from tanjun import parsing
 from tanjun import traits as tanjun_traits
 from yuyo import backoff
 
-from reinhard.util import basic
+from reinhard.util import basic as basic_util
 from reinhard.util import constants
 from reinhard.util import conversion
 from reinhard.util import help as help_util
@@ -65,15 +65,10 @@ class UtilComponent(components.Component):
             .add_field(name="RGB", value=str(colour.rgb))
             .add_field(name="HEX", value=str(colour.hex_code))
         )
-        retry = backoff.Backoff(max_retries=5)
         error_manager = rest_manager.HikariErrorManager(
-            retry, break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
+            break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
         )
-
-        async for _ in retry:
-            with error_manager:
-                await ctx.message.respond(embed=embed)
-                break
+        await error_manager.try_respond(ctx, embed=embed)
 
     # # @decorators.as_command
     # async def copy(
@@ -108,7 +103,7 @@ class UtilComponent(components.Component):
 
         retry = backoff.Backoff(max_retries=5)
         error_manager = rest_manager.HikariErrorManager(
-            retry, break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError,)
+            retry, break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
         )
         async for _ in retry:
             with error_manager:
@@ -139,18 +134,18 @@ class UtilComponent(components.Component):
         else:
             colour = colours.Colour(0)
 
-        permissions_grid = basic.basic_name_grid(permissions) or "None"
+        permissions_grid = basic_util.basic_name_grid(permissions) or "None"
         member_information = [
             f"Color: {colour}",
-            f"Joined Discord: {basic.pretify_date(member.user.created_at)}",
-            f"Joined Server: {basic.pretify_date(member.joined_at)}",
+            f"Joined Discord: {basic_util.pretify_date(member.user.created_at)}",
+            f"Joined Server: {basic_util.pretify_date(member.joined_at)}",
         ]
 
         if member.nickname:
             member_information.append(f"Nickname: {member.nickname}")
 
         if member.premium_since:
-            member_information.append(f"Boosting since: {basic.pretify_date(member.premium_since)}")
+            member_information.append(f"Boosting since: {basic_util.pretify_date(member.premium_since)}")
 
         if member.user.is_bot:
             member_information.append("System bot" if member.user.is_system else "Bot")
@@ -169,13 +164,8 @@ class UtilComponent(components.Component):
             .set_thumbnail(member.user.avatar_url)
             .set_footer(text=str(member.user.id), icon=member.user.default_avatar_url)
         )
-        retry.reset()
         error_manager.clear_rules()
-
-        async for _ in retry:
-            with error_manager:
-                await ctx.message.respond(embed=embed)
-                break
+        await error_manager.try_respond(ctx, embed=embed)
 
     @staticmethod
     def filter_role(role_id: snowflakes.Snowflake) -> typing.Callable[[guilds.Role], bool]:
@@ -187,8 +177,8 @@ class UtilComponent(components.Component):
     @parsing.with_parser
     @components.as_command("role", checks=[lambda ctx: ctx.message.guild_id is not None])
     async def role(self, ctx: tanjun_traits.Context, role: guilds.Role) -> None:
-        permissions = basic.basic_name_grid(role.permissions) or "None"
-        role_information = [f"Created: {basic.pretify_date(role.created_at)}", f"Position: {role.position}"]
+        permissions = basic_util.basic_name_grid(role.permissions) or "None"
+        role_information = [f"Created: {basic_util.pretify_date(role.created_at)}", f"Position: {role.position}"]
 
         if role.colour:
             role_information.append(f"Color: `{role.colour}`")
@@ -202,20 +192,15 @@ class UtilComponent(components.Component):
         if role.is_mentionable:
             role_information.append("Can be mentioned")
 
-        retry = backoff.Backoff(max_retries=5, maximum=2.0)
         error_manager = rest_manager.HikariErrorManager(
-            retry, break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
+            break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
         )
         embed = embeds.Embed(
             colour=role.colour,
             title=role.name,
             description="\n".join(role_information) + f"\n\nPermissions:\n{permissions}",
         )
-
-        async for _ in retry:
-            with error_manager:
-                await ctx.message.respond(embed=embed)
-                break
+        await error_manager.try_respond(ctx, embed=embed)
 
     @help_util.with_parameter_doc(
         "user",
@@ -232,13 +217,13 @@ class UtilComponent(components.Component):
         if user is None:
             user = ctx.message.author
 
-        flags = basic.basic_name_grid(user.flags) or "NONE"
+        flags = basic_util.basic_name_grid(user.flags) or "NONE"
         embed = (
             embeds.Embed(
                 colour=constants.embed_colour(),
                 description=(
                     f"Bot: {user.is_system}\nSystem bot: {user.is_system}\n"
-                    f"Joined Discord: {basic.pretify_date(user.created_at)}\n\nFlags: {int(user.flags)}\n{flags}"
+                    f"Joined Discord: {basic_util.pretify_date(user.created_at)}\n\nFlags: {int(user.flags)}\n{flags}"
                 ),
                 title=f"{user.username}#{user.discriminator}",
                 url=f"https://discordapp.com/users/{user.id}",
@@ -246,14 +231,10 @@ class UtilComponent(components.Component):
             .set_thumbnail(user.avatar_url)
             .set_footer(text=str(user.id), icon=user.default_avatar_url)
         )
-        retry = backoff.Backoff(max_retries=5)
         error_manager = rest_manager.HikariErrorManager(
-            retry, break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
+            break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
         )
-        async for _ in retry:
-            with error_manager:
-                await ctx.message.respond(embed=embed)
-                break
+        await error_manager.try_respond(ctx, embed=embed)
 
     @help_util.with_parameter_doc(
         "user",
@@ -271,22 +252,17 @@ class UtilComponent(components.Component):
         if user is None:
             user = ctx.message.author
 
-        retry = backoff.Backoff(max_retries=5, maximum=2.0)
         error_manager = rest_manager.HikariErrorManager(
-            retry, break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
+            break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
         )
         avatar = user.avatar_url or user.default_avatar_url
         embed = embeds.Embed(title=str(user), url=str(avatar), colour=constants.embed_colour()).set_image(avatar)
-
-        async for _ in retry:
-            with error_manager:
-                await ctx.message.respond(embed=embed)
-                break
+        await error_manager.try_respond(ctx, embed=embed)
 
     @parsing.with_argument("message_id", (snowflakes.Snowflake,))
     @parsing.with_option("channel_id", "--channel", "-c", converters=(snowflakes.Snowflake,), default=None)
     @parsing.with_parser
-    @components.as_command("mentions")
+    @components.as_command("pings", "mentions")
     async def mentions(
         self,
         ctx: tanjun_traits.Context,
@@ -296,20 +272,19 @@ class UtilComponent(components.Component):
         if channel_id is None:
             channel_id = ctx.message.channel_id
 
+        # TODO: set maximum?
         retry = backoff.Backoff()
-        error_handler = rest_manager.HikariErrorManager(retry).with_rule(
+        error_manager = rest_manager.HikariErrorManager(retry).with_rule(
             (hikari_errors.NotFoundError, hikari_errors.ForbiddenError, hikari_errors.BadRequestError),
-            basic.raise_error("Message not found."),
+            basic_util.raise_error("Message not found."),
         )
         async for _ in retry:
-            with error_handler:
+            with error_manager:
                 message = await ctx.client.rest_service.rest.fetch_message(channel_id, message_id)
                 break
 
-        retry.reset()
-        error_handler.clear_rules(break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError))
-        async for _ in retry:
-            with error_handler:
-                mentions = ", ".join(map(str, message.mentions.users.values())) if message.mentions.users else None
-                await ctx.message.respond(f"Mentions: {mentions}" if mentions else "No mentions.")
-                break
+        error_manager.clear_rules(break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError))
+        mentions = ", ".join(map(str, message.mentions.users.values())) if message.mentions.users else None
+        await error_manager.try_respond(
+            ctx, content=f"Pinging mentions: {mentions}" if mentions else "No pinging mentions."
+        )

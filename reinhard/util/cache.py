@@ -72,7 +72,7 @@ class ExpiringDict(typing.MutableMapping[KeyT, ValueT]):
         /,
         *,
         origin: typing.Union[
-            typing.Mapping[KeyT, typing.Tuple[ValueT, float]], typing.Iterable[KeyT, typing.Tuple[ValueT, float]], None,
+            typing.Mapping[KeyT, typing.Tuple[ValueT, float]], typing.Iterable[KeyT, typing.Tuple[ValueT, float]], None
         ] = None,
     ) -> None:
         self._data = dict(origin) if origin else {}

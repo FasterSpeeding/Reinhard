@@ -7,18 +7,29 @@ import typing
 
 import aiohttp
 from hikari import errors as hikari_errors
+from hikari import undefined
 from tanjun import errors as tanjun_errors
 from yuyo import backoff
+
+if typing.TYPE_CHECKING:
+    from hikari import embeds
+    from tanjun import traits as tanjun_traits
 
 _LOGGER = logging.getLogger("hikari.reinhard.rest_manager")
 
 
 class HikariErrorManager(backoff.ErrorManager):
-    __slots__: typing.Sequence[str] = ("_backoff_handler")
+    __slots__: typing.Sequence[str] = ("_backoff_handler",)
 
     def __init__(
-        self, backoff_handler: backoff.Backoff, /, *, break_on: typing.Iterable[typing.Type[BaseException]] = ()
+        self,
+        backoff_handler: typing.Optional[backoff.Backoff] = None,
+        /,
+        *,
+        break_on: typing.Iterable[typing.Type[BaseException]] = (),
     ) -> None:
+        if backoff_handler is None:
+            backoff_handler = backoff.Backoff(max_retries=5)
         self._backoff_handler = backoff_handler
         super().__init__()
         self.clear_rules(break_on=break_on)
@@ -27,7 +38,8 @@ class HikariErrorManager(backoff.ErrorManager):
         self._backoff_handler.finish()
         return False
 
-    def _on_internal_server_error(self, _: hikari_errors.InternalServerError) -> bool:
+    @staticmethod
+    def _on_internal_server_error(_: hikari_errors.InternalServerError) -> bool:
         return False
 
     def _on_rate_limited_error(self, exception: hikari_errors.RateLimitedError) -> bool:
@@ -45,6 +57,20 @@ class HikariErrorManager(backoff.ErrorManager):
         if break_on := tuple(break_on):
             self.with_rule(break_on, self._on_break_on)
 
+    async def try_respond(
+        self,
+        ctx: tanjun_traits.Context,
+        *,
+        content: undefined.UndefinedOr[str] = undefined.UNDEFINED,
+        embed: undefined.UndefinedOr[embeds.Embed] = undefined.UNDEFINED,
+    ) -> None:
+        self._backoff_handler.reset()
+
+        async for _ in self._backoff_handler:
+            with self:
+                await ctx.message.respond(content=content, embed=embed)
+                break
+
 
 class AIOHTTPStatusHandler(backoff.ErrorManager):
     __slots__: typing.Sequence[str] = ("_backoff_handler", "_break_on", "_on_404")
@@ -55,12 +81,12 @@ class AIOHTTPStatusHandler(backoff.ErrorManager):
         /,
         *,
         break_on: typing.Iterable[int] = (),
-        on_404: typing.Optional[str] = None,
+        on_404: typing.Union[str, typing.Callable[[], None], None] = None,
     ) -> None:
         super().__init__()
         self._backoff_handler = backoff_handler
         self._break_on: typing.AbstractSet[int] = set()
-        self._on_404: typing.Optional[str] = None
+        self._on_404: typing.Union[str, typing.Callable[[], None], None] = None
         self.clear_rules(break_on=break_on, on_404=on_404)
 
     def _on_client_response_error(self, exception: aiohttp.ClientResponseError) -> bool:
@@ -82,11 +108,17 @@ class AIOHTTPStatusHandler(backoff.ErrorManager):
             return False
 
         if self._on_404 is not None and exception.status == 404:
-            raise tanjun_errors.CommandError(self._on_404) from None
+            if isinstance(self._on_404, str):
+                raise tanjun_errors.CommandError(self._on_404) from None
+
+            else:
+                self._on_404()
 
         return True
 
-    def clear_rules(self, *, break_on: typing.Iterable[int] = (), on_404: typing.Optional[str] = None) -> None:
+    def clear_rules(
+        self, *, break_on: typing.Iterable[int] = (), on_404: typing.Union[str, typing.Callable[[], None], None] = None
+    ) -> None:
         super().clear_rules()
         self.with_rule((aiohttp.ClientResponseError,), self._on_client_response_error)
         self._break_on = set(break_on)

@@ -28,7 +28,6 @@ from reinhard.util import rest_manager
 
 if typing.TYPE_CHECKING:
     from hikari import snowflakes
-    from tanjun import context
     from tanjun import traits as tanjun_traits
 
 
@@ -73,7 +72,7 @@ class SudoComponent(components.Component):
 
     @help_util.with_command_doc("Command used for testing the current error handling")
     @components.as_command("error")
-    async def error(self, _: context.Context) -> None:
+    async def error(self, _: tanjun_traits.Context) -> None:
         raise Exception("This is an exception, get used to it.")
 
     @help_util.with_parameter_doc(
@@ -88,7 +87,7 @@ class SudoComponent(components.Component):
     @components.as_command("echo")
     async def echo(
         self,
-        ctx: context.Context,
+        ctx: tanjun_traits.Context,
         content: undefined.UndefinedOr[str],
         raw_embed: undefined.UndefinedOr[typing.Dict[str, typing.Any]] = undefined.UNDEFINED,
     ) -> None:
@@ -105,19 +104,11 @@ class SudoComponent(components.Component):
                     embed.colour = constants.embed_colour()
 
             except (TypeError, ValueError) as exc:
-                async for _ in retry:
-                    with error_manager:
-                        await ctx.message.respond(content=f"Invalid embed passed: {str(exc)[:1970]}")
-                        break
-
+                await error_manager.try_respond(ctx, content=f"Invalid embed passed: {str(exc)[:1970]}")
                 return
 
         if content or embed:
-            retry.reset()
-            async for _ in retry:
-                with error_manager:
-                    await ctx.message.respond(content=content, embed=embed)
-                    break
+            await error_manager.try_respond(ctx, content=content, embed=embed)
 
     @staticmethod
     def _yields_results(*args: io.StringIO) -> typing.Iterator[str]:
@@ -126,7 +117,9 @@ class SudoComponent(components.Component):
             while lines := stream.readlines(25):
                 yield from (line[:-1] for line in lines)
 
-    async def eval_python_code(self, ctx: context.Context, code: str) -> typing.Tuple[typing.Iterable[str], int, bool]:
+    async def eval_python_code(
+        self, ctx: tanjun_traits.Context, code: str
+    ) -> typing.Tuple[typing.Iterable[str], int, bool]:
         globals_ = {"ctx": ctx, "client": self}
         stdout = io.StringIO()
         stderr = io.StringIO()
@@ -157,11 +150,11 @@ class SudoComponent(components.Component):
     )
     @help_util.with_command_doc("Dynamically evaluate a script in the bot's environment.")
     @parsing.with_option(
-        "suppress_response", "--suppress-response", "-s", converters=(bool,), default=False, empty_value=True,
+        "suppress_response", "--suppress-response", "-s", converters=(bool,), default=False, empty_value=True
     )
     @parsing.with_parser
     @components.as_command("eval", "exec", "sudo")
-    async def eval(self, ctx: context.Context, suppress_response: bool = False) -> None:
+    async def eval(self, ctx: tanjun_traits.Context, suppress_response: bool = False) -> None:
         assert ctx.message.content is not None  # This shouldn't ever be the case in a command client.
         code = re.findall(r"```(?:[\w]*\n?)([\s\S(^\\`{3})]*?)\n*```", ctx.message.content)
         if not code:
@@ -189,31 +182,28 @@ class SudoComponent(components.Component):
         self.paginator_pool.add_paginator(message, response_paginator)
 
     @components.as_command("commands")
-    async def commands_command(self, ctx: context.Context) -> None:
+    async def commands_command(self, ctx: tanjun_traits.Context) -> None:
         commands = (
             f"  {type(component).__name__}: " + ", ".join(map(repr, component.commands))
             for component in ctx.client.components
         )
-        retry = backoff.Backoff(max_retries=5)
         error_manager = rest_manager.HikariErrorManager(
-            retry, break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
+            break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
         )
-        async for _ in retry:
-            with error_manager:
-                await ctx.message.respond("Loaded commands\n" + "\n".join(commands))
+        await error_manager.try_respond(ctx, content="Loaded commands\n" + "\n".join(commands))
 
     @components.as_group("note", "notes")
-    async def note(self, ctx: context.Context) -> None:
+    async def note(self, ctx: tanjun_traits.Context) -> None:
         await ctx.message.respond("You have zero tags")
 
     @note.with_command("add")
-    async def note_add(self, ctx: context.Context) -> None:
+    async def note_add(self, ctx: tanjun_traits.Context) -> None:
         await ctx.message.respond("todo")
 
     @note.with_command("remove")
-    async def note_remove(self, ctx: context.Context) -> None:
+    async def note_remove(self, ctx: tanjun_traits.Context) -> None:
         await ctx.message.respond("todo")
 
-    async def steal(self, ctx: context.Context, target: snowflakes.Snowflake, *args: str) -> None:
+    async def steal(self, ctx: tanjun_traits.Context, target: snowflakes.Snowflake, *args: str) -> None:
         # TODO: emoji steal command
         ...

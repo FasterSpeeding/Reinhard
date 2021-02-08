@@ -7,3 +7,5 @@ database:
 tokens:
   bot: "A.DISCORD.TOKEN"
   google: "A.GOOGLE.TOKEN"
+  spotify_id: "aSpotifyId"
+  spotify_secret: "aSpotifySecret"

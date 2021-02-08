@@ -94,15 +94,10 @@ class BasicComponent(components.Component):
             )
         )
 
-        retry = backoff.Backoff(max_retries=5)
-        error_handler = rest_manager.HikariErrorManager(
-            retry, break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
+        error_manager = rest_manager.HikariErrorManager(
+            break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
         )
-
-        async for _ in retry:
-            with error_handler:
-                await ctx.message.respond(embed=embed)
-                break
+        await error_manager.try_respond(ctx, embed=embed)
 
     @help_util.with_command_doc("Get information about the commands in this bot.")
     @parsing.with_option("command_name", "--command", "-c", default=None)
@@ -151,13 +146,13 @@ class BasicComponent(components.Component):
     @components.as_command("ping")
     async def ping(self, ctx: tanjun_traits.Context, /) -> None:
         retry = backoff.Backoff(max_retries=5)
-        error_handler = rest_manager.HikariErrorManager(
+        error_manager = rest_manager.HikariErrorManager(
             retry, break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
         )
         message: typing.Optional[messages.Message] = None
         start_time = 0.0
         async for _ in retry:
-            with error_handler:
+            with error_manager:
                 start_time = time.perf_counter()
                 message = await ctx.message.respond(content="Nyaa master!!!")
                 break
@@ -169,16 +164,16 @@ class BasicComponent(components.Component):
         time_taken = (time.perf_counter() - start_time) * 1_000
         heartbeat_latency = ctx.shard.heartbeat_latency * 1_000
         retry.reset()
-        error_handler.clear_rules(break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError))
+        error_manager.clear_rules(break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError))
         async for _ in retry:
-            with error_handler:
+            with error_manager:
                 await message.edit(f"PONG\n - REST: {time_taken:.0f}ms\n - Gateway: {heartbeat_latency:.0f}ms")
                 break
 
     _about_lines: typing.Sequence[typing.Tuple[str, typing.Callable[[hikari_traits.CacheAware], int]]] = (
         ("Guild channels: {0}", lambda c: len(c.cache.get_guild_channels_view())),
         ("Emojis: {0}", lambda c: len(c.cache.get_emojis_view())),
-        ("Available Guilds: {0}", lambda c: len(c.cache.get_available_guilds_view()),),
+        ("Available Guilds: {0}", lambda c: len(c.cache.get_available_guilds_view())),
         ("Unavailable Guilds: {0}", lambda c: len(c.cache.get_unavailable_guilds_view())),
         ("Invites: {0}", lambda c: len(c.cache.get_invites_view())),
         ("Members: {0}", lambda c: sum(len(record) for record in c.cache.get_members_view().values())),
@@ -235,11 +230,7 @@ class BasicComponent(components.Component):
             )
         )
 
-        retry = backoff.Backoff(max_retries=5)
-        error_handler = rest_manager.HikariErrorManager(
-            retry, break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
+        error_manager = rest_manager.HikariErrorManager(
+            break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
         )
-        async for _ in retry:
-            with error_handler:
-                await ctx.message.respond(f"{storage_time_taken * 1_000:.4g} ms", embed=embed)
-                break
+        await error_manager.try_respond(ctx, content=f"{storage_time_taken * 1_000:.4g} ms", embed=embed)

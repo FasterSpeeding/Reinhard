@@ -3,6 +3,7 @@ from __future__ import annotations
 import typing
 
 import asyncpg
+from hikari import config as hikari_config
 from tanjun import clients
 from tanjun import hooks
 
@@ -67,7 +68,11 @@ def add_components(client: tanjun_traits.Client, /, *, config: typing.Optional[c
     if config is None:
         config = config_.load_config()
 
+    # TODO: add more hikari config to reinhard config
+    http_settings = hikari_config.HTTPSettings()
+    proxy_settings = hikari_config.ProxySettings()
+
     client.add_component(basic.BasicComponent())
-    client.add_component(external.ExternalComponent(google_token=config.tokens.google))
+    client.add_component(external.ExternalComponent(http_settings, proxy_settings, config.tokens))
     client.add_component(sudo.SudoComponent(emoji_guild=config.emoji_guild))
     client.add_component(util.UtilComponent())

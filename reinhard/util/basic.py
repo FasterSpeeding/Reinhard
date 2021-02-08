@@ -15,11 +15,19 @@ def pretify_date(date: datetime.datetime) -> str:
     return date.strftime("%a %d %b %Y %H:%M:%S %Z")
 
 
+class _ErrorRaiserT(typing.Protocol):
+    def __call__(self, arg: typing.Any = None, /) -> typing.NoReturn:
+        raise NotImplementedError
+
+
 def raise_error(
     message: typing.Optional[str], /, error_type: typing.Type[BaseException] = errors.CommandError
-) -> typing.Callable[[typing.Any], typing.NoReturn]:
-    def raise_command_error_(_: typing.Any) -> typing.NoReturn:
-        raise error_type(message) from None
+) -> _ErrorRaiserT:  # TODO: better typing for the callable return
+    def raise_command_error_(_: typing.Any = None) -> typing.NoReturn:
+        if message:
+            raise error_type(message) from None
+
+        raise error_type from None
 
     return raise_command_error_
 
@@ -52,6 +60,7 @@ class CommandErrorRelay:
             ) from None  # f"{exc_type.__name__}: {exc_val}"
 
 
+# TODO: fix typing
 def command_error_relay(
     errors_: typing.Union[BaseException, typing.Tuple[typing.Type[BaseException], ...]],
     errors_responses: typing.Optional[typing.MutableMapping[typing.Type[BaseException], str]] = None,

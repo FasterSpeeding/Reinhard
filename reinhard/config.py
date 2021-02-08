@@ -11,10 +11,18 @@ import typing
 import yaml
 from hikari import snowflakes
 
-if typing.TYPE_CHECKING:
-    from hikari.impl import bot
-
 ConfigT = typing.TypeVar("ConfigT", bound="Config")
+DefaultT = typing.TypeVar("DefaultT")
+ValueT = typing.TypeVar("ValueT")
+
+
+def _cast_or_default(
+    data: typing.Mapping[typing.Any, typing.Any],
+    key: str,
+    cast: typing.Callable[[typing.Any], ValueT],
+    default: DefaultT,
+) -> typing.Union[ValueT, DefaultT]:
+    return cast(data[key]) if key in data else default
 
 
 class Config(abc.ABC):
@@ -49,26 +57,37 @@ class DatabaseConfig(Config):
     def from_mapping(cls, mapping: typing.Mapping[str, typing.Any], /) -> DatabaseConfig:
         return cls(
             str(mapping["password"]),
-            database=str(mapping["database"]) if "database" in mapping else "postgres",
-            host=str(mapping["host"]) if "host" in mapping else "localhost",
-            port=int(mapping["port"]) if "port" in mapping else 5432,
-            user=str(mapping["user"]) if "user" in mapping else "postgres",
+            database=_cast_or_default(mapping, "database", str, "postgres"),
+            host=_cast_or_default(mapping, "host", str, "localhost"),
+            port=_cast_or_default(mapping, "port", int, 5432),
+            user=_cast_or_default(mapping, "user", str, "postgres"),
         )
 
 
 class Tokens(Config):
-    __slots__: typing.Sequence[str] = (
-        "bot",
-        "google",
-    )
+    __slots__: typing.Sequence[str] = ("bot", "google", "spotify_id", "spotify_secret")
 
-    def __init__(self, bot: str, *, google: typing.Optional[str] = None) -> None:
+    def __init__(
+        self,
+        bot: str,
+        *,
+        google: typing.Optional[str] = None,
+        spotify_id: typing.Optional[str] = None,
+        spotify_secret: typing.Optional[str] = None,
+    ) -> None:
         self.bot = bot
         self.google = google
+        self.spotify_id = spotify_id
+        self.spotify_secret = spotify_secret
 
     @classmethod
     def from_mapping(cls, mapping: typing.Mapping[str, typing.Any], /) -> Tokens:
-        return cls(bot=str(mapping["bot"]), google=str(mapping["google"]) if "google" in mapping else None)
+        return cls(
+            bot=str(mapping["bot"]),
+            google=_cast_or_default(mapping, "google", str, None),
+            spotify_id=_cast_or_default(mapping, "spotify_id", str, None),
+            spotify_secret=_cast_or_default(mapping, "spotify_secret", str, None),
+        )
 
 
 class FullConfig(Config):
@@ -79,7 +98,7 @@ class FullConfig(Config):
         *,
         database: DatabaseConfig,
         emoji_guild: typing.Optional[snowflakes.Snowflake] = None,
-        log_level: bot.LoggerLevelT = logging.INFO,
+        log_level: typing.Union[None, int, str, typing.Dict[str, typing.Any]] = logging.INFO,
         prefixes: typing.Iterable[str] = ("r.",),
         tokens: Tokens,
     ) -> None:
@@ -97,7 +116,7 @@ class FullConfig(Config):
 
         return cls(
             database=DatabaseConfig.from_mapping(mapping["database"]),
-            emoji_guild=snowflakes.Snowflake(mapping["emoji_guild"]) if "emoji_guild" in mapping else None,
+            emoji_guild=_cast_or_default(mapping, "emoji_guild", snowflakes.Snowflake, None),
             log_level=log_level,
             prefixes=list(map(str, mapping["prefixes"])) if "prefixes" in mapping else ("r.",),
             tokens=Tokens.from_mapping(mapping["tokens"]),
