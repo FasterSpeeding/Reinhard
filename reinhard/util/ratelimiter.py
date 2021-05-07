@@ -6,7 +6,7 @@ import difflib
 import typing
 
 # from . import cache
-from reinhard.util import cache
+from ..util import cache
 
 if typing.TYPE_CHECKING:
     from hikari import messages

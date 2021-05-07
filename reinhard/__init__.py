@@ -4,7 +4,7 @@ import typing
 
 from tanjun import clients
 
-from reinhard import client as reinhard_client
+from . import client as reinhard_client
 
 if typing.TYPE_CHECKING:
     from tanjun import traits as tanjun_traits

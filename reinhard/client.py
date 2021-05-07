@@ -7,13 +7,14 @@ from hikari import config as hikari_config
 from tanjun import clients
 from tanjun import hooks
 
-from reinhard import config as config_
-from reinhard import sql
-from reinhard.components import basic
-from reinhard.components import external
-from reinhard.components import sudo
-from reinhard.components import util
-from reinhard.util import command_hooks
+from . import config as config_
+from . import sql
+from .components import basic
+from .components import external
+from .components import moderation
+from .components import sudo
+from .components import util
+from .util import command_hooks
 
 if typing.TYPE_CHECKING:
     from hikari import traits as hikari_traits
@@ -37,6 +38,7 @@ class Client(clients.Client):
         database: str,
         port: int,
         prefixes: typing.Optional[typing.Iterable[str]] = None,
+        mention_prefix: bool = True,
     ) -> None:
         super().__init__(
             dispatch,
@@ -45,6 +47,7 @@ class Client(clients.Client):
             cache,
             hooks=hooks.Hooks(parser_error=command_hooks.on_parser_error, on_error=command_hooks.on_error),
             prefixes=prefixes,
+            mention_prefix=mention_prefix,
         )
         self._password = password
         self._host = host
@@ -74,5 +77,32 @@ def add_components(client: tanjun_traits.Client, /, *, config: typing.Optional[c
 
     client.add_component(basic.BasicComponent())
     client.add_component(external.ExternalComponent(http_settings, proxy_settings, config.tokens))
+    client.add_component(moderation.ModerationComponent())
     client.add_component(sudo.SudoComponent(emoji_guild=config.emoji_guild))
     client.add_component(util.UtilComponent())
+
+
+def build(*args: typing.Any) -> hikari_traits.BotAware:
+    from hikari import intents as intents_  # TODO: handle intents in config
+    from hikari.impl import bot as bot_module
+
+    config = config_.load_config()
+    bot = bot_module.BotApp(
+        config.tokens.bot,
+        logs=config.log_level,
+        intents=intents_.Intents.ALL,
+        # rest_url="https://staging.discord.co/api/v8"
+    )
+    client = Client(
+        bot,
+        password=config.database.password,
+        host=config.database.host,
+        user=config.database.user,
+        database=config.database.database,
+        port=config.database.port,
+        prefixes=config.prefixes,
+        mention_prefix=False,
+    )
+    client.metadata["args"] = args
+    add_components(client, config=config)
+    return bot

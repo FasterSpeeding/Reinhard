@@ -16,11 +16,11 @@ from tanjun import parsing
 from tanjun import traits as tanjun_traits
 from yuyo import backoff
 
-from reinhard.util import basic as basic_util
-from reinhard.util import constants
-from reinhard.util import conversion
-from reinhard.util import help as help_util
-from reinhard.util import rest_manager
+from ..util import basic as basic_util
+from ..util import constants
+from ..util import conversion
+from ..util import help as help_util
+from ..util import rest_manager
 
 
 @help_util.with_component_doc("Component used for getting miscellaneous Discord information.")
@@ -92,7 +92,7 @@ class UtilComponent(components.Component):
         "If not supplied then this command will target the member triggering it.",
     )
     @help_util.with_command_doc("Get information about a member in the current guild.")
-    @parsing.with_greedy_argument("member", converters=(conversion.RESTFulMemberConverter,), default=None)
+    @parsing.with_greedy_argument("member", converters=conversion.RESTFulMemberConverter, default=None)
     @parsing.with_parser
     @components.as_command("member", checks=[lambda ctx: ctx.message.guild_id is not None])
     async def member(self, ctx: tanjun_traits.Context, member: typing.Union[guilds.Member, None]) -> None:
@@ -173,7 +173,7 @@ class UtilComponent(components.Component):
 
     @help_util.with_parameter_doc("role", "The required argument of a role ID.")
     @help_util.with_command_doc("Get information about a role in the current guild.")
-    @parsing.with_argument("role", converters=(conversion.RESTFulRoleConverter,))
+    @parsing.with_argument("role", converters=conversion.RESTFulRoleConverter)
     @parsing.with_parser
     @components.as_command("role", checks=[lambda ctx: ctx.message.guild_id is not None])
     async def role(self, ctx: tanjun_traits.Context, role: guilds.Role) -> None:
@@ -248,7 +248,6 @@ class UtilComponent(components.Component):
     @parsing.with_parser
     @components.as_command("avatar", "pfp")
     async def avatar(self, ctx: tanjun_traits.Context, user: typing.Union[users.User, None]) -> None:
-
         if user is None:
             user = ctx.message.author
 
@@ -260,7 +259,7 @@ class UtilComponent(components.Component):
         await error_manager.try_respond(ctx, embed=embed)
 
     @parsing.with_argument("message_id", (snowflakes.Snowflake,))
-    @parsing.with_option("channel_id", "--channel", "-c", converters=(snowflakes.Snowflake,), default=None)
+    @parsing.with_option("channel_id", "--channel", "-c", converters=snowflakes.Snowflake, default=None)
     @parsing.with_parser
     @components.as_command("pings", "mentions")
     async def mentions(
@@ -288,3 +287,20 @@ class UtilComponent(components.Component):
         await error_manager.try_respond(
             ctx, content=f"Pinging mentions: {mentions}" if mentions else "No pinging mentions."
         )
+
+    @parsing.with_greedy_argument("name")
+    @parsing.with_parser
+    @components.as_command("members")
+    async def members(self, ctx: tanjun_traits.Context, name: str) -> None:
+        assert ctx.guild_id is not None
+        members = await ctx.client.rest_service.rest.search_members(ctx.guild_id, name)
+
+        if members:
+            content = "Similar members:\n" + "\n".join(
+                f"* {member.username} ({member.nickname})" if member.nickname else member.username for member in members
+            )
+
+        else:
+            content = "No similar members found"
+
+        await rest_manager.HikariErrorManager().try_respond(ctx, content=content)

@@ -21,9 +21,9 @@ from tanjun import parsing
 from yuyo import backoff
 from yuyo import paginaton
 
-from reinhard.util import constants
-from reinhard.util import help as help_util
-from reinhard.util import rest_manager
+from ..util import constants
+from ..util import help as help_util
+from ..util import rest_manager
 
 if typing.TYPE_CHECKING:
     from hikari import messages

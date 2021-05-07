@@ -25,8 +25,8 @@ from tanjun import conversion
 from tanjun.conversion import *
 from yuyo import backoff
 
-from reinhard.util import basic
-from reinhard.util import rest_manager
+from ..util import basic
+from ..util import rest_manager
 
 if typing.TYPE_CHECKING:
     from hikari import guilds

@@ -2,18 +2,23 @@ from __future__ import annotations
 
 __all__: typing.Sequence[str] = ["SudoComponent"]
 
+import ast
 import asyncio
 import contextlib
+import inspect
 import io
 import json
 import re
-import textwrap
 import time
 import traceback
 import typing
+from builtins import str
 
+import hikari
 from hikari import embeds
+from hikari import emojis
 from hikari import errors as hikari_errors
+from hikari import snowflakes
 from hikari import undefined
 from tanjun import checks as checks_
 from tanjun import components
@@ -22,12 +27,12 @@ from tanjun import parsing
 from yuyo import backoff
 from yuyo import paginaton
 
-from reinhard.util import constants
-from reinhard.util import help as help_util
-from reinhard.util import rest_manager
+from ..util import constants
+from ..util import help as help_util
+from ..util import rest_manager
 
 if typing.TYPE_CHECKING:
-    from hikari import snowflakes
+    from hikari import messages
     from tanjun import traits as tanjun_traits
 
 
@@ -79,9 +84,7 @@ class SudoComponent(components.Component):
         "--embed | -e", "An optional argument used to specify the json of a embed for the bot to send."
     )
     @help_util.with_command_doc("Command used for getting the bot to mirror a response.")
-    @parsing.with_option(
-        "raw_embed", "--embed", "-e", converters=(json.loads,), default=undefined.UNDEFINED, empty_value={}
-    )
+    @parsing.with_option("raw_embed", "--embed", "-e", converters=json.loads, default=undefined.UNDEFINED)
     @parsing.with_greedy_argument("content", default=undefined.UNDEFINED)
     @parsing.with_parser
     @components.as_command("echo")
@@ -89,7 +92,7 @@ class SudoComponent(components.Component):
         self,
         ctx: tanjun_traits.Context,
         content: undefined.UndefinedOr[str],
-        raw_embed: undefined.UndefinedOr[typing.Dict[str, typing.Any]] = undefined.UNDEFINED,
+        raw_embed: undefined.UndefinedOr[typing.Dict[str, typing.Any]],
     ) -> None:
         embed: undefined.UndefinedOr[embeds.Embed] = undefined.UNDEFINED
         retry = backoff.Backoff(max_retries=5)
@@ -100,7 +103,7 @@ class SudoComponent(components.Component):
             try:
                 embed = ctx.client.rest_service.entity_factory.deserialize_embed(raw_embed)
 
-                if not embed.colour:
+                if embed.colour is None:
                     embed.colour = constants.embed_colour()
 
             except (TypeError, ValueError) as exc:
@@ -120,7 +123,14 @@ class SudoComponent(components.Component):
     async def eval_python_code(
         self, ctx: tanjun_traits.Context, code: str
     ) -> typing.Tuple[typing.Iterable[str], int, bool]:
-        globals_ = {"ctx": ctx, "client": self}
+        globals_ = {
+            "asyncio": asyncio,
+            "app": ctx.client.rest_service,
+            "client": self.client,
+            "component": self,
+            "ctx": ctx,
+            "hikari": hikari,
+        }
         stdout = io.StringIO()
         stderr = io.StringIO()
         # contextlib.redirect_xxxxx doesn't work properly with contextlib.ExitStack
@@ -128,11 +138,12 @@ class SudoComponent(components.Component):
             with contextlib.redirect_stderr(stderr):
                 start_time = time.perf_counter()
                 try:
-                    exec(f"async def __callable__(ctx):\n{textwrap.indent(code, '   ')}", globals_)
-                    callback = typing.cast(CallbackT, globals_["__callable__"])
+                    compiled_code = compile(code, "", "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
+                    if compiled_code.co_flags & inspect.CO_COROUTINE:
+                        await eval(compiled_code, globals_)
 
-                    if asyncio.iscoroutine(result := await callback(ctx)):
-                        await result
+                    else:
+                        eval(compiled_code, globals_)
 
                     failed = False
                 except BaseException:
@@ -146,12 +157,10 @@ class SudoComponent(components.Component):
         return self._yields_results(stdout, stderr), exec_time, failed
 
     @help_util.with_parameter_doc(
-        "--suppress-response | -s", "A optional argument used to disable the bot's post-eval response."
+        "--suppress | -s", "A optional argument used to disable the bot's post-eval response."
     )
     @help_util.with_command_doc("Dynamically evaluate a script in the bot's environment.")
-    @parsing.with_option(
-        "suppress_response", "--suppress-response", "-s", converters=(bool,), default=False, empty_value=True
-    )
+    @parsing.with_option("suppress_response", "-s", "--suppress", converters=bool, default=False, empty_value=True)
     @parsing.with_parser
     @components.as_command("eval", "exec", "sudo")
     async def eval(self, ctx: tanjun_traits.Context, suppress_response: bool = False) -> None:

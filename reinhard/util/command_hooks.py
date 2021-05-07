@@ -7,8 +7,8 @@ from hikari import errors as hikari_errors
 from tanjun import errors as tanjun_errors
 from yuyo import backoff
 
-from reinhard.util import constants
-from reinhard.util import rest_manager
+from ..util import constants
+from ..util import rest_manager
 
 if typing.TYPE_CHECKING:
     from tanjun import traits

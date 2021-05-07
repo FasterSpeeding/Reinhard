@@ -2,12 +2,14 @@ from __future__ import annotations
 
 __all__: typing.Sequence[str] = ["ExternalComponent"]
 
+import datetime
 import html
 import logging
 import time
 import typing
 
 import aiohttp
+import sphobjinv
 from hikari import embeds
 from hikari import errors as hikari_errors
 from hikari import undefined
@@ -18,16 +20,19 @@ from tanjun import parsing
 from yuyo import backoff
 from yuyo import paginaton
 
-from reinhard.util import basic as basic_util
-from reinhard.util import constants
-from reinhard.util import help as help_util
-from reinhard.util import rest_manager
+from ..util import basic as basic_util
+from ..util import constants
+from ..util import help as help_util
+from ..util import rest_manager
 
 if typing.TYPE_CHECKING:
+    from hikari import channels
     from hikari import config as hikari_config
     from tanjun import traits as tanjun_traits
 
-    from reinhard import config
+    from .. import config
+
+_ValueT = typing.TypeVar("_ValueT")
 
 YOUTUBE_TYPES = {
     "youtube#video": ("videoId", "https://youtube.com/watch?v="),
@@ -39,6 +44,7 @@ RETRY_AFTER_HEADER = "Retry-After"
 USER_AGENT_HEADER = "User-Agent"
 _LOGGER = logging.getLogger("hikari.reinhard.external")
 SPOTIFY_RESOURCE_TYPES = ("track", "album", "artist", "playlist")
+HIKARI_IO = "https://hikari-py.github.io/hikari"
 
 
 def create_client_session(
@@ -191,18 +197,18 @@ class SpotifyPaginator(typing.AsyncIterator[typing.Tuple[str, undefined.Undefine
 
 
 class ClientCredentialsOauth2:
-    __slots__: typing.Sequence[str] = ("_authorization", "_expire", "_path", "_prefix", "_token")
+    __slots__: typing.Sequence[str] = ("_authorization", "_expire_at", "_path", "_prefix", "_token")
 
     def __init__(self, path: str, client_id: str, client_secret: str, *, prefix: str = "Bearer ") -> None:
         self._authorization = aiohttp.BasicAuth(client_id, client_secret)
-        self._expire = 0
+        self._expire_at = 0
         self._path = path
         self._prefix = prefix
         self._token: typing.Optional[str] = None
 
     @property
     def _expired(self) -> bool:
-        return time.time() >= self._expire
+        return time.time() >= self._expire_at
 
     async def acquire_token(self, session: aiohttp.ClientSession) -> str:
         if self._token and not self._expired:
@@ -225,7 +231,7 @@ class ClientCredentialsOauth2:
                 )
 
             else:
-                self._expire = expire
+                self._expire_at = expire
                 self._token = f"{self._prefix} {token}"
                 return self._token
 
@@ -238,12 +244,56 @@ class ClientCredentialsOauth2:
         raise tanjun_errors.CommandError("Couldn't authenticate")
 
 
+class CachedResource(typing.Generic[_ValueT]):
+    __slots__: typing.Sequence[str] = (
+        "_authorization",
+        "_data",
+        "_expire_after",
+        "_headers",
+        "_parse_data",
+        "_path",
+        "_time",
+    )
+
+    def __init__(
+        self,
+        path: str,
+        expire_after: datetime.timedelta,
+        parse_data: typing.Callable[[bytes], _ValueT],
+        *,
+        authorization: typing.Optional[aiohttp.BasicAuth] = None,
+        headers: typing.Optional[typing.Dict[str, typing.Any]] = None,
+    ) -> None:
+        self._authorization = authorization
+        self._data: typing.Optional[_ValueT] = None
+        self._expire_after = expire_after.total_seconds()
+        self._headers = headers
+        self._parse_data = parse_data
+        self._path = path
+        self._time = 0.0
+
+    @property
+    def _expired(self) -> bool:
+        return time.perf_counter() - self._time >= self._expire_after
+
+    async def acquire_resource(self, session: aiohttp.ClientSession) -> _ValueT:
+        if self._data and not self._expired:
+            return self._data
+
+        response = await session.get(self._path)
+        # TODO: better handling
+        response.raise_for_status()
+        self._data = self._parse_data(await response.read())
+        return self._data
+
+
 @help_util.with_component_name("External Component")
 @help_util.with_component_doc("A utility used for getting data from 3rd party APIs.")
 class ExternalComponent(components.Component):
     __slots__: typing.Sequence[str] = (
         "_client_session",
         "_connector_factory",
+        "_doc_fetcher",
         "_http_settings",
         "paginator_pool",
         "proxy_setting",
@@ -262,6 +312,9 @@ class ExternalComponent(components.Component):
         super().__init__(hooks=hooks)
         self._client_session: typing.Optional[aiohttp.ClientSession] = None
         self._connector_factory = rest_impl.BasicLazyCachedTCPConnectorFactory(http_settings)
+        self._doc_fetcher = CachedResource(
+            HIKARI_IO + "/objects.inv", datetime.timedelta(hours=12), sphobjinv.Inventory
+        )
         self._http_settings = http_settings
         self._proxy_settings = proxy_settings
         self.paginator_pool: typing.Optional[paginaton.PaginatorPool] = None
@@ -274,12 +327,6 @@ class ExternalComponent(components.Component):
 
         self._tokens = tokens
         self.user_agent = ""
-        youtube_command = next(filter(lambda command: "youtube" in command.names, self.commands))
-        youtube_command.add_check(
-            lambda _: bool(self._tokens.google),
-        )
-        spotify_command = next(filter(lambda command: "spotify" in command.names, self.commands))
-        spotify_command.add_check(lambda _: bool(self._spotify_auth))
 
     def _acquire_session(self) -> aiohttp.ClientSession:
         if self._client_session is None:
@@ -405,11 +452,11 @@ class ExternalComponent(components.Component):
         self.paginator_pool.add_paginator(message, response_paginator)
 
     @help_util.with_command_doc("Get a youtube video.")
-    @parsing.with_option("safe_search", "--safe", "-s", "--safe-search", converters=(bool,), default=None)
+    @parsing.with_option("safe_search", "--safe", "-s", "--safe-search", converters=bool, default=None)
     @parsing.with_option("order", "-o", "--order", default="relevance")
     @parsing.with_option("language", "-l", "--language", default=None)
     @parsing.with_option("region", "-r", "--region", default=None)
-    @parsing.with_option("resource_type", "-rt", "--type", "-t", "--resource-type", default="video")
+    @parsing.with_option("resource_type", "--type", "-t", default="video")
     @parsing.with_greedy_argument("query")
     @parsing.with_parser
     @components.as_command("youtube", "yt")
@@ -424,7 +471,19 @@ class ExternalComponent(components.Component):
         safe_search: typing.Optional[bool],
     ) -> None:
         if safe_search is not False:
-            ...
+            channel: typing.Optional[channels.GuildChannel] = None
+
+            if ctx.client.cache_service:
+                channel = ctx.client.cache_service.cache.get_guild_channel(ctx.message.channel_id)
+
+            if not channel:
+                raise NotImplementedError  # TODO: LOL!!!
+
+            if safe_search is None:
+                safe_search = not channel.is_nsfw
+
+            elif not safe_search and not channel.is_nsfw:
+                raise tanjun_errors.CommandError("Cannot disable safe search in a sfw channel")
 
         resource_type = resource_type.lower()
         if resource_type not in ("channel", "playlist", "video"):
@@ -476,6 +535,10 @@ class ExternalComponent(components.Component):
         else:
             assert self.paginator_pool is not None
             self.paginator_pool.add_paginator(message, response_paginator)
+
+    @youtube.with_check
+    def _youtube_token_check(self, _: tanjun_traits.Context) -> bool:
+        return self._tokens.google is not None
 
     # This API is currently dead (always returning 5xxs)
     # @help_util.with_parameter_doc("--source | -s", "The optional argument of a show's title.")
@@ -546,16 +609,14 @@ class ExternalComponent(components.Component):
             ) from None
 
         if status_code >= 300:
-            raise tanjun_errors.CommandError(
-                f"Unable to fetch image due to unexpected error {data.get('msg', '')}"
-            ) from None
+            raise tanjun_errors.CommandError(f"Unable to fetch image due to unexpected error {status_code}") from None
 
         result = data[response_key]
         assert isinstance(result, str)
         return result
 
     # TODO: add valid options for Options maybe?
-    @parsing.with_option("resource_type", "-rt", "--type", "-t", "--resource-type", default="track")
+    @parsing.with_option("resource_type", "--type", "-t", default="track")
     @parsing.with_greedy_argument("query")
     @parsing.with_parser
     @components.as_command("spotify")
@@ -595,3 +656,37 @@ class ExternalComponent(components.Component):
         else:
             assert self.paginator_pool is not None
             self.paginator_pool.add_paginator(message, response_paginator)
+
+    @spotify.with_check
+    def _spotify_authentication_check(self, _: tanjun_traits.Context) -> bool:
+        return self._spotify_auth is not None
+
+    @parsing.with_greedy_argument("path", default=None)
+    @parsing.with_parser
+    @components.as_command("docs")
+    async def docs(self, ctx: tanjun_traits.Context, path: typing.Optional[str]) -> None:
+        error_manager = rest_manager.HikariErrorManager(
+            break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
+        )
+
+        if not path:
+            await error_manager.try_respond(ctx, content=HIKARI_IO + "/hikari/index.html")
+
+        else:
+            path = path.replace(" ", "_")
+            inventory = await self._doc_fetcher.acquire_resource(self._acquire_session())
+            description: typing.List[str] = []
+            # TODO: this line blocks for 2 seconds
+            entries: typing.Iterator[typing.Tuple[str, int, int]] = iter(
+                inventory.suggest(path, thresh=70, with_index=True, with_score=True)
+            )
+
+            for result, _ in zip(entries, range(10)):
+                sphinx_object: sphobjinv.DataObjStr = inventory.objects[result[2]]
+                description.append(f"[{sphinx_object.name}]({HIKARI_IO}/{sphinx_object.uri_expanded})")
+
+            embed = embeds.Embed(
+                description="\n".join(description) if description else "No results found.",
+                color=constants.embed_colour(),
+            )
+            await error_manager.try_respond(ctx, embed=embed)

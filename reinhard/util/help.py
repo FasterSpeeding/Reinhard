@@ -16,7 +16,7 @@ import typing
 from hikari import embeds as embeds_
 from yuyo import paginaton
 
-from reinhard.util import constants
+from ..util import constants
 
 if typing.TYPE_CHECKING:
     from tanjun import traits
