@@ -1,7 +1,7 @@
 asyncpg==0.20.0
 sphobjinv==2.0.1
 python-Levenshtein==0.12.2
-psutil==5.7.0
+psutil==5.8.0
 pyyaml==5.3
 hikari-tanjun~=1.0.1a3
 hikari-yuyo~=0.0.3.a2
