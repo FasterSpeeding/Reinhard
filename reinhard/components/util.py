@@ -108,7 +108,7 @@ class UtilComponent(components.Component):
         )
         async for _ in retry:
             with error_manager:
-                guild = await ctx.client.rest_service.rest.fetch_guild(guild=ctx.message.guild_id)
+                guild = await ctx.rest_service.rest.fetch_guild(guild=ctx.message.guild_id)
                 break
 
         else:
@@ -280,7 +280,7 @@ class UtilComponent(components.Component):
         )
         async for _ in retry:
             with error_manager:
-                message = await ctx.client.rest_service.rest.fetch_message(channel_id, message_id)
+                message = await ctx.rest_service.rest.fetch_message(channel_id, message_id)
                 break
 
         error_manager.clear_rules(break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError))
@@ -294,7 +294,7 @@ class UtilComponent(components.Component):
     @components.as_command("members")
     async def members(self, ctx: tanjun_traits.Context, name: str) -> None:
         assert ctx.message.guild_id is not None
-        members = await ctx.client.rest_service.rest.search_members(ctx.message.guild_id, name)
+        members = await ctx.rest_service.rest.search_members(ctx.message.guild_id, name)
 
         if members:
             content = "Similar members:\n" + "\n".join(

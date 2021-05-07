@@ -75,7 +75,7 @@ class ModerationComponent(components.Component):
         if not before and not after:
             before = ctx.message.id
 
-        iterator = ctx.client.rest_service.rest.fetch_messages(
+        iterator = ctx.rest_service.rest.fetch_messages(
             ctx.message.channel_id,
             before=before or undefined.UNDEFINED,
             after=(after or undefined.UNDEFINED) if before is None else undefined.UNDEFINED,
@@ -109,7 +109,7 @@ class ModerationComponent(components.Component):
             async for messages in iterator:
                 retry.reset()
                 async for _ in retry:
-                    await ctx.client.rest_service.rest.delete_messages(ctx.message.channel_id, *messages)
+                    await ctx.rest_service.rest.delete_messages(ctx.message.channel_id, *messages)
                     break
 
         if not suppress:

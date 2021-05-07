@@ -101,7 +101,7 @@ class SudoComponent(components.Component):
         )
         if raw_embed is not undefined.UNDEFINED:
             try:
-                embed = ctx.client.rest_service.entity_factory.deserialize_embed(raw_embed)
+                embed = ctx.rest_service.entity_factory.deserialize_embed(raw_embed)
 
                 if embed.colour is None:
                     embed.colour = constants.embed_colour()
@@ -125,7 +125,7 @@ class SudoComponent(components.Component):
     ) -> typing.Tuple[typing.Iterable[str], int, bool]:
         globals_ = {
             "asyncio": asyncio,
-            "app": ctx.client.rest_service,
+            "app": ctx.rest_service,
             "client": self.client,
             "component": self,
             "ctx": ctx,
@@ -185,7 +185,7 @@ class SudoComponent(components.Component):
             async for text, page in string_paginator
         )
         response_paginator = paginaton.Paginator(
-            ctx.client.rest_service, ctx.message.channel_id, embed_generator, authors=[ctx.message.author.id]
+            ctx.rest_service, ctx.message.channel_id, embed_generator, authors=[ctx.message.author.id]
         )
         message = await response_paginator.open()
         self.paginator_pool.add_paginator(message, response_paginator)

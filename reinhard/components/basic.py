@@ -78,7 +78,7 @@ class BasicComponent(components.Component):
         embed = (
             embeds_.Embed(description=description, colour=constants.embed_colour())
             .set_author(
-                name=f"Reinhard: Shard {ctx.shard.id} of {ctx.client.shard_service.shard_count}",
+                name=f"Reinhard: Shard {ctx.shard.id} of {ctx.shard_service.shard_count}",
                 icon=avatar,
                 url=hikari_url,
             )
@@ -137,7 +137,7 @@ class BasicComponent(components.Component):
             )
 
         paginator = paginaton.Paginator(
-            ctx.client.rest_service, ctx.message.channel_id, embed_generator, authors=(ctx.message.author,)
+            ctx.rest_service, ctx.message.channel_id, embed_generator, authors=(ctx.message.author,)
         )
         message = await paginator.open()
         self.paginator_pool.add_paginator(message, paginator)
@@ -184,10 +184,10 @@ class BasicComponent(components.Component):
         ("Voice states: {0}", lambda c: sum(len(record) for record in c.cache.get_voice_states_view().values())),
     )
 
-    @components.as_command("cache", checks=(lambda ctx: bool(ctx.client.cache_service),))
+    @components.as_command("cache", checks=(lambda ctx: bool(ctx.cache_service),))
     async def cache(self, ctx: tanjun_traits.Context) -> None:
         """Get general information about this bot."""
-        assert ctx.client.cache_service  # this is asserted by a check
+        assert ctx.cache_service  # this is asserted by a check
         start_date = datetime.datetime.fromtimestamp(self.process.create_time())
         uptime = datetime.datetime.now() - start_date
         memory_usage = self.process.memory_full_info().uss / 1024 ** 2
@@ -199,7 +199,7 @@ class BasicComponent(components.Component):
         storage_start_time = time.perf_counter()
         for line_template, callback in self._about_lines:
             line_start_time = time.perf_counter()
-            line = line_template.format(callback(ctx.client.cache_service))
+            line = line_template.format(callback(ctx.cache_service))
             cache_stats_lines.append((line, (time.perf_counter() - line_start_time) * 1_000))
 
         storage_time_taken = time.perf_counter() - storage_start_time
@@ -212,7 +212,7 @@ class BasicComponent(components.Component):
         )
 
         # TODO: try cache first + backoff
-        avatar = (await ctx.client.rest_service.rest.fetch_my_user()).avatar_url
+        avatar = (await ctx.rest_service.rest.fetch_my_user()).avatar_url
 
         embed = (
             embeds_.Embed(description="An experimental pythonic Hikari bot.", color=0x55CDFC)

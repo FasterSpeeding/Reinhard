@@ -10,6 +10,7 @@ import typing
 
 import aiohttp
 import sphobjinv  # type: ignore[import]
+from hikari import channels
 from hikari import embeds
 from hikari import errors as hikari_errors
 from hikari import undefined
@@ -26,7 +27,6 @@ from ..util import help as help_util
 from ..util import rest_manager
 
 if typing.TYPE_CHECKING:
-    from hikari import channels
     from hikari import config as hikari_config
     from tanjun import traits as tanjun_traits
 
@@ -435,7 +435,7 @@ class ExternalComponent(components.Component):
             async for page, index in paginaton.string_paginator(iter(data["content"].splitlines() or ["..."]))
         )
         response_paginator = paginaton.Paginator(
-            ctx.client.rest_service,
+            ctx.rest_service,
             ctx.message.channel_id,
             pages,
             authors=(ctx.message.author.id,),
@@ -473,11 +473,14 @@ class ExternalComponent(components.Component):
         if safe_search is not False:
             channel: typing.Optional[channels.GuildChannel] = None
 
-            if ctx.client.cache_service:
-                channel = ctx.client.cache_service.cache.get_guild_channel(ctx.message.channel_id)
+            if ctx.cache_service:
+                channel = ctx.cache_service.cache.get_guild_channel(ctx.message.channel_id)
 
             if not channel:
-                raise NotImplementedError  # TODO: LOL!!!
+                # TODO: handle retires
+                result = await ctx.rest_service.rest.fetch_channel(ctx.message.channel_id)
+                assert isinstance(result, channels.GuildChannel)
+                channel = result
 
             if safe_search is None:
                 safe_search = not channel.is_nsfw
@@ -507,7 +510,7 @@ class ExternalComponent(components.Component):
             parameters["relevanceLanguage"] = language
 
         response_paginator = paginaton.Paginator(
-            ctx.client.rest_service,
+            ctx.rest_service,
             ctx.message.channel_id,
             YoutubePaginator(self._acquire_session, parameters),
             authors=[ctx.message.author.id],
@@ -628,7 +631,7 @@ class ExternalComponent(components.Component):
             raise tanjun_errors.CommandError(f"{resource_type!r} is not a valid resource type")
 
         response_paginator = paginaton.Paginator(
-            ctx.client.rest_service,
+            ctx.rest_service,
             ctx.message.channel_id,
             SpotifyPaginator(
                 self._spotify_auth.acquire_token, self._acquire_session, {"query": query, "type": resource_type}

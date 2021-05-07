@@ -75,11 +75,11 @@ class RESTFulMemberConverter(MemberConverter):
             with error_manager:
                 # Get by ID if we were provided a valid ID.
                 if member_id is not None:
-                    return await ctx.client.rest_service.rest.fetch_member(ctx.message.guild_id, member_id)
+                    return await ctx.rest_service.rest.fetch_member(ctx.message.guild_id, member_id)
 
                 # Else get by username/nickname.
                 else:
-                    return (await ctx.client.rest_service.rest.search_members(ctx.message.guild_id, argument))[0]
+                    return (await ctx.rest_service.rest.search_members(ctx.message.guild_id, argument))[0]
 
         else:
             raise ValueError("Couldn't get member in time") from None
@@ -133,7 +133,7 @@ class RESTFulRoleConverter(RoleConverter):
 
         async for _ in retry:
             with error_manager:
-                roles = await ctx.client.rest_service.rest.fetch_roles(ctx.message.guild_id)
+                roles = await ctx.rest_service.rest.fetch_roles(ctx.message.guild_id)
                 return next(filter(predicate, iter(roles)))
 
         else:
@@ -165,7 +165,7 @@ class RESTFulUserConverter(UserConverter):
 
         async for _ in retry:
             with error_manager:
-                return await ctx.client.rest_service.rest.fetch_user(user_id)
+                return await ctx.rest_service.rest.fetch_user(user_id)
 
         else:
             raise ValueError("Couldn't fetch user in time.")
