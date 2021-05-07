@@ -5,7 +5,7 @@ import pathlib
 import re
 import typing
 
-import asyncpg
+import asyncpg  # type: ignore[import]
 
 
 def script_getter_factory(key: str) -> property:  # Could just make this retrieve the file.

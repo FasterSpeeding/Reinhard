@@ -10,6 +10,7 @@ from hikari import errors as hikari_errors
 from hikari import guilds
 from hikari import snowflakes
 from hikari import users
+from tanjun import checks
 from tanjun import components
 from tanjun import errors as tanjun_errors
 from tanjun import parsing
@@ -292,8 +293,8 @@ class UtilComponent(components.Component):
     @parsing.with_parser
     @components.as_command("members")
     async def members(self, ctx: tanjun_traits.Context, name: str) -> None:
-        assert ctx.guild_id is not None
-        members = await ctx.client.rest_service.rest.search_members(ctx.guild_id, name)
+        assert ctx.message.guild_id is not None
+        members = await ctx.client.rest_service.rest.search_members(ctx.message.guild_id, name)
 
         if members:
             content = "Similar members:\n" + "\n".join(

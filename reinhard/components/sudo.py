@@ -58,7 +58,7 @@ class SudoComponent(components.Component):
 
     def bind_client(self, client: tanjun_traits.Client, /) -> None:
         super().bind_client(client)
-        self.paginator_pool = paginaton.PaginatorPool(client.rest_service, client.dispatch_service)
+        self.paginator_pool = paginaton.PaginatorPool(client.rest_service, client.event_service)
 
     async def close(self) -> None:
         await super().close()

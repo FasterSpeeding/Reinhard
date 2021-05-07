@@ -46,7 +46,7 @@ class BasicComponent(components.Component):
 
     def bind_client(self, client: tanjun_traits.Client, /) -> None:
         super().bind_client(client)
-        self.paginator_pool = paginaton.PaginatorPool(client.rest_service, client.dispatch_service)
+        self.paginator_pool = paginaton.PaginatorPool(client.rest_service, client.event_service)
 
     async def close(self) -> None:
         await super().close()
@@ -112,7 +112,7 @@ class BasicComponent(components.Component):
         if not self.help_embeds:
             self.help_embeds = {}
             for component in ctx.client.components:
-                if (value := await help_util.generate_help_embeds(component, prefix=prefix)) :
+                if value := await help_util.generate_help_embeds(component, prefix=prefix):
                     self.help_embeds[value[0].lower()] = [v async for v in value[1]]
 
         if component_name:
@@ -216,14 +216,14 @@ class BasicComponent(components.Component):
 
         embed = (
             embeds_.Embed(description="An experimental pythonic Hikari bot.", color=0x55CDFC)
-            .set_author(name=f"Hikari: testing client", icon=avatar, url=hikari_url)
+            .set_author(name="Hikari: testing client", icon=avatar, url=hikari_url)
             .add_field(name="Uptime", value=str(uptime), inline=True)
             .add_field(
                 name="Process",
                 value=f"{memory_usage:.2f} MiB ({memory_percent:.0f}%)\n{cpu_usage:.2f}% CPU",
                 inline=True,
             )
-            .add_field(name=f"Standard cache stats", value=f"```{cache_stats}```")
+            .add_field(name="Standard cache stats", value=f"```{cache_stats}```")
             .set_footer(
                 icon="http://i.imgur.com/5BFecvA.png",
                 text=f"Made with Hikari v{hikari_version} (python {platform.python_version()})",

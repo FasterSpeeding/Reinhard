@@ -9,7 +9,7 @@ import time
 import typing
 
 import aiohttp
-import sphobjinv
+import sphobjinv  # type: ignore[import]
 from hikari import embeds
 from hikari import errors as hikari_errors
 from hikari import undefined
@@ -344,7 +344,7 @@ class ExternalComponent(components.Component):
 
     def bind_client(self, client: tanjun_traits.Client, /) -> None:
         super().bind_client(client)
-        self.paginator_pool = paginaton.PaginatorPool(client.rest_service, client.dispatch_service)
+        self.paginator_pool = paginaton.PaginatorPool(client.rest_service, client.event_service)
 
     async def close(self) -> None:
         await super().close()

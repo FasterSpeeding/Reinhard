@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import typing
 
-import asyncpg
+import asyncpg  # type: ignore[import]
 from hikari import config as hikari_config
 from tanjun import clients
 from tanjun import hooks
@@ -26,7 +26,7 @@ class Client(clients.Client):
 
     def __init__(
         self,
-        dispatch: hikari_traits.DispatcherAware,
+        events: hikari_traits.EventManagerAware,
         rest: typing.Optional[hikari_traits.RESTAware] = None,
         shard: typing.Optional[hikari_traits.ShardAware] = None,
         cache: typing.Optional[hikari_traits.CacheAware] = None,
@@ -41,7 +41,7 @@ class Client(clients.Client):
         mention_prefix: bool = True,
     ) -> None:
         super().__init__(
-            dispatch,
+            events,
             rest,
             shard,
             cache,
@@ -59,7 +59,7 @@ class Client(clients.Client):
 
     async def open(self, *, register_listener: bool = True) -> None:
         self.sql_pool = await asyncpg.create_pool(
-            password=self._password, host=self._host, user=self._user, database=self._database, port=self._port,
+            password=self._password, host=self._host, user=self._user, database=self._database, port=self._port
         )
         async with self.sql_pool.acquire() as conn:
             await sql.initialise_schema(self.sql_scripts, conn)
