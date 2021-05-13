@@ -3,7 +3,6 @@ from __future__ import annotations
 __all__: typing.Sequence[str] = ["ExternalComponent"]
 
 import datetime
-import html
 import logging
 import time
 import typing
@@ -400,7 +399,7 @@ class ExternalComponent(components.Component):
         )
         async for _ in retry:
             with error_manager:
-                response = await session.get("https://lyrics.tsu.sh/v1", params={"q": query})
+                response = await session.get("https://evan.lol/lyrics/search/top", params={"q": query})
                 response.raise_for_status()
                 break
 
@@ -423,16 +422,23 @@ class ExternalComponent(components.Component):
             )
             raise tanjun_errors.CommandError("Failed to receive lyrics")
 
-        icon = data["song"].get("icon")
-        title = data["song"]["full_title"]
+        icon: typing.Optional[str] = None
+        if "album" in data and (icon_data := data["album"]["icon"]):
+            icon = icon_data.get("url")
+
+        title = data["name"]
+
+        if artists := data["artists"]:
+            title += " - " + " | ".join((a["name"] for a in artists))
+
         pages = (
             (
                 undefined.UNDEFINED,
-                embeds.Embed(description=html.unescape(page), colour=constants.embed_colour())
+                embeds.Embed(description=page, colour=constants.embed_colour())
                 .set_footer(text=f"Page {index + 1}")
-                .set_author(icon=icon, name=html.unescape(title)),
+                .set_author(icon=icon, name=title),
             )
-            async for page, index in paginaton.string_paginator(iter(data["content"].splitlines() or ["..."]))
+            async for page, index in paginaton.string_paginator(iter(data["lyrics"].splitlines() or ["..."]))
         )
         response_paginator = paginaton.Paginator(
             ctx.rest_service,
