@@ -1,4 +1,4 @@
-asyncpg==0.21.0
+asyncpg==0.23.0
 sphobjinv==2.1
 python-Levenshtein==0.12.2
 psutil==5.8.0
