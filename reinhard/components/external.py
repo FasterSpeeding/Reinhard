@@ -22,7 +22,6 @@ from yuyo import paginaton
 
 from ..util import basic as basic_util
 from ..util import constants
-from ..util import help as help_util
 from ..util import rest_manager
 
 if typing.TYPE_CHECKING:
@@ -286,9 +285,9 @@ class CachedResource(typing.Generic[_ValueT]):
         return self._data
 
 
-@help_util.with_component_name("External Component")
-@help_util.with_component_doc("A utility used for getting data from 3rd party APIs.")
 class ExternalComponent(components.Component):
+    """A utility used for getting data from 3rd party APIs."""
+
     __slots__: typing.Sequence[str] = (
         "_client_session",
         "_connector_factory",
@@ -386,12 +385,15 @@ class ExternalComponent(components.Component):
         await self.paginator_pool.open()
         await super().open()
 
-    @help_util.with_parameter_doc("query", "The required argument of a query to search up a song by.")
-    @help_util.with_command_doc("Get a song's lyrics.")
     @parsing.with_greedy_argument("query")
     @parsing.with_parser
     @components.as_command("lyrics")
     async def lyrics(self, ctx: tanjun_traits.Context, query: str) -> None:
+        """Get a song's lyrics.
+
+        Arguments:
+            query: Greedy query string (e.g. name) to search a song by.
+        """
         session = self._acquire_session()
         retry = backoff.Backoff(max_retries=5)
         error_manager = rest_manager.AIOHTTPStatusHandler(
@@ -457,16 +459,16 @@ class ExternalComponent(components.Component):
         assert self.paginator_pool is not None
         self.paginator_pool.add_paginator(message, response_paginator)
 
-    @help_util.with_command_doc("Get a youtube video.")
     @parsing.with_option("safe_search", "--safe", "-s", "--safe-search", converters=bool, default=None)
     @parsing.with_option("order", "-o", "--order", default="relevance")
     @parsing.with_option("language", "-l", "--language", default=None)
     @parsing.with_option("region", "-r", "--region", default=None)
+    # TODO: should different resource types be split between different sub commands?
     @parsing.with_option("resource_type", "--type", "-t", default="video")
-    @parsing.with_greedy_argument("query")
+    @parsing.with_greedy_argument("")
     @parsing.with_parser
     @components.as_command("youtube", "yt")
-    async def youtube(  # TODO: fully document
+    async def youtube(
         self,
         ctx: tanjun_traits.Context,
         query: str,
@@ -476,6 +478,22 @@ class ExternalComponent(components.Component):
         order: str,
         safe_search: typing.Optional[bool],
     ) -> None:
+        """Search for a resource on youtube.
+
+        Arguments:
+            query: Greedy query string to search for a resource by.
+
+        Options:
+            safe_search (--safe, -s, --safe-search): whether safe search should be enabled or not.
+                By default this will be decided based on the current channel's nsfw status and this cannot be set to
+                `false` for a channel that's not nsfw.
+            order (-o, --order): The order to return results in.
+                This can be one of "date", "relevance", "title", "videoCount" or "viewCount" and defaults to "relevance".
+            language (-l, --language): The ISO 639-1 two letter identifier of the language to limit search to.
+            region (-r, --region): The ISO 3166-1 code of the region to search for results in.
+            resource_type (--type, -t): The type of resource to search for.
+                This can be one of "channel", "playlist" or "video" and defaults to "video".
+        """
         if safe_search is not False:
             channel: typing.Optional[channels.GuildChannel] = None
 

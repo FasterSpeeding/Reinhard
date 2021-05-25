@@ -9,7 +9,7 @@ import platform
 import time
 import typing
 
-import psutil
+import psutil  # type: ignore[import]
 from hikari import __url__ as hikari_url
 from hikari import __version__ as hikari_version
 from hikari import embeds as embeds_
@@ -32,9 +32,9 @@ if typing.TYPE_CHECKING:
     from tanjun import traits as tanjun_traits
 
 
-@help_util.with_component_name("Basic Component")
-@help_util.with_component_doc("Commands provided to give information about this bot.")
 class BasicComponent(components.Component):
+    """Commands provided to give information about this bot."""
+
     __slots__: typing.Sequence[str] = ("current_user", "help_embeds", "paginator_pool", "process")
 
     def __init__(self, *, hooks: typing.Optional[tanjun_traits.Hooks] = None) -> None:
@@ -60,10 +60,9 @@ class BasicComponent(components.Component):
         await self.paginator_pool.open()
         await super().open()
 
-    @help_util.with_command_doc("Get basic information about the current bot instance.")
     @components.as_command("about")
     async def about(self, ctx: tanjun_traits.Context) -> None:
-        """Get general information about this bot."""
+        """Get basic information about the current bot instance."""
         start_date = datetime.datetime.fromtimestamp(self.process.create_time())
         uptime = datetime.datetime.now() - start_date
         memory_usage = self.process.memory_full_info().uss / 1024 ** 2
@@ -99,7 +98,6 @@ class BasicComponent(components.Component):
         )
         await error_manager.try_respond(ctx, embed=embed)
 
-    @help_util.with_command_doc("Get information about the commands in this bot.")
     @parsing.with_option("command_name", "--command", "-c", default=None)
     @parsing.with_option("component_name", "--component", default=None)
     @parsing.with_parser
@@ -107,6 +105,7 @@ class BasicComponent(components.Component):
     async def help(
         self, ctx: tanjun_traits.Context, command_name: typing.Optional[str], component_name: typing.Optional[str]
     ) -> None:
+        """Get information about the commands in this bot."""
         prefix = next(iter(self.client.prefixes)) if self.client and self.client.prefixes else ""
 
         if not self.help_embeds:
@@ -142,9 +141,9 @@ class BasicComponent(components.Component):
         message = await paginator.open()
         self.paginator_pool.add_paginator(message, paginator)
 
-    @help_util.with_command_doc("Get the bot's current delay.")
     @components.as_command("ping")
     async def ping(self, ctx: tanjun_traits.Context, /) -> None:
+        """Get the bot's current delay."""
         retry = backoff.Backoff(max_retries=5)
         error_manager = rest_manager.HikariErrorManager(
             retry, break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)

@@ -28,7 +28,6 @@ from yuyo import backoff
 from yuyo import paginaton
 
 from ..util import constants
-from ..util import help as help_util
 from ..util import rest_manager
 
 if typing.TYPE_CHECKING:
@@ -39,9 +38,9 @@ if typing.TYPE_CHECKING:
 CallbackT = typing.Callable[..., typing.Coroutine[typing.Any, typing.Any, typing.Any]]
 
 
-@help_util.with_component_name("Sudo Component")
-@help_util.with_component_doc("Component used by this bot's owner.")
 class SudoComponent(components.Component):
+    """Component used by this bot's owner."""
+
     __slots__: typing.Sequence[str] = ("emoji_guild", "owner_check", "paginator_pool")
 
     def __init__(
@@ -75,15 +74,11 @@ class SudoComponent(components.Component):
         await self.paginator_pool.open()
         await super().open()
 
-    @help_util.with_command_doc("Command used for testing the current error handling")
     @components.as_command("error")
     async def error(self, _: tanjun_traits.Context) -> None:
+        """Command used for testing the current error handling."""
         raise Exception("This is an exception, get used to it.")
 
-    @help_util.with_parameter_doc(
-        "--embed | -e", "An optional argument used to specify the json of a embed for the bot to send."
-    )
-    @help_util.with_command_doc("Command used for getting the bot to mirror a response.")
     @parsing.with_option("raw_embed", "--embed", "-e", converters=json.loads, default=undefined.UNDEFINED)
     @parsing.with_greedy_argument("content", default=undefined.UNDEFINED)
     @parsing.with_parser
@@ -94,6 +89,14 @@ class SudoComponent(components.Component):
         content: undefined.UndefinedOr[str],
         raw_embed: undefined.UndefinedOr[typing.Dict[str, typing.Any]],
     ) -> None:
+        """Command used for getting the bot to mirror a response.
+
+        Arguments:
+            content: The greedy string content the bot should send back. This must be included if `embed` is not.
+
+        options:
+            embed (--embed, -e): String JSON object of an embed for the bot to send.
+        """
         embed: undefined.UndefinedOr[embeds.Embed] = undefined.UNDEFINED
         retry = backoff.Backoff(max_retries=5)
         error_manager = rest_manager.HikariErrorManager(
@@ -156,14 +159,19 @@ class SudoComponent(components.Component):
         stderr.seek(0)
         return self._yields_results(stdout, stderr), exec_time, failed
 
-    @help_util.with_parameter_doc(
-        "--suppress | -s", "A optional argument used to disable the bot's post-eval response."
-    )
-    @help_util.with_command_doc("Dynamically evaluate a script in the bot's environment.")
     @parsing.with_option("suppress_response", "-s", "--suppress", converters=bool, default=False, empty_value=True)
     @parsing.with_parser
     @components.as_command("eval", "exec", "sudo")
     async def eval(self, ctx: tanjun_traits.Context, suppress_response: bool = False) -> None:
+        """Dynamically evaluate a script in the bot's environment.
+
+        This can only be used by the bot's owner.
+
+        Arguments:
+            code: Greedy multi-line string argument of the code to execute. This should be in a code block.
+            suppress_response (-s, --suppress): Whether to suppress this command's confirmation response.
+                This defaults to false and will be set to true if no value is provided.
+        """
         assert ctx.message.content is not None  # This shouldn't ever be the case in a command client.
         code = re.findall(r"```(?:[\w]*\n?)([\s\S(^\\`{3})]*?)\n*```", ctx.message.content)
         if not code:

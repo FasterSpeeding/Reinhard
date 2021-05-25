@@ -20,13 +20,12 @@ from yuyo import backoff
 from ..util import basic as basic_util
 from ..util import constants
 from ..util import conversion
-from ..util import help as help_util
 from ..util import rest_manager
 
 
-@help_util.with_component_doc("Component used for getting miscellaneous Discord information.")
-@help_util.with_component_name("Utility Component")
 class UtilComponent(components.Component):
+    """Component used for getting miscellaneous Discord information."""
+
     __slots__: typing.Sequence[str] = ("own_user",)
 
     def __init__(self, *, hooks: typing.Optional[tanjun_traits.Hooks] = None) -> None:
@@ -50,14 +49,16 @@ class UtilComponent(components.Component):
 
         await super().open()
 
-    @help_util.with_parameter_doc(
-        "colour", "A required argument of either a text colour representation or a role's ID."
-    )
-    @help_util.with_command_doc("Get a visual representation of a color or role's color.")
     @parsing.with_greedy_argument("colour", converters=(conversion.ColorConverter, conversion.RESTFulRoleConverter))
     @parsing.with_parser
     @components.as_command("color", "colour")
     async def colour(self, ctx: tanjun_traits.Context, colour: typing.Union[colours.Colour, guilds.Role]) -> None:
+        """Get a visual representation of a color or role's color.
+
+        Argument:
+            colour: Either the hex/int literal representation of a colour to show or the ID/mention of a role to get
+                the colour of.
+        """
         if isinstance(colour, guilds.Role):
             colour = colour.colour
 
@@ -87,16 +88,16 @@ class UtilComponent(components.Component):
     #     else:
     #         ...  # TODO: Implement this to allow getting the embeds from a suppressed message.
 
-    @help_util.with_parameter_doc(
-        "member",
-        "The optional argument of a member mention or ID. "
-        "If not supplied then this command will target the member triggering it.",
-    )
-    @help_util.with_command_doc("Get information about a member in the current guild.")
     @parsing.with_greedy_argument("member", converters=conversion.RESTFulMemberConverter, default=None)
     @parsing.with_parser
     @components.as_command("member", checks=[lambda ctx: ctx.message.guild_id is not None])
     async def member(self, ctx: tanjun_traits.Context, member: typing.Union[guilds.Member, None]) -> None:
+        """Get information about a member in the current guild.
+
+        Arguments:
+            member: The optional argument of the mention or ID of a member to get information about.
+                If not provided then this will return information about the member executing this command.
+        """
         assert ctx.message.guild_id is not None  # This is asserted by a previous check.
         assert ctx.message.member is not None  # This is always the case for messages made in guilds.
         if member is None:
@@ -172,12 +173,17 @@ class UtilComponent(components.Component):
     def filter_role(role_id: snowflakes.Snowflake) -> typing.Callable[[guilds.Role], bool]:
         return lambda role: role.id == role_id
 
-    @help_util.with_parameter_doc("role", "The required argument of a role ID.")
-    @help_util.with_command_doc("Get information about a role in the current guild.")
+    # TODO: the normal role converter is limited to the current guild right?
     @parsing.with_argument("role", converters=conversion.RESTFulRoleConverter)
     @parsing.with_parser
     @components.as_command("role", checks=[lambda ctx: ctx.message.guild_id is not None])
     async def role(self, ctx: tanjun_traits.Context, role: guilds.Role) -> None:
+        """ "Get information about a role in the current guild.
+
+        Arguments:
+            role: Mention or ID of the role to get information about.
+        """
+
         permissions = basic_util.basic_name_grid(role.permissions) or "None"
         role_information = [f"Created: {basic_util.pretify_date(role.created_at)}", f"Position: {role.position}"]
 
@@ -203,18 +209,18 @@ class UtilComponent(components.Component):
         )
         await error_manager.try_respond(ctx, embed=embed)
 
-    @help_util.with_parameter_doc(
-        "user",
-        "The optional argument of the mention or ID of the user to target. "
-        "If not supplied then this command will target the user triggering it.",
-    )
-    @help_util.with_command_doc("Get information about a Discord user.")
     @parsing.with_greedy_argument(
         "user", converters=(conversion.RESTFulUserConverter, conversion.RESTFulMemberConverter), default=None
     )
     @parsing.with_parser
     @components.as_command("user")
     async def user(self, ctx: tanjun_traits.Context, user: typing.Union[users.User, None]) -> None:
+        """ "Get information about a Discord user."
+
+        Arguments:
+            user: Optional argument of the mention or ID of the user to target.
+                If not supplied then this will return information about the triggering user.
+        """
         if user is None:
             user = ctx.message.author
 
@@ -237,18 +243,18 @@ class UtilComponent(components.Component):
         )
         await error_manager.try_respond(ctx, embed=embed)
 
-    @help_util.with_parameter_doc(
-        "user",
-        "The optional argument of a mention or ID of the user to get the avatar for. "
-        "If this isn't provided then this command will target the user who triggered it.",
-    )
-    @help_util.with_command_doc("Get a user's avatar.")
     @parsing.with_greedy_argument(
         "user", converters=(conversion.RESTFulUserConverter, conversion.RESTFulMemberConverter), default=None
     )
     @parsing.with_parser
     @components.as_command("avatar", "pfp")
     async def avatar(self, ctx: tanjun_traits.Context, user: typing.Union[users.User, None]) -> None:
+        """Get a user's avatar.
+
+        Arguments:
+            user: Optional argument of a mention or ID of the user to get the avatar for.
+                If this isn't provided then this command will return the avatar of the user who triggerred it.
+        """
         if user is None:
             user = ctx.message.author
 

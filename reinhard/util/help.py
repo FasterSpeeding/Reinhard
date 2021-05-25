@@ -6,9 +6,6 @@ __all__: typing.Sequence[str] = [
     "get_command_doc",
     "get_component_doc",
     "get_parameter_docs",
-    "with_command_doc",
-    "with_component_doc",
-    "with_parameter_doc",
 ]
 
 import typing
@@ -28,41 +25,6 @@ DOC_ATTRIBUTE: typing.Final[str] = "__reinhard_doc__"
 DOC_FLAG: typing.Final[str] = "doc"
 NAME_ATTRIBUTE: typing.Final[str] = "__reinhard_name__"
 PARAMETER_DOCS_FLAG: typing.Final[str] = "parameter_docs"
-
-
-def with_command_doc(doc_string: str, /) -> typing.Callable[[_CommandT], _CommandT]:
-    def decorator(command: _CommandT, /) -> _CommandT:
-        command.metadata[DOC_FLAG] = doc_string
-        return command
-
-    return decorator
-
-
-def with_component_doc(doc_string: str, /) -> typing.Callable[[typing.Type[_ComponentT]], typing.Type[_ComponentT]]:
-    def decorator(component: typing.Type[_ComponentT], /) -> typing.Type[_ComponentT]:
-        setattr(component, DOC_ATTRIBUTE, doc_string)
-        return component
-
-    return decorator
-
-
-def with_component_name(name: str, /) -> typing.Callable[[typing.Type[_ComponentT]], typing.Type[_ComponentT]]:
-    def decorator(component: typing.Type[_ComponentT]) -> typing.Type[_ComponentT]:
-        setattr(component, NAME_ATTRIBUTE, name)
-        return component
-
-    return decorator
-
-
-def with_parameter_doc(parameter: str, doc_string: str, /) -> typing.Callable[[_CommandT], _CommandT]:
-    def decorator(command: _CommandT, /) -> _CommandT:
-        if PARAMETER_DOCS_FLAG not in command.metadata:
-            command.metadata[PARAMETER_DOCS_FLAG] = {}
-
-        command.metadata[PARAMETER_DOCS_FLAG][parameter] = doc_string
-        return command
-
-    return decorator
 
 
 def get_command_doc(command: traits.ExecutableCommand, /) -> typing.Optional[str]:

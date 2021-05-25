@@ -82,6 +82,7 @@ class ModerationComponent(components.Component):
         ).filter(lambda message: now - message.created_at < MAX_MESSAGE_BULK_DELETE)
 
         if before and after:
+            assert after is not None
             iterator = iterator.filter(lambda message: message.id > after)
 
         if human_only:
@@ -93,7 +94,7 @@ class ModerationComponent(components.Component):
         if users:
             iterator = iterator.filter(lambda message: message.author.id in users)
 
-        # TODO: Should we limit count for after pagination?
+        # TODO: Should we limit count or at least default it to something other than no limit?
         if count:
             iterator = iterator.limit(count)
 

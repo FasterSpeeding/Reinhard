@@ -55,8 +55,12 @@ class CommandErrorRelay:
         exc_tb: typing.Optional[types.TracebackType],
     ) -> None:
         if exc_type in self.errors:
+            response: typing.Optional[str] = None
+            if self.error_responses:
+                response = self.error_responses.get(exc_type)
+
             raise errors.CommandError(
-                (self.error_responses or {}).get(exc_type) or str(getattr(exc_val, "message", exc_val))
+                response or str(getattr(exc_val, "message", exc_val))
             ) from None  # f"{exc_type.__name__}: {exc_val}"
 
 
