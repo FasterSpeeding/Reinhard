@@ -5,4 +5,4 @@ psutil==5.8.0
 pyyaml==5.4
 hikari-tanjun~=1.0.1a4
 hikari-yuyo~=0.0.3a6
-git+https://github.com/hikari-py/hikari.git@7699bb8da18c6adc79f009b36472cb411d55dc66
+git+https://github.com/FasterSpeeding/hikari.git@989454c31538e8d5cfd11d3108a3bc9957ed8251

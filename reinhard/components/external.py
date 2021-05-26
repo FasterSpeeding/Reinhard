@@ -13,7 +13,6 @@ from hikari import channels
 from hikari import embeds
 from hikari import errors as hikari_errors
 from hikari import undefined
-from hikari.impl import rest as rest_impl
 from tanjun import components
 from tanjun import errors as tanjun_errors
 from tanjun import parsing
@@ -46,8 +45,6 @@ HIKARI_IO = "https://hikari-py.github.io/hikari"
 
 
 def create_client_session(
-    connector: aiohttp.BaseConnector,
-    connector_owner: bool,
     http_settings: hikari_config.HTTPSettings,
     raise_for_status: bool,
     trust_env: bool,
@@ -55,8 +52,6 @@ def create_client_session(
     ws_response_cls: typing.Type[aiohttp.ClientWebSocketResponse] = aiohttp.ClientWebSocketResponse,
 ) -> aiohttp.ClientSession:
     return aiohttp.ClientSession(
-        connector=connector,
-        connector_owner=connector_owner,
         headers=headers,
         raise_for_status=raise_for_status,
         timeout=aiohttp.ClientTimeout(
@@ -290,7 +285,6 @@ class ExternalComponent(components.Component):
 
     __slots__: typing.Sequence[str] = (
         "_client_session",
-        "_connector_factory",
         "_doc_fetcher",
         "_http_settings",
         "paginator_pool",
@@ -309,7 +303,6 @@ class ExternalComponent(components.Component):
     ) -> None:
         super().__init__(hooks=hooks)
         self._client_session: typing.Optional[aiohttp.ClientSession] = None
-        self._connector_factory = rest_impl.BasicLazyCachedTCPConnectorFactory(http_settings)
         self._doc_fetcher = CachedResource(
             HIKARI_IO + "/objects.inv", datetime.timedelta(hours=12), sphobjinv.Inventory
         )
@@ -329,8 +322,6 @@ class ExternalComponent(components.Component):
     def _acquire_session(self) -> aiohttp.ClientSession:
         if self._client_session is None:
             self._client_session = create_client_session(
-                connector=self._connector_factory.acquire(),
-                connector_owner=False,
                 headers={USER_AGENT_HEADER: self.user_agent},
                 http_settings=self._http_settings,
                 raise_for_status=False,
@@ -352,9 +343,6 @@ class ExternalComponent(components.Component):
         if self._client_session:
             await self._client_session.close()
             self._client_session = None
-
-        if self._connector_factory:
-            await self._connector_factory.close()
 
     async def open(self) -> None:
         if self.client is None or self.paginator_pool is None:
