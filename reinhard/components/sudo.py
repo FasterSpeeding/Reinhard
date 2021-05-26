@@ -94,7 +94,7 @@ class SudoComponent(components.Component):
         Arguments:
             * content: The greedy string content the bot should send back. This must be included if `embed` is not.
 
-        options:
+        Options:
             * embed (--embed, -e): String JSON object of an embed for the bot to send.
         """
         embed: undefined.UndefinedOr[embeds.Embed] = undefined.UNDEFINED

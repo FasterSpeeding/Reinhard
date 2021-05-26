@@ -275,6 +275,15 @@ class UtilComponent(components.Component):
         message_id: snowflakes.Snowflake,
         channel_id: typing.Optional[snowflakes.Snowflake],
     ) -> None:
+        """Get a list of the users who were pinged by a message.
+
+        Arguments
+            * message: ID of the message to get the ping list for.
+
+        Options
+            * channel: ID or mention of the channel the message is in.
+                If this isn't provided then the command will assume the message is in the current channel.
+        """
         if channel_id is None:
             channel_id = ctx.message.channel_id
 
@@ -299,6 +308,11 @@ class UtilComponent(components.Component):
     @parsing.with_parser
     @components.as_command("members")
     async def members(self, ctx: tanjun_traits.Context, name: str) -> None:
+        """Search for a member in the current guild.
+
+        Arguments
+            * name: Greedy argument of the name to search for.
+        """
         assert ctx.message.guild_id is not None
         members = await ctx.rest_service.rest.search_members(ctx.message.guild_id, name)
 

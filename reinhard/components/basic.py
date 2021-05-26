@@ -105,7 +105,14 @@ class BasicComponent(components.Component):
     async def help(
         self, ctx: tanjun_traits.Context, command_name: typing.Optional[str], component_name: typing.Optional[str]
     ) -> None:
-        """Get information about the commands in this bot."""
+        """Get information about the commands in this bot.
+
+        Arguments
+            * command name: Optional greedy argument of a name to get a command's documentation by.
+
+        Options
+            * component name (--component): Name of a component to get the documentation for.
+        """
         prefix = next(iter(self.client.prefixes)) if self.client and self.client.prefixes else ""
 
         if not self.help_embeds:

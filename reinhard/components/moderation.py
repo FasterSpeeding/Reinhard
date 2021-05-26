@@ -56,6 +56,24 @@ class ModerationComponent(components.Component):
         users: typing.Sequence[snowflakes.Snowflake],
         suppress: bool,
     ) -> None:
+        """Clear new messages from chat.
+
+        !!! note
+            This can only be used on messages under 14 days old.
+
+        Arguments:
+            * count: The amount of messages to delete.
+
+        Options:
+            * users (--user): Mentions and/or IDs of the users to delete messages from.
+            * human only (--human): Whether this should only delete messages sent by actual users.
+                This defaults to false and will be set to true if provided without a value.
+            * bot only (--bot): Whether this should only delete messages sent by bots and webhooks.
+            * before  (--before): ID of a message to delete messages which were sent before.
+            * after (--after): ID of a message to delete messages which were sent after.
+            * suppress (-s, --suppress): Provided without a value to stop the bot from sending a message once the
+                command's finished.
+        """
         if human_only and bot_only:
             raise tanjun_errors.CommandError("Can only specify one of `--human` or `--user`")
 

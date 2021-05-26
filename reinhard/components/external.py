@@ -648,6 +648,16 @@ class ExternalComponent(components.Component):
     @parsing.with_parser
     @components.as_command("spotify")
     async def spotify(self, ctx: tanjun_traits.Context, query: str, resource_type: str) -> None:
+        """Search for a resource on spotify.
+
+        Arguments:
+            * query: The greedy string query to search by.
+
+        Options:
+            * resource type (--type, -t):
+                Type of resource to search for. This can be one of "track", "album", "artist" or "playlist" and defaults
+                to track.
+        """
         assert self._spotify_auth
 
         resource_type = resource_type.lower()
@@ -692,6 +702,11 @@ class ExternalComponent(components.Component):
     @parsing.with_parser
     @components.as_command("docs")
     async def docs(self, ctx: tanjun_traits.Context, path: typing.Optional[str]) -> None:
+        """Search Hikari's documentation.
+
+        Arguments
+            * path: Optional argument to query Hikari's documentation by.
+        """
         error_manager = rest_manager.HikariErrorManager(
             break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
         )
