@@ -138,6 +138,9 @@ class BasicComponent(components.Component):
                 await ctx.message.respond(embed=command_embed)
                 break
 
+            else:
+                await ctx.message.respond(f"Couldn't find `{command_name}` command.")
+
             return
 
         else:
