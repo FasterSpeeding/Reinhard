@@ -1,7 +1,8 @@
-asyncpg==0.23.0
+asyncpg==0.21.0
 sphobjinv==2.1
 python-Levenshtein==0.12.2
 psutil==5.8.0
 pyyaml==5.4
 hikari-tanjun~=1.0.1a4
 hikari-yuyo~=0.0.3a6
+git+https://github.com/hikari-py/hikari.git@7699bb8da18c6adc79f009b36472cb411d55dc66

@@ -121,13 +121,7 @@ class BasicComponent(components.Component):
                 if value := await help_util.generate_help_embeds(component, prefix=prefix):
                     self.help_embeds[value[0].lower()] = [v async for v in value[1]]
 
-        if component_name:
-            if component_name.lower() not in self.help_embeds:
-                raise tanjun_errors.CommandError(f"Couldn't find component `{component_name}`")
-
-            embed_generator = ((undefined.UNDEFINED, embed) for embed in self.help_embeds[component_name.lower()])
-
-        elif command_name is not None:
+        if command_name is not None:
             for own_prefix in ctx.client.prefixes:
                 if command_name.startswith(own_prefix):
                     command_name = command_name[len(own_prefix) :]
@@ -142,6 +136,12 @@ class BasicComponent(components.Component):
                 await ctx.message.respond(f"Couldn't find `{command_name}` command.")
 
             return
+
+        if component_name:
+            if component_name.lower() not in self.help_embeds:
+                raise tanjun_errors.CommandError(f"Couldn't find component `{component_name}`")
+
+            embed_generator = ((undefined.UNDEFINED, embed) for embed in self.help_embeds[component_name.lower()])
 
         else:
             embed_generator = (
