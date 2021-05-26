@@ -95,7 +95,7 @@ class UtilComponent(components.Component):
         """Get information about a member in the current guild.
 
         Arguments:
-            member: The optional argument of the mention or ID of a member to get information about.
+            * member: The optional argument of the mention or ID of a member to get information about.
                 If not provided then this will return information about the member executing this command.
         """
         assert ctx.message.guild_id is not None  # This is asserted by a previous check.
@@ -181,7 +181,7 @@ class UtilComponent(components.Component):
         """ "Get information about a role in the current guild.
 
         Arguments:
-            role: Mention or ID of the role to get information about.
+            * role: Mention or ID of the role to get information about.
         """
 
         permissions = basic_util.basic_name_grid(role.permissions) or "None"
@@ -218,7 +218,7 @@ class UtilComponent(components.Component):
         """ "Get information about a Discord user."
 
         Arguments:
-            user: Optional argument of the mention or ID of the user to target.
+            * user: Optional argument of the mention or ID of the user to target.
                 If not supplied then this will return information about the triggering user.
         """
         if user is None:
@@ -252,7 +252,7 @@ class UtilComponent(components.Component):
         """Get a user's avatar.
 
         Arguments:
-            user: Optional argument of a mention or ID of the user to get the avatar for.
+            * user: Optional argument of a mention or ID of the user to get the avatar for.
                 If this isn't provided then this command will return the avatar of the user who triggerred it.
         """
         if user is None:

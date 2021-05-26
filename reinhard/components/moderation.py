@@ -82,8 +82,7 @@ class ModerationComponent(components.Component):
         ).filter(lambda message: now - message.created_at < MAX_MESSAGE_BULK_DELETE)
 
         if before and after:
-            assert after is not None
-            iterator = iterator.filter(lambda message: message.id > after)
+            iterator = iterator.filter(lambda message: message.id > after)  # type: ignore[operator]
 
         if human_only:
             iterator = iterator.filter(lambda message: not message.author.is_bot)

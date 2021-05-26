@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 __all__: typing.Sequence[str] = [
-    "generate_command_embeds",
+    "generate_command_embed",
     "generate_help_embeds",
     "get_command_doc",
     "get_component_doc",
-    "get_parameter_docs",
 ]
 
+import inspect
 import typing
 
 from hikari import embeds as embeds_
@@ -28,32 +28,25 @@ PARAMETER_DOCS_FLAG: typing.Final[str] = "parameter_docs"
 
 
 def get_command_doc(command: traits.ExecutableCommand, /) -> typing.Optional[str]:
-    return str(command.metadata[DOC_FLAG]) if DOC_FLAG in command.metadata else None
+    return inspect.getdoc(command.function) or None
 
 
 def get_component_doc(component: traits.Component, /) -> typing.Optional[str]:
-    return str(getattr(component, DOC_ATTRIBUTE)) if hasattr(component, DOC_ATTRIBUTE) else None
+    return inspect.getdoc(component) or None
 
 
-def get_component_name(component: traits.Component, /) -> typing.Optional[str]:
-    name = getattr(component, NAME_ATTRIBUTE, None)
+def get_component_name(component: traits.Component, /) -> str:
+    chars = iter(type(component).__name__)
+    result = [next(chars)]
 
-    if isinstance(name, str):
-        return name
+    for char in chars:
+        if char.isupper():
+            result.append(" ")
+            char = char.lower()
 
-    return type(component).__name__
+        result.append(char)
 
-
-def get_parameter_docs(command: traits.ExecutableCommand, /) -> typing.Mapping[str, str]:
-    docs = command.metadata.get(PARAMETER_DOCS_FLAG)
-
-    if docs is None:
-        return {}
-
-    if not isinstance(docs, dict):
-        raise RuntimeError("Invalid data found under parameter docs flag metadata")
-
-    return docs
+    return "".join(result)
 
 
 async def generate_help_embeds(
@@ -62,17 +55,17 @@ async def generate_help_embeds(
     component_doc = get_component_doc(component)
     component_name = get_component_name(component)
 
-    if component_doc is None or component_name is None:
+    if not component_doc:
         return None
 
     command_docs: typing.MutableSequence[str] = []
 
     for command in component.commands:
-        if (command_name := next(iter(command.names), None)) is None:
+        command_doc = get_command_doc(command)
+        if (command_name := next(iter(command.names), None)) is None or not command_doc:
             continue
 
-        command_description = get_command_doc(command)
-        command_docs.append(f" - {prefix}{command_name}: {command_description}")
+        command_docs.append(f" - {prefix}{command_name}: {command_doc.splitlines()[0]}")
 
     pages = paginaton.string_paginator(iter(command_docs), wrapper=f"{component_doc}\n {'{}'}")
     embeds = (
@@ -85,13 +78,11 @@ async def generate_help_embeds(
     return component_name, embeds
 
 
-def generate_command_embeds(
-    command: traits.ExecutableCommand, /, *, prefix: str = ""
-) -> typing.Optional[typing.AsyncIterator[embeds_.Embed]]:
+def generate_command_embed(command: traits.ExecutableCommand, /, *, prefix: str = "") -> typing.Optional[embeds_.Embed]:
     if not command.names:
         return None
 
-    if (command_description := get_command_doc(command)) is None:
+    if not (command_description := get_command_doc(command)):
         return None
 
     if len(command.names) > 1:
@@ -100,19 +91,11 @@ def generate_command_embeds(
     else:
         command_names = next(iter(command.names))
 
-    lines = command_description.splitlines(keepends=False)
+    split = command_description.split("\n", 1)
 
-    parameter_docs = get_parameter_docs(command)
+    if len(split) == 2:
+        command_description = f"{split[0]}\n```md\n{split[1]}```"
 
-    if parameter_docs:
-        lines.extend(("", "Arguments:"))
-        for name, doc in parameter_docs.items():
-            lines.append(f" - {name}: {doc}")
-
-    pages = paginaton.string_paginator(iter(lines))
-    return (
-        embeds_.Embed(
-            title=f"{prefix}{command_names}", description=content, colour=constants.embed_colour()
-        ).set_footer(text=f"page {page + 1}")
-        async for content, page in pages
+    return embeds_.Embed(
+        title=f"{prefix}{command_names}", description=command_description, colour=constants.embed_colour()
     )

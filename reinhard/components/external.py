@@ -392,7 +392,7 @@ class ExternalComponent(components.Component):
         """Get a song's lyrics.
 
         Arguments:
-            query: Greedy query string (e.g. name) to search a song by.
+            * query: Greedy query string (e.g. name) to search a song by.
         """
         session = self._acquire_session()
         retry = backoff.Backoff(max_retries=5)
@@ -481,17 +481,17 @@ class ExternalComponent(components.Component):
         """Search for a resource on youtube.
 
         Arguments:
-            query: Greedy query string to search for a resource by.
+            * query: Greedy query string to search for a resource by.
 
         Options:
-            safe_search (--safe, -s, --safe-search): whether safe search should be enabled or not.
+            * safe search (--safe, -s, --safe-search): whether safe search should be enabled or not.
                 By default this will be decided based on the current channel's nsfw status and this cannot be set to
                 `false` for a channel that's not nsfw.
-            order (-o, --order): The order to return results in.
+            * order (-o, --order): The order to return results in.
                 This can be one of "date", "relevance", "title", "videoCount" or "viewCount" and defaults to "relevance".
-            language (-l, --language): The ISO 639-1 two letter identifier of the language to limit search to.
-            region (-r, --region): The ISO 3166-1 code of the region to search for results in.
-            resource_type (--type, -t): The type of resource to search for.
+            * language (-l, --language): The ISO 639-1 two letter identifier of the language to limit search to.
+            * region (-r, --region): The ISO 3166-1 code of the region to search for results in.
+            * resource type (--type, -t): The type of resource to search for.
                 This can be one of "channel", "playlist" or "video" and defaults to "video".
         """
         if safe_search is not False:

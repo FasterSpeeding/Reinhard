@@ -98,7 +98,7 @@ class BasicComponent(components.Component):
         )
         await error_manager.try_respond(ctx, embed=embed)
 
-    @parsing.with_option("command_name", "--command", "-c", default=None)
+    @parsing.with_greedy_argument("command_name", default=None)
     @parsing.with_option("component_name", "--component", default=None)
     @parsing.with_parser
     @components.as_command("help")  # TODO: specify a group or command
@@ -127,8 +127,11 @@ class BasicComponent(components.Component):
                     break
 
             for command in ctx.client.check_name(command_name):
-                command_embeds = help_util.generate_command_embeds(command.command, prefix=prefix)
-                embed_generator = ((undefined.UNDEFINED, embed) async for embed in command_embeds)
+                command_embed = help_util.generate_command_embed(command.command, prefix=prefix)
+                await ctx.message.respond(embed=command_embed)
+                break
+
+            return
 
         else:
             embed_generator = (
