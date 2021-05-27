@@ -19,14 +19,6 @@ if typing.TYPE_CHECKING:
     from tanjun import traits
 
 
-_CommandT = typing.TypeVar("_CommandT", bound="traits.CommandDescriptor")
-_ComponentT = typing.TypeVar("_ComponentT", bound="traits.Component")
-DOC_ATTRIBUTE: typing.Final[str] = "__reinhard_doc__"
-DOC_FLAG: typing.Final[str] = "doc"
-NAME_ATTRIBUTE: typing.Final[str] = "__reinhard_name__"
-PARAMETER_DOCS_FLAG: typing.Final[str] = "parameter_docs"
-
-
 def get_command_doc(command: traits.ExecutableCommand, /) -> typing.Optional[str]:
     return inspect.getdoc(command.function) or None
 
