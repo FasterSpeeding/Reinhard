@@ -9,6 +9,7 @@ import pathlib
 import typing
 
 import yaml
+from hikari import config as hikari_config
 from hikari import snowflakes
 
 ConfigT = typing.TypeVar("ConfigT", bound="Config")
@@ -90,22 +91,42 @@ class Tokens(Config):
         )
 
 
+DEFAULT_CACHE = (
+    hikari_config.CacheComponents.GUILDS
+    | hikari_config.CacheComponents.GUILD_CHANNELS
+    | hikari_config.CacheComponents.ROLES
+    # | hikari_config.CacheComponents.ME
+)
+
+
 class FullConfig(Config):
-    __slots__: typing.Sequence[str] = ("database", "emoji_guild", "log_level", "prefixes", "tokens")
+    __slots__: typing.Sequence[str] = (
+        "cache",
+        "database",
+        "emoji_guild",
+        "log_level",
+        "owner_only",
+        "prefixes",
+        "tokens",
+    )
 
     def __init__(
         self,
         *,
+        cache: hikari_config.CacheComponents = DEFAULT_CACHE,
         database: DatabaseConfig,
         emoji_guild: typing.Optional[snowflakes.Snowflake] = None,
         log_level: typing.Union[None, int, str, typing.Dict[str, typing.Any]] = logging.INFO,
-        prefixes: typing.Iterable[str] = ("r.",),
+        owner_only: bool = False,
+        prefixes: typing.AbstractSet[str] = frozenset("r."),
         tokens: Tokens,
     ) -> None:
+        self.cache = cache
         self.database = database
         self.emoji_guild = emoji_guild
-        self.log_level = log_level.upper() if isinstance(log_level, str) else log_level
-        self.prefixes = set(prefixes)
+        self.log_level = log_level
+        self.owner_only = owner_only
+        self.prefixes = prefixes
         self.tokens = tokens
 
     @classmethod
@@ -114,11 +135,16 @@ class FullConfig(Config):
         if not isinstance(log_level, (str, int)):
             raise ValueError("Invalid log level found in config")
 
+        elif isinstance(log_level, str):
+            log_level = log_level.upper()
+
         return cls(
+            cache=_cast_or_default(mapping, "cache", hikari_config.CacheComponents, DEFAULT_CACHE),
             database=DatabaseConfig.from_mapping(mapping["database"]),
             emoji_guild=_cast_or_default(mapping, "emoji_guild", snowflakes.Snowflake, None),
             log_level=log_level,
-            prefixes=list(map(str, mapping["prefixes"])) if "prefixes" in mapping else ("r.",),
+            owner_only=bool(mapping.get("owner_only", False)),
+            prefixes=set(map(str, mapping["prefixes"])) if "prefixes" in mapping else {"r."},
             tokens=Tokens.from_mapping(mapping["tokens"]),
         )
 

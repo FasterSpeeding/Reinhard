@@ -4,6 +4,7 @@ import typing
 
 import asyncpg  # type: ignore[import]
 from hikari import config as hikari_config
+from tanjun import checks
 from tanjun import clients
 from tanjun import hooks
 
@@ -91,6 +92,7 @@ def build(*args: typing.Any) -> hikari_traits.BotAware:
         config.tokens.bot,
         logs=config.log_level,
         intents=intents_.Intents.ALL,
+        cache_settings=hikari_config.CacheSettings(components=config.cache)
         # rest_url="https://staging.discord.co/api/v8"
     )
     client = Client(
@@ -103,6 +105,10 @@ def build(*args: typing.Any) -> hikari_traits.BotAware:
         prefixes=config.prefixes,
         mention_prefix=False,
     )
+
+    if config.owner_only:
+        client.add_check(checks.ApplicationOwnerCheck())
+
     client.metadata["args"] = args
     add_components(client, config=config)
     return bot
