@@ -84,14 +84,13 @@ def add_components(client: tanjun_traits.Client, /, *, config: typing.Optional[c
 
 
 def build(*args: typing.Any) -> hikari_traits.BotAware:
-    from hikari import intents as intents_  # TODO: handle intents in config
     from hikari.impl import bot as bot_module
 
     config = config_.load_config()
     bot = bot_module.BotApp(
         config.tokens.bot,
         logs=config.log_level,
-        intents=intents_.Intents.ALL,
+        intents=config.intents,
         cache_settings=hikari_config.CacheSettings(components=config.cache)
         # rest_url="https://staging.discord.co/api/v8"
     )

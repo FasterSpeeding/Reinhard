@@ -10,6 +10,7 @@ import typing
 
 import yaml
 from hikari import config as hikari_config
+from hikari import intents
 from hikari import snowflakes
 
 ConfigT = typing.TypeVar("ConfigT", bound="Config")
@@ -104,6 +105,7 @@ class FullConfig(Config):
         "cache",
         "database",
         "emoji_guild",
+        "intents",
         "log_level",
         "owner_only",
         "prefixes",
@@ -116,6 +118,7 @@ class FullConfig(Config):
         cache: hikari_config.CacheComponents = DEFAULT_CACHE,
         database: DatabaseConfig,
         emoji_guild: typing.Optional[snowflakes.Snowflake] = None,
+        intents: intents.Intents = intents.Intents.ALL_UNPRIVILEGED,
         log_level: typing.Union[None, int, str, typing.Dict[str, typing.Any]] = logging.INFO,
         owner_only: bool = False,
         prefixes: typing.AbstractSet[str] = frozenset("r."),
@@ -124,6 +127,7 @@ class FullConfig(Config):
         self.cache = cache
         self.database = database
         self.emoji_guild = emoji_guild
+        self.intents = intents
         self.log_level = log_level
         self.owner_only = owner_only
         self.prefixes = prefixes
@@ -142,6 +146,7 @@ class FullConfig(Config):
             cache=_cast_or_default(mapping, "cache", hikari_config.CacheComponents, DEFAULT_CACHE),
             database=DatabaseConfig.from_mapping(mapping["database"]),
             emoji_guild=_cast_or_default(mapping, "emoji_guild", snowflakes.Snowflake, None),
+            intents=_cast_or_default(mapping, "intents", intents.Intents, intents.Intents.ALL_UNPRIVILEGED),
             log_level=log_level,
             owner_only=bool(mapping.get("owner_only", False)),
             prefixes=set(map(str, mapping["prefixes"])) if "prefixes" in mapping else {"r."},

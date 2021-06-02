@@ -453,7 +453,7 @@ class ExternalComponent(components.Component):
     @parsing.with_option("region", "-r", "--region", default=None)
     # TODO: should different resource types be split between different sub commands?
     @parsing.with_option("resource_type", "--type", "-t", default="video")
-    @parsing.with_greedy_argument("")
+    @parsing.with_greedy_argument("query")
     @parsing.with_parser
     @components.as_command("youtube", "yt")
     async def youtube(
