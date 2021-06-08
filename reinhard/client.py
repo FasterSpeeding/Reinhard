@@ -39,7 +39,6 @@ class Client(clients.Client):
         database: str,
         port: int,
         prefixes: typing.Optional[typing.Iterable[str]] = None,
-        mention_prefix: bool = True,
     ) -> None:
         super().__init__(
             events,
@@ -48,7 +47,6 @@ class Client(clients.Client):
             cache,
             hooks=hooks.Hooks(parser_error=command_hooks.on_parser_error, on_error=command_hooks.on_error),
             prefixes=prefixes,
-            mention_prefix=mention_prefix,
         )
         self._password = password
         self._host = host
@@ -102,7 +100,6 @@ def build(*args: typing.Any) -> hikari_traits.BotAware:
         database=config.database.database,
         port=config.database.port,
         prefixes=config.prefixes,
-        mention_prefix=False,
     )
 
     if config.owner_only:

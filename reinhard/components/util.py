@@ -304,6 +304,7 @@ class UtilComponent(components.Component):
             ctx, content=f"Pinging mentions: {mentions}" if mentions else "No pinging mentions."
         )
 
+    @checks.with_guild_check
     @parsing.with_greedy_argument("name")
     @parsing.with_parser
     @components.as_command("members")

@@ -149,7 +149,7 @@ class FullConfig(Config):
             intents=_cast_or_default(mapping, "intents", intents.Intents, intents.Intents.ALL_UNPRIVILEGED),
             log_level=log_level,
             owner_only=bool(mapping.get("owner_only", False)),
-            prefixes=set(map(str, mapping["prefixes"])) if "prefixes" in mapping else {"r."},
+            prefixes=frozenset(map(str, mapping["prefixes"])) if "prefixes" in mapping else {"r."},
             tokens=Tokens.from_mapping(mapping["tokens"]),
         )
 
