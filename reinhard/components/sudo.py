@@ -123,17 +123,21 @@ class SudoComponent(components.Component):
             while lines := stream.readlines(25):
                 yield from (line[:-1] for line in lines)
 
-    async def eval_python_code(
-        self, ctx: tanjun_traits.Context, code: str
-    ) -> typing.Tuple[typing.Iterable[str], int, bool]:
-        globals_ = {
+    def build_eval_globals(self, ctx: tanjun_traits.Context, /) -> typing.Dict[str, typing.Any]:
+        return {
             "asyncio": asyncio,
             "app": ctx.rest_service,
+            "bot": ctx.rest_service,
             "client": self.client,
             "component": self,
             "ctx": ctx,
             "hikari": hikari,
         }
+
+    async def eval_python_code(
+        self, ctx: tanjun_traits.Context, code: str
+    ) -> typing.Tuple[typing.Iterable[str], int, bool]:
+        globals_ = self.build_eval_globals(ctx)
         stdout = io.StringIO()
         stderr = io.StringIO()
         # contextlib.redirect_xxxxx doesn't work properly with contextlib.ExitStack
@@ -159,6 +163,20 @@ class SudoComponent(components.Component):
         stderr.seek(0)
         return self._yields_results(stdout, stderr), exec_time, failed
 
+    async def eval_python_code_no_capture(self, ctx: tanjun_traits.Context, code: str) -> None:
+        globals_ = self.build_eval_globals(ctx)
+        try:
+            compiled_code = compile(code, "", "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
+            if compiled_code.co_flags & inspect.CO_COROUTINE:
+                await eval(compiled_code, globals_)
+
+            else:
+                eval(compiled_code, globals_)
+
+        except BaseException:
+            traceback.print_exc()
+            pass
+
     @parsing.with_option("suppress_response", "-s", "--suppress", converters=bool, default=False, empty_value=True)
     @parsing.with_parser
     @components.as_command("eval", "exec", "sudo")
@@ -177,11 +195,12 @@ class SudoComponent(components.Component):
         if not code:
             raise tanjun_errors.CommandError("Expected a python code block.")
 
-        result, exec_time, failed = await self.eval_python_code(ctx, code[0])
-        colour = constants.FAILED_COLOUR if failed else constants.PASS_COLOUR
         if suppress_response:
+            await self.eval_python_code_no_capture(ctx, code[0])
             return
 
+        result, exec_time, failed = await self.eval_python_code(ctx, code[0])
+        colour = constants.FAILED_COLOUR if failed else constants.PASS_COLOUR
         string_paginator = paginaton.string_paginator(iter(result), wrapper="```python\n{}\n```", char_limit=2034)
         embed_generator = (
             (
