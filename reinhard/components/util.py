@@ -3,12 +3,15 @@ from __future__ import annotations
 __all__: typing.Sequence[str] = ["UtilComponent"]
 
 import typing
+import unicodedata
 
 from hikari import colours
 from hikari import embeds
 from hikari import errors as hikari_errors
+from hikari import files
 from hikari import guilds
 from hikari import snowflakes
+from hikari import undefined
 from hikari import users
 from tanjun import checks
 from tanjun import components
@@ -326,3 +329,36 @@ class UtilComponent(components.Component):
             content = "No similar members found"
 
         await rest_manager.HikariErrorManager().try_respond(ctx, content=content)
+
+    @staticmethod
+    def _format_char_line(char: str, to_file: bool) -> str:
+        code = ord(char)
+        name = unicodedata.name(char, "???")
+        if to_file:
+            return f"* `\\u{code:08x}`: {name} <http://www.fileformat.info/info/unicode/char/{code:x}>"
+
+        return f"`\\u{code:08x}`: {name} <http://www.fileformat.info/info/unicode/char/{code:x}>"
+
+    @components.as_group("char", checks=[lambda ctx: bool(ctx.content)])
+    async def char(self, ctx: tanjun_traits.Context, to_file: bool = False) -> None:
+        """Get information about the UTF-8 characters in the executing message."""
+        if len(ctx.content) > 20:
+            to_file = True
+
+        content: undefined.UndefinedOr[str]
+        content = "\n".join(self._format_char_line(char, to_file) for char in ctx.content)
+        file: undefined.UndefinedOr[files.Bytes] = undefined.UNDEFINED
+
+        # highly doubt this'll ever be over 1990 when to_file is False but better safe than sorry.
+        if to_file or len(content) >= 1990:
+            file = files.Bytes(content.encode(), "character-info.md", mimetype="text/markdown; charset=UTF-8")
+            content = undefined.UNDEFINED
+
+        else:
+            content = content
+
+        await ctx.message.respond(content=content, attachment=file)
+
+    @char.with_command("file")
+    async def char_file(self, ctx: tanjun_traits.Context) -> None:
+        await self.char(ctx, to_file=True)
