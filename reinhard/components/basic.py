@@ -128,9 +128,9 @@ class BasicComponent(components.Component):
                     break
 
             for command in ctx.client.check_name(command_name):
-                command_embed = help_util.generate_command_embed(command.command, prefix=prefix)
-                await ctx.message.respond(embed=command_embed)
-                break
+                if command_embed := help_util.generate_command_embed(command.command, prefix=prefix):
+                    await ctx.message.respond(embed=command_embed)
+                    break
 
             else:
                 await ctx.message.respond(f"Couldn't find `{command_name}` command.")
