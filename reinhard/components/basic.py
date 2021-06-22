@@ -18,6 +18,7 @@ from hikari import undefined
 from tanjun import components
 from tanjun import errors as tanjun_errors
 from tanjun import parsing
+from tanjun import checks
 from yuyo import backoff
 from yuyo import paginaton
 
@@ -98,10 +99,22 @@ class BasicComponent(components.Component):
         )
         await error_manager.try_respond(ctx, embed=embed)
 
+    async def _help_pre_execution(self, ctx: tanjun_traits.Context, /) -> typing.Literal[True]:
+        if not self.help_embeds:
+            prefix = next(iter(self.client.prefixes)) if self.client and self.client.prefixes else ""
+
+            self.help_embeds = {}
+            for component in ctx.client.components:
+                if value := help_util.generate_help_embeds(component, prefix=prefix):
+                    self.help_embeds[value[0].lower()] = [v for v in value[1]]
+
+        return True
+
     @parsing.with_greedy_argument("command_name", default=None)
     @parsing.with_option("component_name", "--component", default=None)
     @parsing.with_parser
-    @components.as_command("help")  # TODO: specify a group or command
+    # TODO: specify a group or command
+    @components.as_command("help")
     async def help(
         self, ctx: tanjun_traits.Context, command_name: typing.Optional[str], component_name: typing.Optional[str]
     ) -> None:
@@ -113,20 +126,14 @@ class BasicComponent(components.Component):
         Options
             * component name (--component): Name of a component to get the documentation for.
         """
-        prefix = next(iter(self.client.prefixes)) if self.client and self.client.prefixes else ""
-
-        if not self.help_embeds:
-            self.help_embeds = {}
-            for component in ctx.client.components:
-                if value := await help_util.generate_help_embeds(component, prefix=prefix):
-                    self.help_embeds[value[0].lower()] = [v async for v in value[1]]
-
+        await self._help_pre_execution(ctx)
         if command_name is not None:
             for own_prefix in ctx.client.prefixes:
                 if command_name.startswith(own_prefix):
                     command_name = command_name[len(own_prefix) :]
                     break
 
+            prefix = next(iter(self.client.prefixes)) if self.client and self.client.prefixes else ""
             for command in ctx.client.check_name(command_name):
                 if command_embed := help_util.generate_command_embed(command.command, prefix=prefix):
                     await ctx.message.respond(embed=command_embed)
@@ -152,6 +159,7 @@ class BasicComponent(components.Component):
             ctx.rest_service, ctx.message.channel_id, embed_generator, authors=(ctx.message.author,)
         )
         message = await paginator.open()
+        assert self.paginator_pool is not None
         self.paginator_pool.add_paginator(message, paginator)
 
     @components.as_command("ping")
@@ -196,7 +204,8 @@ class BasicComponent(components.Component):
         ("Voice states: {0}", lambda c: sum(len(record) for record in c.cache.get_voice_states_view().values())),
     )
 
-    @components.as_command("cache", checks=(lambda ctx: bool(ctx.cache_service),))
+    @checks.with_check(lambda ctx: bool(ctx.cache_service))
+    @components.as_command("cache")
     async def cache(self, ctx: tanjun_traits.Context) -> None:
         """Get general information about this bot."""
         assert ctx.cache_service  # this is asserted by a check

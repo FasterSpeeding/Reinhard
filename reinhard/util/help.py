@@ -41,9 +41,9 @@ def get_component_name(component: traits.Component, /) -> str:
     return "".join(result)
 
 
-async def generate_help_embeds(
+def generate_help_embeds(
     component: traits.Component, /, *, prefix: str = ""
-) -> typing.Optional[typing.Tuple[str, typing.AsyncIterator[embeds_.Embed]]]:
+) -> typing.Optional[typing.Tuple[str, typing.Iterator[embeds_.Embed]]]:
     component_doc = get_component_doc(component)
     component_name = get_component_name(component)
 
@@ -64,7 +64,7 @@ async def generate_help_embeds(
         embeds_.Embed(title=f"{component_name}", description=content, colour=constants.embed_colour()).set_footer(
             text=f"page {page + 1}"
         )
-        async for content, page in pages
+        for content, page in pages
     )
 
     return component_name, embeds

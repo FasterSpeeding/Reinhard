@@ -107,6 +107,7 @@ class FullConfig(Config):
         "emoji_guild",
         "intents",
         "log_level",
+        "mention_prefix",
         "owner_only",
         "prefixes",
         "tokens",
@@ -120,6 +121,7 @@ class FullConfig(Config):
         emoji_guild: typing.Optional[snowflakes.Snowflake] = None,
         intents: intents.Intents = intents.Intents.ALL_UNPRIVILEGED,
         log_level: typing.Union[None, int, str, typing.Dict[str, typing.Any]] = logging.INFO,
+        mention_prefix: bool = True,
         owner_only: bool = False,
         prefixes: typing.AbstractSet[str] = frozenset("r."),
         tokens: Tokens,
@@ -129,6 +131,7 @@ class FullConfig(Config):
         self.emoji_guild = emoji_guild
         self.intents = intents
         self.log_level = log_level
+        self.mention_prefix = mention_prefix
         self.owner_only = owner_only
         self.prefixes = prefixes
         self.tokens = tokens
@@ -148,6 +151,7 @@ class FullConfig(Config):
             emoji_guild=_cast_or_default(mapping, "emoji_guild", snowflakes.Snowflake, None),
             intents=_cast_or_default(mapping, "intents", intents.Intents, intents.Intents.ALL_UNPRIVILEGED),
             log_level=log_level,
+            mention_prefix=bool(mapping.get("mention_prefix", False)),
             owner_only=bool(mapping.get("owner_only", False)),
             prefixes=frozenset(map(str, mapping["prefixes"])) if "prefixes" in mapping else {"r."},
             tokens=Tokens.from_mapping(mapping["tokens"]),

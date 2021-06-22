@@ -51,9 +51,10 @@ class SudoComponent(components.Component):
         hooks: typing.Optional[tanjun_traits.Hooks] = None,
     ) -> None:
         self.owner_check = checks_.ApplicationOwnerCheck()
-        super().__init__(checks=(*checks, self.owner_check) if checks else (self.owner_check,), hooks=hooks)
+        super().__init__(checks=checks, hooks=hooks)
         self.emoji_guild = emoji_guild
         self.paginator_pool: typing.Optional[paginaton.PaginatorPool] = None
+        self.add_check(self.owner_check)
 
     def bind_client(self, client: tanjun_traits.Client, /) -> None:
         super().bind_client(client)
@@ -215,6 +216,7 @@ class SudoComponent(components.Component):
             ctx.rest_service, ctx.message.channel_id, embed_generator, authors=[ctx.message.author.id]
         )
         message = await response_paginator.open()
+        assert self.paginator_pool is not None
         self.paginator_pool.add_paginator(message, response_paginator)
 
     @components.as_command("commands")

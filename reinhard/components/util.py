@@ -93,7 +93,8 @@ class UtilComponent(components.Component):
 
     @parsing.with_greedy_argument("member", converters=conversion.RESTFulMemberConverter, default=None)
     @parsing.with_parser
-    @components.as_command("member", checks=[lambda ctx: ctx.message.guild_id is not None])
+    @checks.with_check(lambda ctx: ctx.message.guild_id is not None)
+    @components.as_command("member")
     async def member(self, ctx: tanjun_traits.Context, member: typing.Union[guilds.Member, None]) -> None:
         """Get information about a member in the current guild.
 
@@ -179,7 +180,8 @@ class UtilComponent(components.Component):
     # TODO: the normal role converter is limited to the current guild right?
     @parsing.with_argument("role", converters=conversion.RESTFulRoleConverter)
     @parsing.with_parser
-    @components.as_command("role", checks=[lambda ctx: ctx.message.guild_id is not None])
+    @checks.with_check(lambda ctx: ctx.message.guild_id is not None)
+    @components.as_command("role")
     async def role(self, ctx: tanjun_traits.Context, role: guilds.Role) -> None:
         """ "Get information about a role in the current guild.
 
@@ -339,9 +341,13 @@ class UtilComponent(components.Component):
 
         return f"`\\u{code:08x}`: {name} <http://www.fileformat.info/info/unicode/char/{code:x}>"
 
-    @components.as_group("char", checks=[lambda ctx: bool(ctx.content)])
+    @checks.with_check(lambda ctx: bool(ctx.content))
+    @components.as_group("char")
     async def char(self, ctx: tanjun_traits.Context, to_file: bool = False) -> None:
-        """Get information about the UTF-8 characters in the executing message."""
+        """Get information about the UTF-8 characters in the executing message.
+
+        Running `char file...` will ensure that the output is always sent as a markdown file.
+        """
         if len(ctx.content) > 20:
             to_file = True
 

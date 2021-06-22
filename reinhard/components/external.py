@@ -529,7 +529,6 @@ class ExternalComponent(components.Component):
         )
         try:
             message = await response_paginator.open()
-            assert message is not None
 
         except RuntimeError as exc:
             raise tanjun_errors.CommandError(str(exc)) from None
@@ -662,7 +661,6 @@ class ExternalComponent(components.Component):
         )
         try:
             message = await response_paginator.open()
-            assert message is not None
 
         except RuntimeError as exc:
             raise tanjun_errors.CommandError(str(exc)) from None
