@@ -99,7 +99,7 @@ class BasicComponent(components.Component):
         )
         await error_manager.try_respond(ctx, embed=embed)
 
-    async def _help_pre_execution(self, ctx: tanjun_traits.Context, /) -> typing.Literal[True]:
+    def _help_pre_execution(self, ctx: tanjun_traits.Context, /) -> typing.Literal[True]:
         if not self.help_embeds:
             prefix = next(iter(self.client.prefixes)) if self.client and self.client.prefixes else ""
 
@@ -126,7 +126,7 @@ class BasicComponent(components.Component):
         Options
             * component name (--component): Name of a component to get the documentation for.
         """
-        await self._help_pre_execution(ctx)
+        self._help_pre_execution(ctx)
         if command_name is not None:
             for own_prefix in ctx.client.prefixes:
                 if command_name.startswith(own_prefix):
