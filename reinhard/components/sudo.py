@@ -242,6 +242,76 @@ class SudoComponent(components.Component):
     async def note_remove(self, ctx: tanjun_traits.Context) -> None:
         await ctx.message.respond("todo")
 
-    async def steal(self, ctx: tanjun_traits.Context, target: snowflakes.Snowflake, *args: str) -> None:
-        # TODO: emoji steal command
-        ...
+    @staticmethod
+    def _split_emoji(emoji: emojis.CustomEmoji) -> typing.Tuple[snowflakes.Snowflake, str, bool]:
+        assert emoji.is_animated is not None
+        assert emoji.name is not None
+        return (emoji.id, emoji.name, emoji.is_animated)
+
+    @checks_.with_guild_check
+    @parsing.with_option("reaction", "-r", "--reaction", converters=bool, default=False, empty_value=True)
+    @parsing.with_option("channel", "-c", "--channel", converters=snowflakes.Snowflake, default=None)
+    @parsing.with_option("presence", "-p", "--presence", default=False, empty_value=True)
+    @parsing.with_argument("target", converters=snowflakes.Snowflake)
+    @parsing.with_parser
+    @components.as_command("commands")
+    async def steal(
+        self,
+        ctx: tanjun_traits.Context,
+        target: snowflakes.Snowflake,
+        presence: bool,
+        channel: typing.Optional[snowflakes.Snowflake],
+        reaction: bool,
+    ) -> None:
+        assert ctx.message.guild_id is not None
+        if presence and reaction:
+            raise tanjun_errors.CommandError("Only one of `presence` or `reaction` can be provided.")
+
+        if channel and presence:
+            raise tanjun_errors.CommandError("`channel` cannot be provided for presence targets")
+
+        retry = backoff.Backoff(max_retries=5)
+        error_manager = rest_manager.HikariErrorManager(
+            retry, break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
+        )
+
+        iterator: typing.Iterator[typing.Tuple[snowflakes.Snowflake, str, bool]]
+
+        if presence:
+            member_presence = (
+                ctx.cache_service.cache.get_presence(ctx.message.guild_id, target) if ctx.cache_service else None
+            )
+            if not member_presence:
+                raise tanjun_errors.CommandError("Couldn't find target user's presence")
+
+            iterator = (
+                self._split_emoji(activity.emoji)
+                for activity in member_presence.activities
+                if isinstance(activity.emoji, emojis.CustomEmoji)
+            )
+
+        else:
+            channel = channel or ctx.message.channel_id
+            message: typing.Optional[messages.Message] = None
+
+            if ctx.cache_service:
+                message = ctx.cache_service.cache.get_message(target)
+
+            if not message:
+                # TODO: handle not found properly
+                with error_manager:
+                    async for _ in retry:
+                        message = await ctx.rest_service.rest.fetch_message(channel, target)
+                        break
+
+        for emoji_id, emoji_name, is_animated in iterator:
+            with error_manager:
+                async for _ in retry:
+                    file_extension = "gif" if is_animated else "png"
+                    url = f"https://cdn.discordapp.com/emojis/{emoji_id}.{file_extension}?v=1"
+                    await ctx.rest_service.rest.create_emoji(ctx.message.guild_id, name=emoji_name, image=url)
+                    break
+
+    @steal.with_check
+    def _steal_guild_check(self, _: tanjun_traits.Context) -> bool:
+        return self.emoji_guild is not None

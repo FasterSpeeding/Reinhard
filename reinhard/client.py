@@ -38,16 +38,9 @@ class Client(clients.Client):
         user: str,
         database: str,
         port: int,
-        prefixes: typing.Optional[typing.Iterable[str]] = None,
+        mention_prefix: bool = False,
     ) -> None:
-        super().__init__(
-            events,
-            rest,
-            shard,
-            cache,
-            hooks=hooks.Hooks(parser_error=command_hooks.on_parser_error, on_error=command_hooks.on_error),
-            prefixes=prefixes,
-        )
+        super().__init__(events, rest, shard, cache, mention_prefix=mention_prefix)
         self._password = password
         self._host = host
         self._user = user
@@ -89,17 +82,21 @@ def build(*args: typing.Any) -> hikari_traits.BotAware:
         config.tokens.bot,
         logs=config.log_level,
         intents=config.intents,
-        cache_settings=hikari_config.CacheSettings(components=config.cache)
+        cache_settings=hikari_config.CacheSettings(components=config.cache),
         # rest_url="https://staging.discord.co/api/v8"
     )
-    client = Client(
-        bot,
-        password=config.database.password,
-        host=config.database.host,
-        user=config.database.user,
-        database=config.database.database,
-        port=config.database.port,
-        prefixes=config.prefixes,
+    client = (
+        Client(
+            bot,
+            password=config.database.password,
+            host=config.database.host,
+            user=config.database.user,
+            database=config.database.database,
+            port=config.database.port,
+            mention_prefix=config.mention_prefix,
+        )
+        .set_hooks(hooks.Hooks(on_parser_error=command_hooks.on_parser_error, on_error=command_hooks.on_error))
+        .add_prefix(config.prefixes)
     )
 
     if config.owner_only:
