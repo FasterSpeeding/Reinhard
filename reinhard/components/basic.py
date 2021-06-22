@@ -15,10 +15,10 @@ from hikari import __version__ as hikari_version
 from hikari import embeds as embeds_
 from hikari import errors as hikari_errors
 from hikari import undefined
+from tanjun import checks
 from tanjun import components
 from tanjun import errors as tanjun_errors
 from tanjun import parsing
-from tanjun import checks
 from yuyo import backoff
 from yuyo import paginaton
 

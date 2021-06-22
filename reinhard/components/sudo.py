@@ -210,7 +210,7 @@ class SudoComponent(components.Component):
                     text=f"Time taken: {exec_time} ms"
                 ),
             )
-            async for text, page in string_paginator
+            for text, page in string_paginator
         )
         response_paginator = paginaton.Paginator(
             ctx.rest_service, ctx.message.channel_id, embed_generator, authors=[ctx.message.author.id]

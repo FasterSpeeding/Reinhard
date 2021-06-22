@@ -428,7 +428,7 @@ class ExternalComponent(components.Component):
                 .set_footer(text=f"Page {index + 1}")
                 .set_author(icon=icon, name=title),
             )
-            async for page, index in paginaton.string_paginator(iter(data["lyrics"].splitlines() or ["..."]))
+            for page, index in paginaton.string_paginator(iter(data["lyrics"].splitlines() or ["..."]))
         )
         response_paginator = paginaton.Paginator(
             ctx.rest_service,
