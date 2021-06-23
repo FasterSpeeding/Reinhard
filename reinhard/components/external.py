@@ -767,7 +767,7 @@ class ExternalComponent(components.Component):
 
         response.raise_for_status()
 
-        file_path = (await response.json())["shareable_link"] + "?link=" + link_token
+        file_path = (await response.json())["shareable_link"].format(link_token=link_token)
         await ctx.message.respond(content=file_path)
 
     @ytdl.with_check
