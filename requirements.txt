@@ -6,3 +6,4 @@ pyyaml==5.4
 hikari==2.0.0.dev101
 hikari-tanjun~=2.0.0a1
 hikari-yuyo~=0.0.3a7
+youtube_dl~=2021.6.6

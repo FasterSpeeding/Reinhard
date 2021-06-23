@@ -68,7 +68,9 @@ def add_components(client: tanjun_traits.Client, /, *, config: typing.Optional[c
     proxy_settings = hikari_config.ProxySettings()
 
     client.add_component(basic.BasicComponent())
-    client.add_component(external.ExternalComponent(http_settings, proxy_settings, config.tokens))
+    client.add_component(
+        external.ExternalComponent(http_settings, proxy_settings, config.tokens, ptf_config=config.ptf)
+    )
     client.add_component(moderation.ModerationComponent())
     client.add_component(sudo.SudoComponent(emoji_guild=config.emoji_guild))
     client.add_component(util.UtilComponent())

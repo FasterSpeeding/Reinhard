@@ -12,7 +12,6 @@ import re
 import time
 import traceback
 import typing
-from builtins import str
 
 import hikari
 from hikari import embeds

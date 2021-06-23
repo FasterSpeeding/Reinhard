@@ -3,9 +3,11 @@ from __future__ import annotations
 __all__: typing.Sequence[str] = ["DatabaseConfig", "Tokens", "FullConfig"]
 
 import abc
+import dataclasses
 import logging
 import os
 import pathlib
+import sys
 import typing
 
 import yaml
@@ -16,6 +18,7 @@ from hikari import snowflakes
 ConfigT = typing.TypeVar("ConfigT", bound="Config")
 DefaultT = typing.TypeVar("DefaultT")
 ValueT = typing.TypeVar("ValueT")
+_DATACLASS_KWORDS = {"kw_only": True, "repr": False, "slots": True} if sys.version_info.minor >= 10 else {"repr": False}
 
 
 def _cast_or_default(
@@ -36,24 +39,13 @@ class Config(abc.ABC):
         raise NotImplementedError
 
 
+@dataclasses.dataclass(**_DATACLASS_KWORDS)
 class DatabaseConfig(Config):
-    __slots__: typing.Sequence[str] = ("password", "database", "host", "port", "user")
-
-    def __init__(
-        self,
-        password: str,
-        /,
-        *,
-        database: str = "postgres",
-        host: str = "localhost",
-        port: int = 5432,
-        user: str = "postgres",
-    ) -> None:
-        self.password = password
-        self.database = database
-        self.host = host
-        self.port = port
-        self.user = user
+    password: str
+    database: str = "postgres"
+    host: str = "localhost"
+    port: int = 5432
+    user: str = "postgres"
 
     @classmethod
     def from_mapping(cls, mapping: typing.Mapping[str, typing.Any], /) -> DatabaseConfig:
@@ -66,21 +58,31 @@ class DatabaseConfig(Config):
         )
 
 
-class Tokens(Config):
-    __slots__: typing.Sequence[str] = ("bot", "google", "spotify_id", "spotify_secret")
+@dataclasses.dataclass(**_DATACLASS_KWORDS)
+class PTFConfig(Config):
+    auth_service: str
+    file_service: str
+    message_service: str
+    password: str
+    username: str
 
-    def __init__(
-        self,
-        bot: str,
-        *,
-        google: typing.Optional[str] = None,
-        spotify_id: typing.Optional[str] = None,
-        spotify_secret: typing.Optional[str] = None,
-    ) -> None:
-        self.bot = bot
-        self.google = google
-        self.spotify_id = spotify_id
-        self.spotify_secret = spotify_secret
+    @classmethod
+    def from_mapping(cls, mapping: typing.Mapping[str, typing.Any], /) -> PTFConfig:
+        return cls(
+            auth_service=str(mapping["auth_service"]),
+            file_service=str(mapping["file_service"]),
+            message_service=str(mapping["message_service"]),
+            username=str(mapping["username"]),
+            password=str(mapping["password"]),
+        )
+
+
+@dataclasses.dataclass(**_DATACLASS_KWORDS)
+class Tokens(Config):
+    bot: str
+    google: typing.Optional[str] = None
+    spotify_id: typing.Optional[str] = None
+    spotify_secret: typing.Optional[str] = None
 
     @classmethod
     def from_mapping(cls, mapping: typing.Mapping[str, typing.Any], /) -> Tokens:
@@ -100,41 +102,20 @@ DEFAULT_CACHE = (
 )
 
 
+@dataclasses.dataclass(
+    **_DATACLASS_KWORDS,
+)
 class FullConfig(Config):
-    __slots__: typing.Sequence[str] = (
-        "cache",
-        "database",
-        "emoji_guild",
-        "intents",
-        "log_level",
-        "mention_prefix",
-        "owner_only",
-        "prefixes",
-        "tokens",
-    )
-
-    def __init__(
-        self,
-        *,
-        cache: hikari_config.CacheComponents = DEFAULT_CACHE,
-        database: DatabaseConfig,
-        emoji_guild: typing.Optional[snowflakes.Snowflake] = None,
-        intents: intents.Intents = intents.Intents.ALL_UNPRIVILEGED,
-        log_level: typing.Union[None, int, str, typing.Dict[str, typing.Any]] = logging.INFO,
-        mention_prefix: bool = True,
-        owner_only: bool = False,
-        prefixes: typing.AbstractSet[str] = frozenset("r."),
-        tokens: Tokens,
-    ) -> None:
-        self.cache = cache
-        self.database = database
-        self.emoji_guild = emoji_guild
-        self.intents = intents
-        self.log_level = log_level
-        self.mention_prefix = mention_prefix
-        self.owner_only = owner_only
-        self.prefixes = prefixes
-        self.tokens = tokens
+    database: DatabaseConfig
+    tokens: Tokens
+    cache: hikari_config.CacheComponents = DEFAULT_CACHE
+    emoji_guild: typing.Optional[snowflakes.Snowflake] = None
+    intents: intents.Intents = intents.Intents.ALL_UNPRIVILEGED
+    log_level: typing.Union[None, int, str, typing.Dict[str, typing.Any]] = logging.INFO
+    mention_prefix: bool = True
+    owner_only: bool = False
+    prefixes: typing.AbstractSet[str] = frozenset("r.")
+    ptf: typing.Optional[PTFConfig] = None
 
     @classmethod
     def from_mapping(cls, mapping: typing.Mapping[str, typing.Any], /) -> FullConfig:
@@ -154,6 +135,7 @@ class FullConfig(Config):
             mention_prefix=bool(mapping.get("mention_prefix", False)),
             owner_only=bool(mapping.get("owner_only", False)),
             prefixes=frozenset(map(str, mapping["prefixes"])) if "prefixes" in mapping else {"r."},
+            ptf=_cast_or_default(mapping, "ptf", PTFConfig.from_mapping, None),
             tokens=Tokens.from_mapping(mapping["tokens"]),
         )
 

@@ -99,7 +99,7 @@ class BasicComponent(components.Component):
         )
         await error_manager.try_respond(ctx, embed=embed)
 
-    def _help_pre_execution(self, ctx: tanjun_traits.Context, /) -> typing.Literal[True]:
+    def _help_pre_execution(self, ctx: tanjun_traits.Context, /) -> None:
         if not self.help_embeds:
             prefix = next(iter(self.client.prefixes)) if self.client and self.client.prefixes else ""
 
@@ -107,8 +107,6 @@ class BasicComponent(components.Component):
             for component in ctx.client.components:
                 if value := help_util.generate_help_embeds(component, prefix=prefix):
                     self.help_embeds[value[0].lower()] = [v for v in value[1]]
-
-        return True
 
     @parsing.with_greedy_argument("command_name", default=None)
     @parsing.with_option("component_name", "--component", default=None)

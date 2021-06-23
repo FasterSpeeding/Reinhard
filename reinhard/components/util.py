@@ -337,9 +337,9 @@ class UtilComponent(components.Component):
         code = ord(char)
         name = unicodedata.name(char, "???")
         if to_file:
-            return f"* `\\u{code:08x}`: {name} <http://www.fileformat.info/info/unicode/char/{code:x}>"
+            return f"* `\\u{code:08x}`/`{char}`: {name} <http://www.fileformat.info/info/unicode/char/{code:x}>"
 
-        return f"`\\u{code:08x}`: {name} <http://www.fileformat.info/info/unicode/char/{code:x}>"
+        return f"`\\u{code:08x}`/`{char}`: {name} <http://www.fileformat.info/info/unicode/char/{code:x}>"
 
     @checks.with_check(lambda ctx: bool(ctx.content))
     @components.as_group("char")

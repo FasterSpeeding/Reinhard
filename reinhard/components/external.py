@@ -6,6 +6,7 @@ import datetime
 import logging
 import time
 import typing
+import urllib.parse
 
 import aiohttp
 import sphobjinv  # type: ignore[import]
@@ -13,6 +14,7 @@ from hikari import channels
 from hikari import embeds
 from hikari import errors as hikari_errors
 from hikari import undefined
+from tanjun import checks
 from tanjun import components
 from tanjun import errors as tanjun_errors
 from tanjun import parsing
@@ -22,6 +24,7 @@ from yuyo import paginaton
 from ..util import basic as basic_util
 from ..util import constants
 from ..util import rest_manager
+from ..util import ytdl
 
 if typing.TYPE_CHECKING:
     from hikari import config as hikari_config
@@ -289,8 +292,10 @@ class ExternalComponent(components.Component):
         "_http_settings",
         "paginator_pool",
         "proxy_setting",
+        "_ptf_config",
         "_tokens",
         "user_agent",
+        "ytdl_client",
     )
 
     def __init__(
@@ -299,6 +304,7 @@ class ExternalComponent(components.Component):
         proxy_settings: hikari_config.ProxySettings,
         tokens: config.Tokens,
         *,
+        ptf_config: typing.Optional[config.PTFConfig] = None,
         hooks: typing.Optional[tanjun_traits.Hooks] = None,
     ) -> None:
         super().__init__(hooks=hooks)
@@ -307,6 +313,7 @@ class ExternalComponent(components.Component):
             HIKARI_IO + "/objects.inv", datetime.timedelta(hours=12), sphobjinv.Inventory
         )
         self._http_settings = http_settings
+        self._ptf_config = ptf_config
         self._proxy_settings = proxy_settings
         self.paginator_pool: typing.Optional[paginaton.PaginatorPool] = None
 
@@ -318,6 +325,7 @@ class ExternalComponent(components.Component):
 
         self._tokens = tokens
         self.user_agent = ""
+        self.ytdl_client = ytdl.YoutubeDownloader()
 
     def _acquire_session(self) -> aiohttp.ClientSession:
         if self._client_session is None:
@@ -337,6 +345,7 @@ class ExternalComponent(components.Component):
 
     async def close(self) -> None:
         await super().close()
+        self.ytdl_client.close()
         if self.paginator_pool is not None:
             await self.paginator_pool.close()
 
@@ -348,6 +357,7 @@ class ExternalComponent(components.Component):
         if self.client is None or self.paginator_pool is None:
             raise RuntimeError("Cannot open this component without binding a client.")
 
+        self.ytdl_client.start()
         retry = backoff.Backoff(max_retries=4)
         error_manger = rest_manager.HikariErrorManager(retry)
         async for _ in retry:
@@ -718,3 +728,48 @@ class ExternalComponent(components.Component):
                 color=constants.embed_colour(),
             )
             await error_manager.try_respond(ctx, embed=embed)
+
+    @checks.with_owner_check
+    @parsing.with_argument("url", converters=urllib.parse.urlparse)
+    @parsing.with_parser
+    @components.as_command("ytdl")
+    async def ytdl(self, ctx: tanjun_traits.Context, url: urllib.parse.ParseResult) -> None:
+        assert self._ptf_config is not None
+        auth = aiohttp.BasicAuth(self._ptf_config.username, self._ptf_config.password)
+        session = self._acquire_session()
+
+        # Create Message
+        response = await session.post(
+            self._ptf_config.message_service + "/messages", json={"title": f"Reinhard upload {time.time()}"}, auth=auth
+        )
+        response.raise_for_status()
+        message_id = (await response.json())["id"]
+
+        # Create message link
+        response = await session.post(
+            f"{self._ptf_config.auth_service}/messages/{message_id}/links", json={}, auth=auth
+        )
+        response.raise_for_status()
+        link_token = (await response.json())["token"]
+
+        # Download video
+        path, data = await self.ytdl_client.download(url.geturl())
+        filename = urllib.parse.quote(path.name)
+
+        try:
+            with path.open("rb") as file:
+                response = await session.put(
+                    f"{self._ptf_config.file_service}/messages/{message_id}/files/{filename}", auth=auth, data=file
+                )
+
+        finally:
+            path.unlink(missing_ok=True)
+
+        response.raise_for_status()
+
+        file_path = (await response.json())["shareable_link"] + "?link=" + link_token
+        await ctx.message.respond(content=file_path)
+
+    @ytdl.with_check
+    def _ytdl_check(self, _: tanjun_traits.Context, /) -> bool:
+        return self._ptf_config is not None
