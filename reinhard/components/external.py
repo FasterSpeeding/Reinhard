@@ -736,25 +736,27 @@ class ExternalComponent(components.Component):
         auth = aiohttp.BasicAuth(self._ptf_config.username, self._ptf_config.password)
         session = self._acquire_session()
 
-        # Create Message
-        response = await session.post(
-            self._ptf_config.message_service + "/messages", json={"title": f"Reinhard upload {time.time()}"}, auth=auth
-        )
-        response.raise_for_status()
-        message_id = (await response.json())["id"]
-
-        # Create message link
-        response = await session.post(
-            f"{self._ptf_config.auth_service}/messages/{message_id}/links", json={}, auth=auth
-        )
-        response.raise_for_status()
-        link_token = (await response.json())["token"]
-
         # Download video
         path, data = await self.ytdl_client.download(url.geturl())
         filename = urllib.parse.quote(path.name)
 
         try:
+            # Create Message
+            response = await session.post(
+                self._ptf_config.message_service + "/messages",
+                json={"title": f"Reinhard upload {time.time()}"},
+                auth=auth,
+            )
+            response.raise_for_status()
+            message_id = (await response.json())["id"]
+
+            # Create message link
+            response = await session.post(
+                f"{self._ptf_config.auth_service}/messages/{message_id}/links", json={}, auth=auth
+            )
+            response.raise_for_status()
+            link_token = (await response.json())["token"]
+
             with path.open("rb") as file:
                 response = await session.put(
                     f"{self._ptf_config.file_service}/messages/{message_id}/files/{filename}", auth=auth, data=file
