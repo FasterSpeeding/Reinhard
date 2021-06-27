@@ -493,21 +493,19 @@ class ExternalComponent(components.Component):
                 This can be one of "channel", "playlist" or "video" and defaults to "video".
         """
         if safe_search is not False:
-            channel: typing.Optional[channels.GuildChannel] = None
+            channel: typing.Optional[channels.PartialChannel]
+            if ctx.cache_service and (channel := ctx.cache_service.cache.get_guild_channel(ctx.message.channel_id)):
+                channel_is_nsfw = channel.is_nsfw
 
-            if ctx.cache_service:
-                channel = ctx.cache_service.cache.get_guild_channel(ctx.message.channel_id)
-
-            if not channel:
+            else:
                 # TODO: handle retires
-                result = await ctx.rest_service.rest.fetch_channel(ctx.message.channel_id)
-                assert isinstance(result, channels.GuildChannel)
-                channel = result
+                channel = await ctx.rest_service.rest.fetch_channel(ctx.message.channel_id)
+                channel_is_nsfw = channel.is_nsfw if isinstance(channel, channels.GuildChannel) else False
 
             if safe_search is None:
-                safe_search = not channel.is_nsfw
+                safe_search = not channel_is_nsfw
 
-            elif not safe_search and not channel.is_nsfw:
+            elif not safe_search and not channel_is_nsfw:
                 raise tanjun_errors.CommandError("Cannot disable safe search in a sfw channel")
 
         resource_type = resource_type.lower()
