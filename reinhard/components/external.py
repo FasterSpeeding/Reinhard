@@ -728,7 +728,7 @@ class ExternalComponent(components.Component):
             await error_manager.try_respond(ctx, embed=embed)
 
     @checks.with_owner_check
-    @parsing.with_argument("url", converters=urllib.parse.urlparse)
+    @parsing.with_argument("url", converters=urllib.parse.ParseResult)
     @parsing.with_parser
     @components.as_command("ytdl")
     async def ytdl(self, ctx: tanjun_traits.Context, url: urllib.parse.ParseResult) -> None:
