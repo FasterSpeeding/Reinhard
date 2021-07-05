@@ -212,7 +212,17 @@ class SudoComponent(components.Component):
             for text, page in string_paginator
         )
         response_paginator = paginaton.Paginator(
-            ctx.rest_service, ctx.message.channel_id, embed_generator, authors=[ctx.message.author.id]
+            ctx.rest_service,
+            ctx.message.channel_id,
+            embed_generator,
+            authors=[ctx.message.author.id],
+            triggers=(
+                paginaton.LEFT_DOUBLE_TRIANGLE,
+                paginaton.LEFT_TRIANGLE,
+                paginaton.STOP_SQUARE,
+                paginaton.RIGHT_TRIANGLE,
+                paginaton.RIGHT_DOUBLE_TRIANGLE,
+            ),
         )
         message = await response_paginator.open()
         assert self.paginator_pool is not None

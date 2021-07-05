@@ -762,12 +762,12 @@ class ExternalComponent(components.Component):
                     f"{self._ptf_config.file_service}/messages/{message_id}/files/{filename}", auth=auth, data=file
                 )
 
+            response.raise_for_status()
+            file_path = (await response.json())["shareable_link"].format(link_token=link_token)
+
         finally:
             path.unlink(missing_ok=True)
 
-        response.raise_for_status()
-
-        file_path = (await response.json())["shareable_link"].format(link_token=link_token)
         await ctx.message.respond(content=file_path)
 
     @ytdl.with_check
