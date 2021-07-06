@@ -22,10 +22,12 @@ from hikari import undefined
 from tanjun import checks as checks_
 from tanjun import components
 from tanjun import errors as tanjun_errors
+from tanjun import injector
 from tanjun import parsing
 from yuyo import backoff
 from yuyo import paginaton
 
+from .. import config as config_
 from ..util import constants
 from ..util import rest_manager
 
@@ -40,38 +42,27 @@ CallbackT = typing.Callable[..., typing.Coroutine[typing.Any, typing.Any, typing
 class SudoComponent(components.Component):
     """Component used by this bot's owner."""
 
-    __slots__: typing.Sequence[str] = ("emoji_guild", "owner_check", "paginator_pool")
+    __slots__: typing.Sequence[str] = ("owner_check",)
 
     def __init__(
         self,
         *,
         checks: typing.Optional[typing.Iterable[tanjun_traits.CheckT]] = None,
-        emoji_guild: typing.Optional[snowflakes.Snowflake] = None,
         hooks: typing.Optional[tanjun_traits.Hooks] = None,
     ) -> None:
         self.owner_check = checks_.ApplicationOwnerCheck()
         super().__init__(checks=checks, hooks=hooks)
-        self.emoji_guild = emoji_guild
-        self.paginator_pool: typing.Optional[paginaton.PaginatorPool] = None
         self.add_check(self.owner_check)
-
-    def bind_client(self, client: tanjun_traits.Client, /) -> None:
-        super().bind_client(client)
-        self.paginator_pool = paginaton.PaginatorPool(client.rest_service, client.event_service)
 
     async def close(self) -> None:
         await super().close()
-        if self.paginator_pool is not None:
-            await self.paginator_pool.close()
-
         self.owner_check.close()
 
     async def open(self) -> None:
-        if self.client is None or self.paginator_pool is None:
+        if self.client is None:
             raise RuntimeError("Cannot open this component before binding it to a client.")
 
         await self.owner_check.open(self.client)
-        await self.paginator_pool.open()
         await super().open()
 
     @components.as_command("error")
@@ -180,7 +171,12 @@ class SudoComponent(components.Component):
     @parsing.with_option("suppress_response", "-s", "--suppress", converters=bool, default=False, empty_value=True)
     @parsing.with_parser
     @components.as_command("eval", "exec", "sudo")
-    async def eval(self, ctx: tanjun_traits.Context, suppress_response: bool = False) -> None:
+    async def eval(
+        self,
+        ctx: tanjun_traits.Context,
+        suppress_response: bool = False,
+        paginator_pool: paginaton.PaginatorPool = injector.Injected(type=paginaton.PaginatorPool),
+    ) -> None:
         """Dynamically evaluate a script in the bot's environment.
 
         This can only be used by the bot's owner.
@@ -225,8 +221,7 @@ class SudoComponent(components.Component):
             ),
         )
         message = await response_paginator.open()
-        assert self.paginator_pool is not None
-        self.paginator_pool.add_paginator(message, response_paginator)
+        paginator_pool.add_paginator(message, response_paginator)
 
     @components.as_command("commands")
     async def commands_command(self, ctx: tanjun_traits.Context) -> None:

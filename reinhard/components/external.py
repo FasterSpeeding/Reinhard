@@ -17,20 +17,20 @@ from hikari import undefined
 from tanjun import checks
 from tanjun import components
 from tanjun import errors as tanjun_errors
+from tanjun import injector
 from tanjun import parsing
 from yuyo import backoff
 from yuyo import paginaton
 
+from .. import config as config_
 from ..util import basic as basic_util
 from ..util import constants
 from ..util import rest_manager
 from ..util import ytdl
 
 if typing.TYPE_CHECKING:
-    from hikari import config as hikari_config
     from tanjun import traits as tanjun_traits
 
-    from .. import config
 
 _ValueT = typing.TypeVar("_ValueT")
 
@@ -47,37 +47,15 @@ SPOTIFY_RESOURCE_TYPES = ("track", "album", "artist", "playlist")
 HIKARI_IO = "https://hikari-py.github.io/hikari"
 
 
-def create_client_session(
-    http_settings: hikari_config.HTTPSettings,
-    raise_for_status: bool,
-    trust_env: bool,
-    headers: typing.Optional[typing.Mapping[str, str]] = None,
-    ws_response_cls: typing.Type[aiohttp.ClientWebSocketResponse] = aiohttp.ClientWebSocketResponse,
-) -> aiohttp.ClientSession:
-    return aiohttp.ClientSession(
-        headers=headers,
-        raise_for_status=raise_for_status,
-        timeout=aiohttp.ClientTimeout(
-            connect=http_settings.timeouts.acquire_and_connect,
-            sock_connect=http_settings.timeouts.request_socket_connect,
-            sock_read=http_settings.timeouts.request_socket_read,
-            total=http_settings.timeouts.total,
-        ),
-        trust_env=trust_env,
-        version=aiohttp.HttpVersion11,
-        ws_response_class=ws_response_cls,
-    )
-
-
 class YoutubePaginator(typing.AsyncIterator[typing.Tuple[str, undefined.UndefinedType]]):
-    __slots__ = ("_acquire_session", "_buffer", "_next_page_token", "_parameters")
+    __slots__ = ("_session", "_buffer", "_next_page_token", "_parameters")
 
     def __init__(
         self,
-        acquire_session: typing.Callable[[], aiohttp.ClientSession],
+        session: aiohttp.ClientSession,
         parameters: typing.Dict[str, typing.Union[str, int]],
     ) -> None:
-        self._acquire_session = acquire_session
+        self._session = session
         self._buffer: typing.List[typing.Dict[str, typing.Any]] = []
         self._next_page_token: typing.Optional[str] = ""
         self._parameters = parameters
@@ -92,10 +70,11 @@ class YoutubePaginator(typing.AsyncIterator[typing.Tuple[str, undefined.Undefine
 
             parameters = self._parameters.copy()
             parameters["pageToken"] = self._next_page_token
-            session = self._acquire_session()
             async for _ in retry:
                 with error_manager:
-                    response = await session.get("https://www.googleapis.com/youtube/v3/search", params=parameters)
+                    response = await self._session.get(
+                        "https://www.googleapis.com/youtube/v3/search", params=parameters
+                    )
                     response.raise_for_status()
                     break
 
@@ -128,7 +107,7 @@ class YoutubePaginator(typing.AsyncIterator[typing.Tuple[str, undefined.Undefine
 class SpotifyPaginator(typing.AsyncIterator[typing.Tuple[str, undefined.UndefinedType]]):
     __slots__: typing.Sequence[str] = (
         "_acquire_authorization",
-        "_acquire_session",
+        "_session",
         "_buffer",
         "_offset",
         "_parameters",
@@ -139,11 +118,11 @@ class SpotifyPaginator(typing.AsyncIterator[typing.Tuple[str, undefined.Undefine
     def __init__(
         self,
         acquire_authorization: typing.Callable[[aiohttp.ClientSession], typing.Awaitable[str]],
-        acquire_session: typing.Callable[[], aiohttp.ClientSession],
+        session: aiohttp.ClientSession,
         parameters: typing.Dict[str, typing.Union[str, int]],
     ) -> None:
         self._acquire_authorization = acquire_authorization
-        self._acquire_session = acquire_session
+        self._session = session
         self._buffer: typing.List[typing.Dict[str, typing.Any]] = []
         self._offset: typing.Optional[int] = 0
         self._parameters = parameters
@@ -163,13 +142,12 @@ class SpotifyPaginator(typing.AsyncIterator[typing.Tuple[str, undefined.Undefine
             parameters["offset"] = self._offset
             self._offset += self._limit
 
-            session = self._acquire_session()
             async for _ in retry:
                 with error_manager:
-                    response = await session.get(
+                    response = await self._session.get(
                         "https://api.spotify.com/v1/search",
                         params=parameters,
-                        headers={"Authorization": await self._acquire_authorization(session)},
+                        headers={"Authorization": await self._acquire_authorization(self._session)},
                     )
                     response.raise_for_status()
                     break
@@ -239,6 +217,13 @@ class ClientCredentialsOauth2:
             )
         raise tanjun_errors.CommandError("Couldn't authenticate")
 
+    @classmethod
+    def spotify(cls, config: config_.Tokens = injector.Injected(type=config_.Tokens)) -> ClientCredentialsOauth2:
+        if not config.spotify_id or not config.spotify_secret:
+            raise tanjun_errors.MissingDependencyError("Missing spotify secret and/or client id")
+
+        return cls("https://accounts.spotify.com/api/token", config.spotify_id, config.spotify_secret)
+
 
 class CachedResource(typing.Generic[_ValueT]):
     __slots__: typing.Sequence[str] = (
@@ -283,116 +268,30 @@ class CachedResource(typing.Generic[_ValueT]):
         return self._data
 
 
+def make_doc_fetcher() -> CachedResource[sphobjinv.Inventory]:
+    return CachedResource(HIKARI_IO + "/objects.inv", datetime.timedelta(hours=12), sphobjinv.Inventory)
+
+
 class ExternalComponent(components.Component):
     """A utility used for getting data from 3rd party APIs."""
 
-    __slots__: typing.Sequence[str] = (
-        "_client_session",
-        "_doc_fetcher",
-        "_http_settings",
-        "paginator_pool",
-        "proxy_setting",
-        "_ptf_config",
-        "_tokens",
-        "user_agent",
-        "ytdl_client",
-    )
-
-    def __init__(
-        self,
-        http_settings: hikari_config.HTTPSettings,
-        proxy_settings: hikari_config.ProxySettings,
-        tokens: config.Tokens,
-        *,
-        ptf_config: typing.Optional[config.PTFConfig] = None,
-        hooks: typing.Optional[tanjun_traits.Hooks] = None,
-    ) -> None:
-        super().__init__(hooks=hooks)
-        self._client_session: typing.Optional[aiohttp.ClientSession] = None
-        self._doc_fetcher = CachedResource(
-            HIKARI_IO + "/objects.inv", datetime.timedelta(hours=12), sphobjinv.Inventory
-        )
-        self._http_settings = http_settings
-        self._ptf_config = ptf_config
-        self._proxy_settings = proxy_settings
-        self.paginator_pool: typing.Optional[paginaton.PaginatorPool] = None
-
-        self._spotify_auth: typing.Optional[ClientCredentialsOauth2] = None
-        if tokens.spotify_id is not None and tokens.spotify_secret is not None:
-            self._spotify_auth = ClientCredentialsOauth2(
-                "https://accounts.spotify.com/api/token", tokens.spotify_id, tokens.spotify_secret
-            )
-
-        self._tokens = tokens
-        self.user_agent = ""
-        self.ytdl_client = ytdl.YoutubeDownloader()
-
-    def _acquire_session(self) -> aiohttp.ClientSession:
-        if self._client_session is None:
-            self._client_session = create_client_session(
-                headers={USER_AGENT_HEADER: self.user_agent},
-                http_settings=self._http_settings,
-                raise_for_status=False,
-                trust_env=self._proxy_settings.trust_env,
-            )
-            _LOGGER.log(logging.DEBUG, "acquired new aiohttp client session")
-
-        return self._client_session
-
-    def bind_client(self, client: tanjun_traits.Client, /) -> None:
-        super().bind_client(client)
-        self.paginator_pool = paginaton.PaginatorPool(client.rest_service, client.event_service)
-
-    async def close(self) -> None:
-        await super().close()
-        self.ytdl_client.close()
-        if self.paginator_pool is not None:
-            await self.paginator_pool.close()
-
-        if self._client_session:
-            await self._client_session.close()
-            self._client_session = None
-
-    async def open(self) -> None:
-        if self.client is None or self.paginator_pool is None:
-            raise RuntimeError("Cannot open this component without binding a client.")
-
-        self.ytdl_client.start()
-        retry = backoff.Backoff(max_retries=4)
-        error_manger = rest_manager.HikariErrorManager(retry)
-        async for _ in retry:
-            with error_manger:
-                application = await self.client.rest_service.rest.fetch_application()
-                break
-
-        else:
-            application = await self.client.rest_service.rest.fetch_application()
-
-        owner_id = application.team.owner_id if application.team else application.owner.id
-        retry.reset()
-
-        async for _ in retry:
-            with error_manger:
-                me = await self.client.rest_service.rest.fetch_my_user()
-                break
-
-        else:
-            me = await self.client.rest_service.rest.fetch_my_user()
-
-        self.user_agent = f"Reinhard discord bot (id:{me.id}; owner:{owner_id})"
-        await self.paginator_pool.open()
-        await super().open()
+    __slots__: typing.Sequence[str] = ()
 
     @parsing.with_greedy_argument("query")
     @parsing.with_parser
     @components.as_command("lyrics")
-    async def lyrics(self, ctx: tanjun_traits.Context, query: str) -> None:
+    async def lyrics(
+        self,
+        ctx: tanjun_traits.Context,
+        query: str,
+        session: aiohttp.ClientSession = injector.Injected(type=aiohttp.ClientSession),
+        paginator_pool: paginaton.PaginatorPool = injector.Injected(type=paginaton.PaginatorPool),
+    ) -> None:
         """Get a song's lyrics.
 
         Arguments:
             * query: Greedy query string (e.g. name) to search a song by.
         """
-        session = self._acquire_session()
         retry = backoff.Backoff(max_retries=5)
         error_manager = rest_manager.AIOHTTPStatusHandler(
             retry, on_404=f"Couldn't find the lyrics for `{query[:1960]}`"
@@ -454,8 +353,7 @@ class ExternalComponent(components.Component):
             ),
         )
         message = await response_paginator.open()
-        assert self.paginator_pool is not None
-        self.paginator_pool.add_paginator(message, response_paginator)
+        paginator_pool.add_paginator(message, response_paginator)
 
     @parsing.with_option("safe_search", "--safe", "-s", "--safe-search", converters=bool, default=None)
     @parsing.with_option("order", "-o", "--order", default="relevance")
@@ -475,6 +373,9 @@ class ExternalComponent(components.Component):
         language: typing.Optional[str],
         order: str,
         safe_search: typing.Optional[bool],
+        session: aiohttp.ClientSession = injector.Injected(type=aiohttp.ClientSession),
+        tokens: config_.Tokens = injector.Injected(type=config_.Tokens),
+        paginator_pool: paginaton.PaginatorPool = injector.Injected(type=paginaton.PaginatorPool),
     ) -> None:
         """Search for a resource on youtube.
 
@@ -492,6 +393,7 @@ class ExternalComponent(components.Component):
             * resource type (--type, -t): The type of resource to search for.
                 This can be one of "channel", "playlist" or "video" and defaults to "video".
         """
+        assert tokens.google is not None
         if safe_search is not False:
             channel: typing.Optional[channels.PartialChannel]
             if ctx.cache_service and (channel := ctx.cache_service.cache.get_guild_channel(ctx.message.channel_id)):
@@ -512,9 +414,8 @@ class ExternalComponent(components.Component):
         if resource_type not in ("channel", "playlist", "video"):
             raise tanjun_errors.CommandError("Resource type must be one of 'channel', 'playist' or 'video'.")
 
-        assert self._tokens.google is not None
         parameters: typing.Dict[str, typing.Union[str, int]] = {
-            "key": self._tokens.google,
+            "key": tokens.google,
             "maxResults": 50,
             "order": order,
             "part": "snippet",
@@ -532,7 +433,7 @@ class ExternalComponent(components.Component):
         response_paginator = paginaton.Paginator(
             ctx.rest_service,
             ctx.message.channel_id,
-            YoutubePaginator(self._acquire_session, parameters),
+            YoutubePaginator(session, parameters),
             authors=[ctx.message.author.id],
         )
         try:
@@ -555,12 +456,13 @@ class ExternalComponent(components.Component):
             raise
 
         else:
-            assert self.paginator_pool is not None
-            self.paginator_pool.add_paginator(message, response_paginator)
+            paginator_pool.add_paginator(message, response_paginator)
 
     @youtube.with_check
-    def _youtube_token_check(self, _: tanjun_traits.Context) -> bool:
-        return self._tokens.google is not None
+    def _youtube_token_check(
+        self, _: tanjun_traits.Context, tokens: config_.Tokens = injector.Injected(type=config_.Tokens)
+    ) -> bool:
+        return tokens.google is not None
 
     # This API is currently dead (always returning 5xxs)
     # @help_util.with_parameter_doc("--source | -s", "The optional argument of a show's title.")
@@ -568,7 +470,12 @@ class ExternalComponent(components.Component):
     # @parsing.with_option("source", "--source", "-s", default=None)
     # @parsing.with_parser
     # @components.as_command("moe")  # TODO: https://lewd.bowsette.pictures/api/request
-    async def moe(self, ctx: tanjun_traits.Context, source: typing.Optional[str] = None) -> None:
+    async def moe(
+        self,
+        ctx: tanjun_traits.Context,
+        source: typing.Optional[str] = None,
+        session: aiohttp.ClientSession = injector.Injected(type=aiohttp.ClientSession),
+    ) -> None:
         params = {}
         if source is not None:
             params["source"] = source
@@ -577,7 +484,6 @@ class ExternalComponent(components.Component):
         error_manager = rest_manager.AIOHTTPStatusHandler(
             retry, on_404=f"Couldn't find source `{source[:1970]}`" if source is not None else "couldn't access api"
         )
-        session = self._acquire_session()
         async for _ in retry:
             with error_manager:
                 response = await session.get("http://api.cutegirls.moe/json", params=params)
@@ -601,8 +507,12 @@ class ExternalComponent(components.Component):
             ctx, content=f"{data['image']} (source {data.get('source') or 'unknown'})"
         )
 
-    async def query_nekos_life(self, endpoint: str, response_key: str, **kwargs: typing.Any) -> str:
-        session = self._acquire_session()
+    async def query_nekos_life(
+        self,
+        endpoint: str,
+        response_key: str,
+        session: aiohttp.ClientSession = injector.Injected(type=aiohttp.ClientSession),
+    ) -> str:
         # TODO: retries
         response = await session.get(url="https://nekos.life/api/v2" + endpoint)
 
@@ -642,7 +552,17 @@ class ExternalComponent(components.Component):
     @parsing.with_greedy_argument("query")
     @parsing.with_parser
     @components.as_command("spotify")
-    async def spotify(self, ctx: tanjun_traits.Context, query: str, resource_type: str) -> None:
+    async def spotify(
+        self,
+        ctx: tanjun_traits.Context,
+        query: str,
+        resource_type: str,
+        session: aiohttp.ClientSession = injector.Injected(type=aiohttp.ClientSession),
+        paginator_pool: paginaton.PaginatorPool = injector.Injected(type=paginaton.PaginatorPool),
+        spotify_auth: ClientCredentialsOauth2 = injector.Injected(
+            callback=injector.cache_callback(ClientCredentialsOauth2.spotify)
+        ),
+    ) -> None:
         """Search for a resource on spotify.
 
         Arguments:
@@ -653,8 +573,6 @@ class ExternalComponent(components.Component):
                 Type of resource to search for. This can be one of "track", "album", "artist" or "playlist" and defaults
                 to track.
         """
-        assert self._spotify_auth
-
         resource_type = resource_type.lower()
         if resource_type not in SPOTIFY_RESOURCE_TYPES:
             raise tanjun_errors.CommandError(f"{resource_type!r} is not a valid resource type")
@@ -662,9 +580,7 @@ class ExternalComponent(components.Component):
         response_paginator = paginaton.Paginator(
             ctx.rest_service,
             ctx.message.channel_id,
-            SpotifyPaginator(
-                self._spotify_auth.acquire_token, self._acquire_session, {"query": query, "type": resource_type}
-            ),
+            SpotifyPaginator(spotify_auth.acquire_token, session, {"query": query, "type": resource_type}),
             authors=[ctx.message.author.id],
         )
         try:
@@ -685,17 +601,20 @@ class ExternalComponent(components.Component):
             raise
 
         else:
-            assert self.paginator_pool is not None
-            self.paginator_pool.add_paginator(message, response_paginator)
-
-    @spotify.with_check
-    def _spotify_authentication_check(self, _: tanjun_traits.Context) -> bool:
-        return self._spotify_auth is not None
+            paginator_pool.add_paginator(message, response_paginator)
 
     @parsing.with_greedy_argument("path", default=None)
     @parsing.with_parser
     @components.as_command("docs")
-    async def docs(self, ctx: tanjun_traits.Context, path: typing.Optional[str]) -> None:
+    async def docs(
+        self,
+        ctx: tanjun_traits.Context,
+        path: typing.Optional[str],
+        session: aiohttp.ClientSession = injector.Injected(type=aiohttp.ClientSession),
+        doc_fetcher: CachedResource[sphobjinv.Inventory] = injector.Injected(
+            callback=injector.cache_callback(make_doc_fetcher)
+        ),
+    ) -> None:
         """Search Hikari's documentation.
 
         Arguments
@@ -710,7 +629,7 @@ class ExternalComponent(components.Component):
 
         else:
             path = path.replace(" ", "_")
-            inventory = await self._doc_fetcher.acquire_resource(self._acquire_session())
+            inventory = await doc_fetcher.acquire_resource(session)
             description: typing.List[str] = []
             # TODO: this line blocks for 2 seconds
             entries: typing.Iterator[typing.Tuple[str, int, int]] = iter(
@@ -731,19 +650,26 @@ class ExternalComponent(components.Component):
     @parsing.with_argument("url", converters=urllib.parse.ParseResult)
     @parsing.with_parser
     @components.as_command("ytdl")
-    async def ytdl(self, ctx: tanjun_traits.Context, url: urllib.parse.ParseResult) -> None:
-        assert self._ptf_config is not None
-        auth = aiohttp.BasicAuth(self._ptf_config.username, self._ptf_config.password)
-        session = self._acquire_session()
+    async def ytdl(
+        self,
+        ctx: tanjun_traits.Context,
+        url: urllib.parse.ParseResult,
+        session: aiohttp.ClientSession = injector.Injected(type=aiohttp.ClientSession),
+        config: config_.PTFConfig = injector.Injected(type=config_.PTFConfig),
+        ytdl_client: ytdl.YoutubeDownloader = injector.Injected(
+            callback=injector.cache_callback(ytdl.YoutubeDownloader)
+        ),
+    ) -> None:
+        auth = aiohttp.BasicAuth(config.username, config.password)
 
         # Download video
-        path, data = await self.ytdl_client.download(url.geturl())
+        path, data = await ytdl_client.download(url.geturl())
         filename = urllib.parse.quote(path.name)
 
         try:
             # Create Message
             response = await session.post(
-                self._ptf_config.message_service + "/messages",
+                config.message_service + "/messages",
                 json={"title": f"Reinhard upload {time.time()}"},
                 auth=auth,
             )
@@ -751,15 +677,13 @@ class ExternalComponent(components.Component):
             message_id = (await response.json())["id"]
 
             # Create message link
-            response = await session.post(
-                f"{self._ptf_config.auth_service}/messages/{message_id}/links", json={}, auth=auth
-            )
+            response = await session.post(f"{config.auth_service}/messages/{message_id}/links", json={}, auth=auth)
             response.raise_for_status()
             link_token = (await response.json())["token"]
 
             with path.open("rb") as file:
                 response = await session.put(
-                    f"{self._ptf_config.file_service}/messages/{message_id}/files/{filename}", auth=auth, data=file
+                    f"{config.file_service}/messages/{message_id}/files/{filename}", auth=auth, data=file
                 )
 
             response.raise_for_status()
@@ -769,7 +693,3 @@ class ExternalComponent(components.Component):
             path.unlink(missing_ok=True)
 
         await ctx.message.respond(content=file_path)
-
-    @ytdl.with_check
-    def _ytdl_check(self, _: tanjun_traits.Context, /) -> bool:
-        return self._ptf_config is not None

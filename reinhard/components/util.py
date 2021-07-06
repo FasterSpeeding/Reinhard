@@ -29,30 +29,9 @@ from ..util import rest_manager
 class UtilComponent(components.Component):
     """Component used for getting miscellaneous Discord information."""
 
-    __slots__: typing.Sequence[str] = ("own_user",)
+    __slots__: typing.Sequence[str] = ()
 
-    def __init__(self, *, hooks: typing.Optional[tanjun_traits.Hooks] = None) -> None:
-        super().__init__(hooks=hooks)
-        self.own_user: typing.Optional[users.OwnUser] = None
-
-    async def open(self) -> None:
-        if self.client is None:
-            raise RuntimeError("Cannot start this component before binding a client")
-
-        retry = backoff.Backoff(max_retries=4)
-        error_manager = rest_manager.HikariErrorManager(retry)
-
-        async for _ in retry:
-            with error_manager:
-                self.own_user = await self.client.rest_service.rest.fetch_my_user()
-                break
-
-        else:
-            self.own_user = await self.client.rest_service.rest.fetch_my_user()
-
-        await super().open()
-
-    @parsing.with_greedy_argument("colour", converters=(conversion.ColorConverter, conversion.RESTFulRoleConverter))
+    @parsing.with_greedy_argument("colour", converters=(conversion.ColorConverter(), conversion.RESTFulRoleConverter()))
     @parsing.with_parser
     @components.as_command("color", "colour")
     async def colour(self, ctx: tanjun_traits.Context, colour: typing.Union[colours.Colour, guilds.Role]) -> None:
@@ -91,7 +70,7 @@ class UtilComponent(components.Component):
     #     else:
     #         ...  # TODO: Implement this to allow getting the embeds from a suppressed message.
 
-    @parsing.with_greedy_argument("member", converters=conversion.RESTFulMemberConverter, default=None)
+    @parsing.with_greedy_argument("member", converters=conversion.RESTFulMemberConverter(), default=None)
     @parsing.with_parser
     @checks.with_check(lambda ctx: ctx.message.guild_id is not None)
     @components.as_command("member")
@@ -178,7 +157,7 @@ class UtilComponent(components.Component):
         return lambda role: role.id == role_id
 
     # TODO: the normal role converter is limited to the current guild right?
-    @parsing.with_argument("role", converters=conversion.RESTFulRoleConverter)
+    @parsing.with_argument("role", converters=conversion.RESTFulRoleConverter())
     @parsing.with_parser
     @checks.with_check(lambda ctx: ctx.message.guild_id is not None)
     @components.as_command("role")
@@ -215,7 +194,7 @@ class UtilComponent(components.Component):
         await error_manager.try_respond(ctx, embed=embed)
 
     @parsing.with_greedy_argument(
-        "user", converters=(conversion.RESTFulUserConverter, conversion.RESTFulMemberConverter), default=None
+        "user", converters=(conversion.RESTFulUserConverter(), conversion.RESTFulMemberConverter()), default=None
     )
     @parsing.with_parser
     @components.as_command("user")
@@ -249,7 +228,7 @@ class UtilComponent(components.Component):
         await error_manager.try_respond(ctx, embed=embed)
 
     @parsing.with_greedy_argument(
-        "user", converters=(conversion.RESTFulUserConverter, conversion.RESTFulMemberConverter), default=None
+        "user", converters=(conversion.RESTFulUserConverter(), conversion.RESTFulMemberConverter()), default=None
     )
     @parsing.with_parser
     @components.as_command("avatar", "pfp")

@@ -14,11 +14,14 @@ from hikari import __url__ as hikari_url
 from hikari import __version__ as hikari_version
 from hikari import embeds as embeds_
 from hikari import errors as hikari_errors
+from hikari import traits as hikari_traits
 from hikari import undefined
 from tanjun import checks
 from tanjun import components
 from tanjun import errors as tanjun_errors
+from tanjun import injector
 from tanjun import parsing
+from tanjun import traits as tanjun_traits
 from yuyo import backoff
 from yuyo import paginaton
 
@@ -28,48 +31,39 @@ from ..util import rest_manager
 
 if typing.TYPE_CHECKING:
     from hikari import messages
-    from hikari import traits as hikari_traits
-    from hikari import users
-    from tanjun import traits as tanjun_traits
+
+
+def gen_help_embeds(
+    ctx: tanjun_traits.Context,
+    client: tanjun_traits.Client = injector.Injected(type=tanjun_traits.Client),
+) -> typing.Dict[str, typing.List[embeds_.Embed]]:
+    prefix = next(iter(client.prefixes)) if client and client.prefixes else ""
+
+    help_embeds: typing.Dict[str, typing.List[embeds_.Embed]] = {}
+    for component in ctx.client.components:
+        if value := help_util.generate_help_embeds(component, prefix=prefix):
+            help_embeds[value[0].lower()] = [v for v in value[1]]
+
+    return help_embeds
 
 
 class BasicComponent(components.Component):
     """Commands provided to give information about this bot."""
 
-    __slots__: typing.Sequence[str] = ("current_user", "help_embeds", "paginator_pool", "process")
-
-    def __init__(self, *, hooks: typing.Optional[tanjun_traits.Hooks] = None) -> None:
-        super().__init__(hooks=hooks)
-        self.current_user: typing.Optional[users.OwnUser] = None
-        self.help_embeds: typing.Mapping[str, typing.Sequence[embeds_.Embed]] = {}
-        self.paginator_pool: typing.Optional[paginaton.PaginatorPool] = None
-        self.process = psutil.Process()
-
-    def bind_client(self, client: tanjun_traits.Client, /) -> None:
-        super().bind_client(client)
-        self.paginator_pool = paginaton.PaginatorPool(client.rest_service, client.event_service)
-
-    async def close(self) -> None:
-        await super().close()
-        if self.paginator_pool is not None:
-            await self.paginator_pool.close()
-
-    async def open(self) -> None:
-        if self.client is None or self.paginator_pool is None:
-            raise RuntimeError("Cannot open this component without binding a client.")
-
-        await self.paginator_pool.open()
-        await super().open()
+    __slots__: typing.Sequence[str] = ()
 
     @components.as_command("about")
-    async def about(self, ctx: tanjun_traits.Context) -> None:
+    async def about(
+        self,
+        ctx: tanjun_traits.Context,
+        process: psutil.Process = injector.Injected(callback=injector.cache_callback(psutil.Process)),
+    ) -> None:
         """Get basic information about the current bot instance."""
-        start_date = datetime.datetime.fromtimestamp(self.process.create_time())
+        start_date = datetime.datetime.fromtimestamp(process.create_time())
         uptime = datetime.datetime.now() - start_date
-        memory_usage = self.process.memory_full_info().uss / 1024 ** 2
-        cpu_usage = self.process.cpu_percent() / psutil.cpu_count()
-        memory_percent = self.process.memory_percent()
-        avatar = self.current_user.avatar_url or self.current_user.default_avatar_url if self.current_user else None
+        memory_usage = process.memory_full_info().uss / 1024 ** 2
+        cpu_usage = process.cpu_percent() / psutil.cpu_count()
+        memory_percent = process.memory_percent()
 
         description = (
             "An experimental pythonic Hikari bot.\n "
@@ -79,7 +73,6 @@ class BasicComponent(components.Component):
             embeds_.Embed(description=description, colour=constants.embed_colour())
             .set_author(
                 name=f"Reinhard: Shard {ctx.shard.id} of {ctx.shard_service.shard_count}",
-                icon=avatar,
                 url=hikari_url,
             )
             .add_field(name="Uptime", value=str(uptime), inline=True)
@@ -99,22 +92,20 @@ class BasicComponent(components.Component):
         )
         await error_manager.try_respond(ctx, embed=embed)
 
-    def _help_pre_execution(self, ctx: tanjun_traits.Context, /) -> None:
-        if not self.help_embeds:
-            prefix = next(iter(self.client.prefixes)) if self.client and self.client.prefixes else ""
-
-            self.help_embeds = {}
-            for component in ctx.client.components:
-                if value := help_util.generate_help_embeds(component, prefix=prefix):
-                    self.help_embeds[value[0].lower()] = [v for v in value[1]]
-
     @parsing.with_greedy_argument("command_name", default=None)
     @parsing.with_option("component_name", "--component", default=None)
     @parsing.with_parser
     # TODO: specify a group or command
     @components.as_command("help")
     async def help(
-        self, ctx: tanjun_traits.Context, command_name: typing.Optional[str], component_name: typing.Optional[str]
+        self,
+        ctx: tanjun_traits.Context,
+        command_name: typing.Optional[str],
+        component_name: typing.Optional[str],
+        paginator_pool: paginaton.PaginatorPool = injector.Injected(type=paginaton.PaginatorPool),
+        help_embeds: typing.Dict[str, typing.List[embeds_.Embed]] = injector.Injected(
+            callback=injector.cache_callback(gen_help_embeds)
+        ),
     ) -> None:
         """Get information about the commands in this bot.
 
@@ -124,7 +115,6 @@ class BasicComponent(components.Component):
         Options
             * component name (--component): Name of a component to get the documentation for.
         """
-        self._help_pre_execution(ctx)
         if command_name is not None:
             for own_prefix in ctx.client.prefixes:
                 if command_name.startswith(own_prefix):
@@ -143,22 +133,21 @@ class BasicComponent(components.Component):
             return
 
         if component_name:
-            if component_name.lower() not in self.help_embeds:
+            if component_name.lower() not in help_embeds:
                 raise tanjun_errors.CommandError(f"Couldn't find component `{component_name}`")
 
-            embed_generator = ((undefined.UNDEFINED, embed) for embed in self.help_embeds[component_name.lower()])
+            embed_generator = ((undefined.UNDEFINED, embed) for embed in help_embeds[component_name.lower()])
 
         else:
             embed_generator = (
-                (undefined.UNDEFINED, embed) for embed in itertools.chain.from_iterable(list(self.help_embeds.values()))
+                (undefined.UNDEFINED, embed) for embed in itertools.chain.from_iterable(list(help_embeds.values()))
             )
 
         paginator = paginaton.Paginator(
             ctx.rest_service, ctx.message.channel_id, embed_generator, authors=(ctx.message.author,)
         )
         message = await paginator.open()
-        assert self.paginator_pool is not None
-        self.paginator_pool.add_paginator(message, paginator)
+        paginator_pool.add_paginator(message, paginator)
 
     @components.as_command("ping")
     async def ping(self, ctx: tanjun_traits.Context, /) -> None:
@@ -204,21 +193,27 @@ class BasicComponent(components.Component):
 
     @checks.with_check(lambda ctx: bool(ctx.cache_service))
     @components.as_command("cache")
-    async def cache(self, ctx: tanjun_traits.Context) -> None:
+    async def cache(
+        self,
+        ctx: tanjun_traits.Context,
+        process: psutil.Process = injector.Injected(callback=injector.cache_callback(psutil.Process)),
+        cache_service: hikari_traits.CacheAware = injector.Injected(
+            type=hikari_traits.CacheAware  # type: ignore[misc]
+        ),
+    ) -> None:
         """Get general information about this bot."""
-        assert ctx.cache_service  # this is asserted by a check
-        start_date = datetime.datetime.fromtimestamp(self.process.create_time())
+        start_date = datetime.datetime.fromtimestamp(process.create_time())
         uptime = datetime.datetime.now() - start_date
-        memory_usage = self.process.memory_full_info().uss / 1024 ** 2
-        cpu_usage = self.process.cpu_percent() / psutil.cpu_count()
-        memory_percent = self.process.memory_percent()
+        memory_usage = process.memory_full_info().uss / 1024 ** 2
+        cpu_usage = process.cpu_percent() / psutil.cpu_count()
+        memory_percent = process.memory_percent()
 
         cache_stats_lines = []
 
         storage_start_time = time.perf_counter()
         for line_template, callback in self._about_lines:
             line_start_time = time.perf_counter()
-            line = line_template.format(callback(ctx.cache_service))
+            line = line_template.format(callback(cache_service))
             cache_stats_lines.append((line, (time.perf_counter() - line_start_time) * 1_000))
 
         storage_time_taken = time.perf_counter() - storage_start_time
