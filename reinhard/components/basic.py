@@ -35,7 +35,7 @@ if typing.TYPE_CHECKING:
 
 def gen_help_embeds(
     ctx: tanjun_traits.Context,
-    client: tanjun_traits.Client = injector.Injected(type=tanjun_traits.Client),
+    client: tanjun_traits.Client = injector.injected(type=tanjun_traits.Client),
 ) -> typing.Dict[str, typing.List[embeds_.Embed]]:
     prefix = next(iter(client.prefixes)) if client and client.prefixes else ""
 
@@ -56,7 +56,7 @@ class BasicComponent(components.Component):
     async def about(
         self,
         ctx: tanjun_traits.Context,
-        process: psutil.Process = injector.Injected(callback=injector.cache_callback(psutil.Process)),
+        process: psutil.Process = injector.injected(callback=injector.cache_callback(psutil.Process)),
     ) -> None:
         """Get basic information about the current bot instance."""
         start_date = datetime.datetime.fromtimestamp(process.create_time())
@@ -102,8 +102,8 @@ class BasicComponent(components.Component):
         ctx: tanjun_traits.Context,
         command_name: typing.Optional[str],
         component_name: typing.Optional[str],
-        paginator_pool: paginaton.PaginatorPool = injector.Injected(type=paginaton.PaginatorPool),
-        help_embeds: typing.Dict[str, typing.List[embeds_.Embed]] = injector.Injected(
+        paginator_pool: paginaton.PaginatorPool = injector.injected(type=paginaton.PaginatorPool),
+        help_embeds: typing.Dict[str, typing.List[embeds_.Embed]] = injector.injected(
             callback=injector.cache_callback(gen_help_embeds)
         ),
     ) -> None:
@@ -196,8 +196,8 @@ class BasicComponent(components.Component):
     async def cache(
         self,
         ctx: tanjun_traits.Context,
-        process: psutil.Process = injector.Injected(callback=injector.cache_callback(psutil.Process)),
-        cache_service: hikari_traits.CacheAware = injector.Injected(
+        process: psutil.Process = injector.injected(callback=injector.cache_callback(psutil.Process)),
+        cache_service: hikari_traits.CacheAware = injector.injected(
             type=hikari_traits.CacheAware  # type: ignore[misc]
         ),
     ) -> None:

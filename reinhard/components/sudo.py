@@ -175,7 +175,7 @@ class SudoComponent(components.Component):
         self,
         ctx: tanjun_traits.Context,
         suppress_response: bool = False,
-        paginator_pool: paginaton.PaginatorPool = injector.Injected(type=paginaton.PaginatorPool),
+        paginator_pool: paginaton.PaginatorPool = injector.injected(type=paginaton.PaginatorPool),
     ) -> None:
         """Dynamically evaluate a script in the bot's environment.
 

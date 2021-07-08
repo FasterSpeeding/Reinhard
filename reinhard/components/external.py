@@ -218,7 +218,7 @@ class ClientCredentialsOauth2:
         raise tanjun_errors.CommandError("Couldn't authenticate")
 
     @classmethod
-    def spotify(cls, config: config_.Tokens = injector.Injected(type=config_.Tokens)) -> ClientCredentialsOauth2:
+    def spotify(cls, config: config_.Tokens = injector.injected(type=config_.Tokens)) -> ClientCredentialsOauth2:
         if not config.spotify_id or not config.spotify_secret:
             raise tanjun_errors.MissingDependencyError("Missing spotify secret and/or client id")
 
@@ -284,8 +284,8 @@ class ExternalComponent(components.Component):
         self,
         ctx: tanjun_traits.Context,
         query: str,
-        session: aiohttp.ClientSession = injector.Injected(type=aiohttp.ClientSession),
-        paginator_pool: paginaton.PaginatorPool = injector.Injected(type=paginaton.PaginatorPool),
+        session: aiohttp.ClientSession = injector.injected(type=aiohttp.ClientSession),
+        paginator_pool: paginaton.PaginatorPool = injector.injected(type=paginaton.PaginatorPool),
     ) -> None:
         """Get a song's lyrics.
 
@@ -373,9 +373,9 @@ class ExternalComponent(components.Component):
         language: typing.Optional[str],
         order: str,
         safe_search: typing.Optional[bool],
-        session: aiohttp.ClientSession = injector.Injected(type=aiohttp.ClientSession),
-        tokens: config_.Tokens = injector.Injected(type=config_.Tokens),
-        paginator_pool: paginaton.PaginatorPool = injector.Injected(type=paginaton.PaginatorPool),
+        session: aiohttp.ClientSession = injector.injected(type=aiohttp.ClientSession),
+        tokens: config_.Tokens = injector.injected(type=config_.Tokens),
+        paginator_pool: paginaton.PaginatorPool = injector.injected(type=paginaton.PaginatorPool),
     ) -> None:
         """Search for a resource on youtube.
 
@@ -460,7 +460,7 @@ class ExternalComponent(components.Component):
 
     @youtube.with_check
     def _youtube_token_check(
-        self, _: tanjun_traits.Context, tokens: config_.Tokens = injector.Injected(type=config_.Tokens)
+        self, _: tanjun_traits.Context, tokens: config_.Tokens = injector.injected(type=config_.Tokens)
     ) -> bool:
         return tokens.google is not None
 
@@ -474,7 +474,7 @@ class ExternalComponent(components.Component):
         self,
         ctx: tanjun_traits.Context,
         source: typing.Optional[str] = None,
-        session: aiohttp.ClientSession = injector.Injected(type=aiohttp.ClientSession),
+        session: aiohttp.ClientSession = injector.injected(type=aiohttp.ClientSession),
     ) -> None:
         params = {}
         if source is not None:
@@ -511,7 +511,7 @@ class ExternalComponent(components.Component):
         self,
         endpoint: str,
         response_key: str,
-        session: aiohttp.ClientSession = injector.Injected(type=aiohttp.ClientSession),
+        session: aiohttp.ClientSession = injector.injected(type=aiohttp.ClientSession),
     ) -> str:
         # TODO: retries
         response = await session.get(url="https://nekos.life/api/v2" + endpoint)
@@ -557,9 +557,9 @@ class ExternalComponent(components.Component):
         ctx: tanjun_traits.Context,
         query: str,
         resource_type: str,
-        session: aiohttp.ClientSession = injector.Injected(type=aiohttp.ClientSession),
-        paginator_pool: paginaton.PaginatorPool = injector.Injected(type=paginaton.PaginatorPool),
-        spotify_auth: ClientCredentialsOauth2 = injector.Injected(
+        session: aiohttp.ClientSession = injector.injected(type=aiohttp.ClientSession),
+        paginator_pool: paginaton.PaginatorPool = injector.injected(type=paginaton.PaginatorPool),
+        spotify_auth: ClientCredentialsOauth2 = injector.injected(
             callback=injector.cache_callback(ClientCredentialsOauth2.spotify)
         ),
     ) -> None:
@@ -610,8 +610,8 @@ class ExternalComponent(components.Component):
         self,
         ctx: tanjun_traits.Context,
         path: typing.Optional[str],
-        session: aiohttp.ClientSession = injector.Injected(type=aiohttp.ClientSession),
-        doc_fetcher: CachedResource[sphobjinv.Inventory] = injector.Injected(
+        session: aiohttp.ClientSession = injector.injected(type=aiohttp.ClientSession),
+        doc_fetcher: CachedResource[sphobjinv.Inventory] = injector.injected(
             callback=injector.cache_callback(make_doc_fetcher)
         ),
     ) -> None:
@@ -654,9 +654,9 @@ class ExternalComponent(components.Component):
         self,
         ctx: tanjun_traits.Context,
         url: urllib.parse.ParseResult,
-        session: aiohttp.ClientSession = injector.Injected(type=aiohttp.ClientSession),
-        config: config_.PTFConfig = injector.Injected(type=config_.PTFConfig),
-        ytdl_client: ytdl.YoutubeDownloader = injector.Injected(
+        session: aiohttp.ClientSession = injector.injected(type=aiohttp.ClientSession),
+        config: config_.PTFConfig = injector.injected(type=config_.PTFConfig),
+        ytdl_client: ytdl.YoutubeDownloader = injector.injected(
             callback=injector.cache_callback(ytdl.YoutubeDownloader)
         ),
     ) -> None:
