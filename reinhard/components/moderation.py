@@ -87,7 +87,7 @@ class ModerationComponent(components.Component):
         if count is None and not after:
             raise tanjun_errors.CommandError("Must specify `count` when `after` is not specified")
 
-        elif count and count <= 0:
+        elif count is not None and count <= 0:
             raise tanjun_errors.CommandError("Count must be greater than 0.")
 
         if not before and not after:
