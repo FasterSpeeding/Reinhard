@@ -84,19 +84,19 @@ class ModerationComponent(components.Component):
         if after_too_old or before_too_old:
             raise tanjun_errors.CommandError("Cannot delete messages that are over 14 days old")
 
-        if count is None and not after:
+        if count is None and after is not None:
             raise tanjun_errors.CommandError("Must specify `count` when `after` is not specified")
 
         elif count is not None and count <= 0:
             raise tanjun_errors.CommandError("Count must be greater than 0.")
 
-        if not before and not after:
+        if before is None and after is None:
             before = ctx.message.id
 
         iterator = ctx.rest_service.rest.fetch_messages(
             ctx.message.channel_id,
-            before=before or undefined.UNDEFINED,
-            after=(after or undefined.UNDEFINED) if before is None else undefined.UNDEFINED,
+            before=undefined.UNDEFINED if before is None else before,
+            after=(undefined.UNDEFINED if after is None else after) if before is None else undefined.UNDEFINED,
         ).filter(lambda message: now - message.created_at < MAX_MESSAGE_BULK_DELETE)
 
         if before and after:
@@ -115,9 +115,7 @@ class ModerationComponent(components.Component):
         if count:
             iterator = iterator.limit(count)
 
-        iterator = iterator.map(lambda x: x.id)
-        iterator = iterator.chunk(100)
-
+        iterator = iterator.map(lambda x: x.id).chunk(100)
         retry = backoff.Backoff(max_retries=5)
         error_manager = rest_manager.HikariErrorManager(
             retry, break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
