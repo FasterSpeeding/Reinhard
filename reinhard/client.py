@@ -10,52 +10,54 @@ from tanjun import hooks
 from yuyo import paginaton
 
 from . import config as config_
-from .components import basic
-from .components import external
-from .components import moderation
-from .components import sudo
-from .components import util
 from .util import command_hooks
 from .util import dependencies
 
 if typing.TYPE_CHECKING:
     from hikari import traits as hikari_traits
-    from tanjun import traits as tanjun_traits
 
 
-def add_components(client: tanjun_traits.Client, /) -> None:
-    client.add_component(basic.BasicComponent())
-    client.add_component(external.ExternalComponent())
-    client.add_component(moderation.ModerationComponent())
-    client.add_component(sudo.SudoComponent())
-    client.add_component(util.UtilComponent())
-
-
-def build(*args: typing.Any) -> hikari_traits.BotAware:
+def build_bot(*, config: typing.Optional[config_.FullConfig] = None) -> hikari_traits.GatewayBotAware:
     from hikari.impl import bot as bot_module
 
-    config = config_.load_config()
-    bot = bot_module.BotApp(
+    if config is None:
+        config = config_.load_config()
+
+    bot = bot_module.GatewayBot(
         config.tokens.bot,
         logs=config.log_level,
         intents=config.intents,
         cache_settings=hikari_config.CacheSettings(components=config.cache),
         # rest_url="https://staging.discord.co/api/v8"
     )
+    build(bot, config=config)
+    return bot
+
+
+def build(
+    bot: hikari_traits.GatewayBotAware, /, *, config: typing.Optional[config_.FullConfig] = None
+) -> clients.Client:
+    if config is None:
+        config = config_.load_config()
+
     client = (
-        clients.Client(
-            bot,
-            mention_prefix=config.mention_prefix,
+        clients.Client(bot, mention_prefix=config.mention_prefix)
+        .set_hooks(
+            hooks.Hooks().set_on_parser_error(command_hooks.on_parser_error).set_on_error(command_hooks.on_error)
         )
-        .set_hooks(hooks.Hooks(on_parser_error=command_hooks.on_parser_error, on_error=command_hooks.on_error))
         .add_prefix(config.prefixes)
         .add_type_dependency(
             aiohttp.ClientSession,
             dependencies.SessionDependency(bot.http_settings, bot.proxy_settings, "Reinhard discord bot"),
         )
-        .add_type_dependency(config_.FullConfig, lambda: config)
-        .add_type_dependency(config_.Tokens, lambda: config.tokens)
+        .add_type_dependency(config_.FullConfig, lambda: typing.cast(config_.FullConfig, config))
+        .add_type_dependency(config_.Tokens, lambda: typing.cast(config_.FullConfig, config).tokens)
         .add_type_dependency(paginaton.PaginatorPool, dependencies.PaginatorPoolDependency())
+        .load_modules("reinhard.components.basic")
+        .load_modules("reinhard.components.external")
+        .load_modules("reinhard.components.moderation")
+        .load_modules("reinhard.components.sudo")
+        .load_modules("reinhard.components.util")
     )
 
     if config.ptf:
@@ -65,6 +67,4 @@ def build(*args: typing.Any) -> hikari_traits.BotAware:
     if config.owner_only:
         client.add_check(checks.ApplicationOwnerCheck())
 
-    client.metadata["args"] = args
-    add_components(client)
-    return bot
+    return client
