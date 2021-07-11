@@ -27,6 +27,7 @@ from yuyo import paginaton
 from .. import config as config_
 from ..util import basic as basic_util
 from ..util import constants
+from ..util import help as help_util
 from ..util import rest_manager
 from ..util import ytdl
 
@@ -275,7 +276,9 @@ def make_doc_fetcher() -> CachedResource[sphobjinv.Inventory]:
 
 
 external_component = components.Component()
-"""A utility component used for getting data from 3rd party APIs."""
+help_util.with_docs(
+    external_component, "External API commands", "A utility component used for getting data from 3rd party APIs."
+)
 
 
 @external_component.with_command

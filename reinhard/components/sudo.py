@@ -29,12 +29,13 @@ from yuyo import backoff
 from yuyo import paginaton
 
 from ..util import constants
+from ..util import help as help_util
 from ..util import rest_manager
 
 CallbackT = typing.Callable[..., typing.Coroutine[typing.Any, typing.Any, typing.Any]]
 
 sudo_component = components.Component()
-"""Component used by this bot's owner."""
+help_util.with_docs(sudo_component, "Sudo commands", "Component used by this bot's owner.")
 
 
 @sudo_component.with_command

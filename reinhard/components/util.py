@@ -25,10 +25,11 @@ from yuyo import backoff
 from ..util import basic as basic_util
 from ..util import constants
 from ..util import conversion
+from ..util import help as help_util
 from ..util import rest_manager
 
 util_component = components.Component()
-"""Component used for getting miscellaneous Discord information."""
+help_util.with_docs(util_component, "Utility commands", "Component used for getting miscellaneous Discord information.")
 
 
 @util_component.with_command

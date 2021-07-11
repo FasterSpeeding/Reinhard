@@ -36,7 +36,7 @@ if typing.TYPE_CHECKING:
 
 
 def gen_help_embeds(
-    ctx: tanjun_traits.Context,
+    ctx: tanjun_traits.Context = injector.injected(type=tanjun_traits.Context),  # type: ignore[misc]
     client: tanjun_traits.Client = injector.injected(type=tanjun_traits.Client),  # type: ignore[misc]
 ) -> typing.Dict[str, typing.List[embeds_.Embed]]:
     prefix = next(iter(client.prefixes)) if client and client.prefixes else ""
@@ -50,7 +50,7 @@ def gen_help_embeds(
 
 
 basic_component = components.Component()
-"""Commands provided to give information about this bot."""
+help_util.with_docs(basic_component, "Basic commands", "Commands provided to give information about this bot.")
 
 
 @basic_component.with_command

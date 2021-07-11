@@ -17,6 +17,7 @@ from tanjun import errors as tanjun_errors
 from tanjun import parsing
 from yuyo import backoff
 
+from ..util import help as help_util
 from ..util import rest_manager
 
 if typing.TYPE_CHECKING:
@@ -26,6 +27,7 @@ MAX_MESSAGE_BULK_DELETE = datetime.timedelta(weeks=2)
 
 
 moderation_component = components.Component()
+help_util.with_docs(moderation_component, "Moderation commands", "Moderation oriented commands.")
 
 
 @moderation_component.with_command

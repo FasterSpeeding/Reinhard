@@ -5,6 +5,7 @@ __all__: typing.Sequence[str] = [
     "generate_help_embeds",
     "get_command_doc",
     "get_component_doc",
+    "with_docs",
 ]
 
 import inspect
@@ -19,37 +20,30 @@ if typing.TYPE_CHECKING:
     from tanjun import traits
 
 
+COMPONENT_DOC_KEY: typing.Final[str] = "REINHARD_COMPONENT_DOC"
+
+
+def with_docs(component: traits.Component, name: str, doc: str) -> None:
+    component.metadata[COMPONENT_DOC_KEY] = (name, doc)
+
+
 def get_command_doc(command: traits.ExecutableCommand, /) -> typing.Optional[str]:
     return inspect.getdoc(command.function) or None
 
 
-def get_component_doc(component: traits.Component, /) -> typing.Optional[str]:
-    return inspect.getdoc(component) or None
-
-
-def get_component_name(component: traits.Component, /) -> str:
-    chars = iter(type(component).__name__)
-    result = [next(chars)]
-
-    for char in chars:
-        if char.isupper():
-            result.append(" ")
-            char = char.lower()
-
-        result.append(char)
-
-    return "".join(result)
+def get_component_doc(component: traits.Component, /) -> typing.Optional[typing.Tuple[str, str]]:
+    return component.metadata.get(COMPONENT_DOC_KEY)
 
 
 def generate_help_embeds(
     component: traits.Component, /, *, prefix: str = ""
 ) -> typing.Optional[typing.Tuple[str, typing.Iterator[embeds_.Embed]]]:
-    component_doc = get_component_doc(component)
-    component_name = get_component_name(component)
+    component_info = get_component_doc(component)
 
-    if not component_doc:
+    if not component_info:
         return None
 
+    component_name, component_doc = component_info
     command_docs: typing.MutableSequence[str] = []
 
     for command in component.commands:
