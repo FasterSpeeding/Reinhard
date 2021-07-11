@@ -15,6 +15,7 @@ from .util import dependencies
 
 if typing.TYPE_CHECKING:
     from hikari import traits as hikari_traits
+    from tanjun import traits as tanjun_traits
 
 
 def build_bot(*, config: typing.Optional[config_.FullConfig] = None) -> hikari_traits.GatewayBotAware:
@@ -43,7 +44,9 @@ def build(
     client = (
         clients.Client(bot, mention_prefix=config.mention_prefix)
         .set_hooks(
-            hooks.Hooks().set_on_parser_error(command_hooks.on_parser_error).set_on_error(command_hooks.on_error)
+            hooks.Hooks["tanjun_traits.Context"]()
+            .set_on_parser_error(command_hooks.on_parser_error)
+            .set_on_error(command_hooks.on_error)
         )
         .add_prefix(config.prefixes)
         .add_type_dependency(

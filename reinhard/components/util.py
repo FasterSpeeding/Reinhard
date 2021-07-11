@@ -32,11 +32,11 @@ util_component = components.Component()
 help_util.with_docs(util_component, "Utility commands", "Component used for getting miscellaneous Discord information.")
 
 
-@util_component.with_command
+@util_component.with_message_command
 @parsing.with_greedy_argument("colour", converters=(conversion.ColorConverter(), conversion.RESTFulRoleConverter()))
 @parsing.with_parser
-@commands.as_command("color", "colour")
-async def colour_command(ctx: tanjun_traits.Context, colour: typing.Union[colours.Colour, guilds.Role]) -> None:
+@commands.as_message_command("color", "colour")
+async def colour_command(ctx: tanjun_traits.MessageContext, colour: typing.Union[colours.Colour, guilds.Role]) -> None:
     """Get a visual representation of a color or role's color.
 
     Argument:
@@ -57,10 +57,10 @@ async def colour_command(ctx: tanjun_traits.Context, colour: typing.Union[colour
     await error_manager.try_respond(ctx, embed=embed)
 
 
-# # @decorators.as_command
+# # @decorators.as_message_command
 # async def copy_command(
 #     self,
-#     ctx: commands.Context,
+#     ctx: commands.MessageContext,
 #     message: converters.BaseIDConverter,
 #     channel: typing.Optional[converters.BaseIDConverter] = None,
 # ) -> None:
@@ -74,12 +74,12 @@ async def colour_command(ctx: tanjun_traits.Context, colour: typing.Union[colour
 #         ...  # TODO: Implement this to allow getting the embeds from a suppressed message.
 
 
-@util_component.with_command
+@util_component.with_message_command
 @parsing.with_greedy_argument("member", converters=conversion.RESTFulMemberConverter(), default=None)
 @parsing.with_parser
 @checks.with_check(lambda ctx: ctx.message.guild_id is not None)
-@commands.as_command("member")
-async def member_command(ctx: tanjun_traits.Context, member: typing.Union[guilds.Member, None]) -> None:
+@commands.as_message_command("member")
+async def member_command(ctx: tanjun_traits.MessageContext, member: typing.Union[guilds.Member, None]) -> None:
     """Get information about a member in the current guild.
 
     Arguments:
@@ -159,12 +159,12 @@ async def member_command(ctx: tanjun_traits.Context, member: typing.Union[guilds
 
 
 # TODO: the normal role converter is limited to the current guild right?
-@util_component.with_command
+@util_component.with_message_command
 @parsing.with_argument("role", converters=conversion.RESTFulRoleConverter())
 @parsing.with_parser
 @checks.with_check(lambda ctx: ctx.message.guild_id is not None)
-@commands.as_command("role")
-async def role_command(ctx: tanjun_traits.Context, role: guilds.Role) -> None:
+@commands.as_message_command("role")
+async def role_command(ctx: tanjun_traits.MessageContext, role: guilds.Role) -> None:
     """ "Get information about a role in the current guild.
 
     Arguments:
@@ -197,13 +197,13 @@ async def role_command(ctx: tanjun_traits.Context, role: guilds.Role) -> None:
     await error_manager.try_respond(ctx, embed=embed)
 
 
-@util_component.with_command
+@util_component.with_message_command
 @parsing.with_greedy_argument(
     "user", converters=(conversion.RESTFulUserConverter(), conversion.RESTFulMemberConverter()), default=None
 )
 @parsing.with_parser
-@commands.as_command("user")
-async def user_command(ctx: tanjun_traits.Context, user: typing.Union[users.User, None]) -> None:
+@commands.as_message_command("user")
+async def user_command(ctx: tanjun_traits.MessageContext, user: typing.Union[users.User, None]) -> None:
     """ "Get information about a Discord user."
 
     Arguments:
@@ -233,13 +233,13 @@ async def user_command(ctx: tanjun_traits.Context, user: typing.Union[users.User
     await error_manager.try_respond(ctx, embed=embed)
 
 
-@util_component.with_command
+@util_component.with_message_command
 @parsing.with_greedy_argument(
     "user", converters=(conversion.RESTFulUserConverter(), conversion.RESTFulMemberConverter()), default=None
 )
 @parsing.with_parser
-@commands.as_command("avatar", "pfp")
-async def avatar_command(ctx: tanjun_traits.Context, user: typing.Union[users.User, None]) -> None:
+@commands.as_message_command("avatar", "pfp")
+async def avatar_command(ctx: tanjun_traits.MessageContext, user: typing.Union[users.User, None]) -> None:
     """Get a user's avatar.
 
     Arguments:
@@ -257,13 +257,13 @@ async def avatar_command(ctx: tanjun_traits.Context, user: typing.Union[users.Us
     await error_manager.try_respond(ctx, embed=embed)
 
 
-@util_component.with_command
+@util_component.with_message_command
 @parsing.with_argument("message_id", (snowflakes.Snowflake,))
 @parsing.with_option("channel_id", "--channel", "-c", converters=snowflakes.Snowflake, default=None)
 @parsing.with_parser
-@commands.as_command("pings", "mentions")
+@commands.as_message_command("pings", "mentions")
 async def mentions_command(
-    ctx: tanjun_traits.Context,
+    ctx: tanjun_traits.MessageContext,
     message_id: snowflakes.Snowflake,
     channel_id: typing.Optional[snowflakes.Snowflake],
 ) -> None:
@@ -297,19 +297,19 @@ async def mentions_command(
     )
 
 
-@util_component.with_command
+@util_component.with_message_command
 @checks.with_guild_check
 @parsing.with_greedy_argument("name")
 @parsing.with_parser
-@commands.as_command("members")
-async def members_command(ctx: tanjun_traits.Context, name: str) -> None:
+@commands.as_message_command("members")
+async def members_command(ctx: tanjun_traits.MessageContext, name: str) -> None:
     """Search for a member in the current guild.
 
     Arguments
         * name: Greedy argument of the name to search for.
     """
-    assert ctx.message.guild_id is not None
-    members = await ctx.rest_service.rest.search_members(ctx.message.guild_id, name)
+    assert ctx.guild_id is not None
+    members = await ctx.rest_service.rest.search_members(ctx.guild_id, name)
 
     if members:
         content = "Similar members:\n" + "\n".join(
@@ -331,9 +331,9 @@ def _format_char_line(char: str, to_file: bool) -> str:
     return f"`\\U{code:08x}`/`{char}`: {name} <http://www.fileformat.info/info/unicode/char/{code:x}>"
 
 
-@util_component.with_command
-@commands.as_group("char")
-async def char_command(ctx: tanjun_traits.Context, to_file: bool = False) -> None:
+@util_component.with_message_command
+@commands.as_message_command_group("char")
+async def char_command(ctx: tanjun_traits.MessageContext, to_file: bool = False) -> None:
     """Get information about the UTF-8 characters in the executing message.
 
     Running `char file...` will ensure that the output is always sent as a markdown file.
@@ -360,7 +360,7 @@ async def char_command(ctx: tanjun_traits.Context, to_file: bool = False) -> Non
 
 
 @char_command.with_command("file")
-async def char_file_command(ctx: tanjun_traits.Context) -> None:
+async def char_file_command(ctx: tanjun_traits.MessageContext) -> None:
     await char_command(ctx, to_file=True)
 
 

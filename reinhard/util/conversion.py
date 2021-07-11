@@ -43,7 +43,7 @@ class RESTFulMemberConverter(MemberConverter):
         return False
 
     async def convert(self, ctx: traits.Context, argument: str, /) -> guilds.Member:
-        if ctx.message.guild_id is None:
+        if ctx.guild_id is None:
             raise ValueError("Cannot get a member from a DM channel")
 
         try:
@@ -74,11 +74,11 @@ class RESTFulMemberConverter(MemberConverter):
             with error_manager:
                 # Get by ID if we were provided a valid ID.
                 if member_id is not None:
-                    return await ctx.rest_service.rest.fetch_member(ctx.message.guild_id, member_id)
+                    return await ctx.rest_service.rest.fetch_member(ctx.guild_id, member_id)
 
                 # Else get by username/nickname.
                 else:
-                    return (await ctx.rest_service.rest.search_members(ctx.message.guild_id, argument))[0]
+                    return (await ctx.rest_service.rest.search_members(ctx.guild_id, argument))[0]
 
         else:
             raise ValueError("Couldn't get member in time") from None
@@ -94,7 +94,7 @@ class RESTFulRoleConverter(RoleConverter):
     async def convert(self, ctx: traits.Context, argument: str, /) -> guilds.Role:
         # This is more strict than RoleConverter but having it consistently reject DM channels is preferable over it
         # rejecting DM channels once it fails to find anything in the cache.
-        if ctx.message.guild_id is None:
+        if ctx.guild_id is None:
             raise ValueError("Cannot get a role from a DM channel")
 
         try:
@@ -131,7 +131,7 @@ class RESTFulRoleConverter(RoleConverter):
 
         async for _ in retry:
             with error_manager:
-                roles = await ctx.rest_service.rest.fetch_roles(ctx.message.guild_id)
+                roles = await ctx.rest_service.rest.fetch_roles(ctx.guild_id)
                 return next(filter(predicate, iter(roles)))
 
         else:

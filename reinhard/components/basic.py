@@ -36,7 +36,7 @@ if typing.TYPE_CHECKING:
 
 
 def gen_help_embeds(
-    ctx: tanjun_traits.Context = injector.injected(type=tanjun_traits.Context),  # type: ignore[misc]
+    ctx: tanjun_traits.MessageContext = injector.injected(type=tanjun_traits.MessageContext),  # type: ignore[misc]
     client: tanjun_traits.Client = injector.injected(type=tanjun_traits.Client),  # type: ignore[misc]
 ) -> typing.Dict[str, typing.List[embeds_.Embed]]:
     prefix = next(iter(client.prefixes)) if client and client.prefixes else ""
@@ -53,10 +53,10 @@ basic_component = components.Component()
 help_util.with_docs(basic_component, "Basic commands", "Commands provided to give information about this bot.")
 
 
-@basic_component.with_command
-@commands.as_command("about")
+@basic_component.with_message_command
+@commands.as_message_command("about")
 async def about_command(
-    ctx: tanjun_traits.Context,
+    ctx: tanjun_traits.MessageContext,
     process: psutil.Process = injector.injected(callback=injector.cache_callback(psutil.Process)),
 ) -> None:
     """Get basic information about the current bot instance."""
@@ -66,16 +66,18 @@ async def about_command(
     cpu_usage = process.cpu_percent() / psutil.cpu_count()
     memory_percent = process.memory_percent()
 
+    name = (
+        f"Reinhard: Shard {ctx.shard.id} of {ctx.shard_service.shard_count}"
+        if ctx.shard and ctx.shard_service
+        else "Reinhard"
+    )
     description = (
         "An experimental pythonic Hikari bot.\n "
         "The source can be found on [Github](https://github.com/FasterSpeeding/Reinhard)."
     )
     embed = (
         embeds_.Embed(description=description, colour=constants.embed_colour())
-        .set_author(
-            name=f"Reinhard: Shard {ctx.shard.id} of {ctx.shard_service.shard_count}",
-            url=hikari_url,
-        )
+        .set_author(name=name, url=hikari_url)
         .add_field(name="Uptime", value=str(uptime), inline=True)
         .add_field(
             name="Process",
@@ -94,14 +96,14 @@ async def about_command(
     await error_manager.try_respond(ctx, embed=embed)
 
 
-@basic_component.with_command
+@basic_component.with_message_command
 @parsing.with_greedy_argument("command_name", default=None)
 @parsing.with_option("component_name", "--component", default=None)
 @parsing.with_parser
 # TODO: specify a group or command
-@commands.as_command("help")
+@commands.as_message_command("help")
 async def help_command(
-    ctx: tanjun_traits.Context,
+    ctx: tanjun_traits.MessageContext,
     command_name: typing.Optional[str],
     component_name: typing.Optional[str],
     paginator_pool: paginaton.PaginatorPool = injector.injected(type=paginaton.PaginatorPool),
@@ -124,7 +126,7 @@ async def help_command(
                 break
 
         prefix = next(iter(ctx.client.prefixes)) if ctx.client.prefixes else ""
-        for command in ctx.client.check_name(command_name):
+        for command in ctx.client.check_message_name(command_name):
             if command_embed := help_util.generate_command_embed(command.command, prefix=prefix):
                 await ctx.message.respond(embed=command_embed)
                 break
@@ -145,16 +147,14 @@ async def help_command(
             (undefined.UNDEFINED, embed) for embed in itertools.chain.from_iterable(list(help_embeds.values()))
         )
 
-    paginator = paginaton.Paginator(
-        ctx.rest_service, ctx.message.channel_id, embed_generator, authors=(ctx.message.author,)
-    )
+    paginator = paginaton.Paginator(ctx.rest_service, ctx.channel_id, embed_generator, authors=(ctx.author,))
     message = await paginator.open()
     paginator_pool.add_paginator(message, paginator)
 
 
-@basic_component.with_command
-@commands.as_command("ping")
-async def ping_command(ctx: tanjun_traits.Context, /) -> None:
+@basic_component.with_message_command
+@commands.as_message_command("ping")
+async def ping_command(ctx: tanjun_traits.MessageContext, /) -> None:
     """Get the bot's current delay."""
     retry = backoff.Backoff(max_retries=5)
     error_manager = rest_manager.HikariErrorManager(
@@ -173,7 +173,7 @@ async def ping_command(ctx: tanjun_traits.Context, /) -> None:
         return
 
     time_taken = (time.perf_counter() - start_time) * 1_000
-    heartbeat_latency = ctx.shard.heartbeat_latency * 1_000
+    heartbeat_latency = ctx.shard.heartbeat_latency * 1_000 if ctx.shard else float("NAN")
     retry.reset()
     error_manager.clear_rules(break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError))
     async for _ in retry:
@@ -197,11 +197,11 @@ _about_lines: typing.Sequence[typing.Tuple[str, typing.Callable[[hikari_traits.C
 )
 
 
-@basic_component.with_command
+@basic_component.with_message_command
 @checks.with_check(lambda ctx: bool(ctx.cache_service))
-@commands.as_command("cache")
+@commands.as_message_command("cache")
 async def cache_command(
-    ctx: tanjun_traits.Context,
+    ctx: tanjun_traits.MessageContext,
     process: psutil.Process = injector.injected(callback=injector.cache_callback(psutil.Process)),
     cache_service: hikari_traits.CacheAware = injector.injected(type=hikari_traits.CacheAware),  # type: ignore[misc]
 ) -> None:

@@ -38,20 +38,20 @@ sudo_component = components.Component()
 help_util.with_docs(sudo_component, "Sudo commands", "Component used by this bot's owner.")
 
 
-@sudo_component.with_command
-@commands.as_command("error")
-async def error_command(_: tanjun_traits.Context) -> None:
+@sudo_component.with_message_command
+@commands.as_message_command("error")
+async def error_command(_: tanjun_traits.MessageContext) -> None:
     """Command used for testing the current error handling."""
     raise Exception("This is an exception, get used to it.")
 
 
-@sudo_component.with_command
+@sudo_component.with_message_command
 @parsing.with_option("raw_embed", "--embed", "-e", converters=json.loads, default=undefined.UNDEFINED)
 @parsing.with_greedy_argument("content", default=undefined.UNDEFINED)
 @parsing.with_parser
-@commands.as_command("echo")
+@commands.as_message_command("echo")
 async def echo_command(
-    ctx: tanjun_traits.Context,
+    ctx: tanjun_traits.MessageContext,
     content: undefined.UndefinedOr[str],
     raw_embed: undefined.UndefinedOr[typing.Dict[str, typing.Any]],
 ) -> None:
@@ -91,7 +91,7 @@ def _yields_results(*args: io.StringIO) -> typing.Iterator[str]:
 
 
 def build_eval_globals(
-    ctx: tanjun_traits.Context, component: tanjun_traits.Component, /
+    ctx: tanjun_traits.MessageContext, component: tanjun_traits.Component, /
 ) -> typing.Dict[str, typing.Any]:
     return {
         "asyncio": asyncio,
@@ -105,7 +105,7 @@ def build_eval_globals(
 
 
 async def eval_python_code(
-    ctx: tanjun_traits.Context, component: tanjun_traits.Component, code: str
+    ctx: tanjun_traits.MessageContext, component: tanjun_traits.Component, code: str
 ) -> typing.Tuple[typing.Iterable[str], int, bool]:
     globals_ = build_eval_globals(ctx, component)
     stdout = io.StringIO()
@@ -135,7 +135,7 @@ async def eval_python_code(
 
 
 async def eval_python_code_no_capture(
-    ctx: tanjun_traits.Context, component: tanjun_traits.Component, code: str
+    ctx: tanjun_traits.MessageContext, component: tanjun_traits.Component, code: str
 ) -> None:
     globals_ = build_eval_globals(ctx, component)
     try:
@@ -151,12 +151,12 @@ async def eval_python_code_no_capture(
         pass
 
 
-@sudo_component.with_command
+@sudo_component.with_message_command
 @parsing.with_option("suppress_response", "-s", "--suppress", converters=bool, default=False, empty_value=True)
 @parsing.with_parser
-@commands.as_command("eval", "exec", "sudo")
+@commands.as_message_command("eval", "exec", "sudo")
 async def eval_command(
-    ctx: tanjun_traits.Context,
+    ctx: tanjun_traits.MessageContext,
     suppress_response: bool = False,
     component: tanjun_traits.Component = injector.injected(type=tanjun_traits.Component),  # type: ignore[misc]
     paginator_pool: paginaton.PaginatorPool = injector.injected(type=paginaton.PaginatorPool),
@@ -193,9 +193,9 @@ async def eval_command(
     )
     response_paginator = paginaton.Paginator(
         ctx.rest_service,
-        ctx.message.channel_id,
+        ctx.channel_id,
         embed_generator,
-        authors=[ctx.message.author.id],
+        authors=[ctx.author.id],
         triggers=(
             paginaton.LEFT_DOUBLE_TRIANGLE,
             paginaton.LEFT_TRIANGLE,
@@ -208,11 +208,11 @@ async def eval_command(
     paginator_pool.add_paginator(message, response_paginator)
 
 
-@sudo_component.with_command
-@commands.as_command("commands")
-async def commands_command(ctx: tanjun_traits.Context) -> None:
+@sudo_component.with_message_command
+@commands.as_message_command("commands")
+async def commands_command(ctx: tanjun_traits.MessageContext) -> None:
     commands = (
-        f"  {type(component).__name__}: " + ", ".join(map(repr, component.commands))
+        f"  {type(component).__name__}: " + ", ".join(map(repr, component.message_commands))
         for component in ctx.client.components
     )
     error_manager = rest_manager.HikariErrorManager(
@@ -221,19 +221,19 @@ async def commands_command(ctx: tanjun_traits.Context) -> None:
     await error_manager.try_respond(ctx, content="Loaded commands\n" + "\n".join(commands))
 
 
-@sudo_component.with_command
-@commands.as_group("note", "notes")
-async def note_command(ctx: tanjun_traits.Context) -> None:
+@sudo_component.with_message_command
+@commands.as_message_command_group("note", "notes")
+async def note_command(ctx: tanjun_traits.MessageContext) -> None:
     await ctx.message.respond("You have zero tags")
 
 
 @note_command.with_command("add")
-async def note_add_command(ctx: tanjun_traits.Context) -> None:
+async def note_add_command(ctx: tanjun_traits.MessageContext) -> None:
     await ctx.message.respond("todo")
 
 
 @note_command.with_command("remove")
-async def note_remove_command(ctx: tanjun_traits.Context) -> None:
+async def note_remove_command(ctx: tanjun_traits.MessageContext) -> None:
     await ctx.message.respond("todo")
 
 

@@ -30,7 +30,7 @@ moderation_component = components.Component()
 help_util.with_docs(moderation_component, "Moderation commands", "Moderation oriented commands.")
 
 
-@moderation_component.with_command
+@moderation_component.with_message_command
 @checks_.with_own_permission_check(
     permissions.Permissions.MANAGE_MESSAGES
     | permissions.Permissions.VIEW_CHANNEL
@@ -49,9 +49,9 @@ help_util.with_docs(moderation_component, "Moderation commands", "Moderation ori
 @parsing.with_multi_option("users", "--user", converters=snowflakes.Snowflake, default=())
 @parsing.with_argument("count", converters=int, default=None)
 @parsing.with_parser
-@commands.as_command("clear")
+@commands.as_message_command("clear")
 async def clear_command(
-    ctx: tanjun_traits.Context,
+    ctx: tanjun_traits.MessageContext,
     count: typing.Optional[int],
     after: typing.Optional[snowflakes.Snowflake],
     before: typing.Optional[snowflakes.Snowflake],
@@ -98,7 +98,7 @@ async def clear_command(
         before = ctx.message.id
 
     iterator = ctx.rest_service.rest.fetch_messages(
-        ctx.message.channel_id,
+        ctx.channel_id,
         before=undefined.UNDEFINED if before is None else before,
         after=(undefined.UNDEFINED if after is None else after) if before is None else undefined.UNDEFINED,
     ).filter(lambda message: now - message.created_at < MAX_MESSAGE_BULK_DELETE)
@@ -129,7 +129,7 @@ async def clear_command(
         async for messages in iterator:
             retry.reset()
             async for _ in retry:
-                await ctx.rest_service.rest.delete_messages(ctx.message.channel_id, *messages)
+                await ctx.rest_service.rest.delete_messages(ctx.channel_id, *messages)
                 break
 
     if not suppress:

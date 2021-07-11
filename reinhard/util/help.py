@@ -46,7 +46,7 @@ def generate_help_embeds(
     component_name, component_doc = component_info
     command_docs: typing.MutableSequence[str] = []
 
-    for command in component.commands:
+    for command in component.message_commands:
         command_doc = get_command_doc(command)
         if (command_name := next(iter(command.names), None)) is None or not command_doc:
             continue

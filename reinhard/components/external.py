@@ -281,12 +281,12 @@ help_util.with_docs(
 )
 
 
-@external_component.with_command
+@external_component.with_message_command
 @parsing.with_greedy_argument("query")
 @parsing.with_parser
-@commands.as_command("lyrics")
+@commands.as_message_command("lyrics")
 async def lyrics_command(
-    ctx: tanjun_traits.Context,
+    ctx: tanjun_traits.MessageContext,
     query: str,
     session: aiohttp.ClientSession = injector.injected(type=aiohttp.ClientSession),
     paginator_pool: paginaton.PaginatorPool = injector.injected(type=paginaton.PaginatorPool),
@@ -343,9 +343,9 @@ async def lyrics_command(
     )
     response_paginator = paginaton.Paginator(
         ctx.rest_service,
-        ctx.message.channel_id,
+        ctx.channel_id,
         pages,
-        authors=(ctx.message.author.id,),
+        authors=(ctx.author.id,),
         triggers=(
             paginaton.LEFT_DOUBLE_TRIANGLE,
             paginaton.LEFT_TRIANGLE,
@@ -358,7 +358,7 @@ async def lyrics_command(
     paginator_pool.add_paginator(message, response_paginator)
 
 
-@external_component.with_command
+@external_component.with_message_command
 @parsing.with_option("safe_search", "--safe", "-s", "--safe-search", converters=bool, default=None)
 @parsing.with_option("order", "-o", "--order", default="relevance")
 @parsing.with_option("language", "-l", "--language", default=None)
@@ -367,9 +367,9 @@ async def lyrics_command(
 @parsing.with_option("resource_type", "--type", "-t", default="video")
 @parsing.with_greedy_argument("query")
 @parsing.with_parser
-@commands.as_command("youtube", "yt")
+@commands.as_message_command("youtube", "yt")
 async def youtube_command(
-    ctx: tanjun_traits.Context,
+    ctx: tanjun_traits.MessageContext,
     query: str,
     resource_type: str,
     region: typing.Optional[str],
@@ -399,12 +399,12 @@ async def youtube_command(
     assert tokens.google is not None
     if safe_search is not False:
         channel: typing.Optional[channels.PartialChannel]
-        if ctx.cache_service and (channel := ctx.cache_service.cache.get_guild_channel(ctx.message.channel_id)):
+        if ctx.cache_service and (channel := ctx.cache_service.cache.get_guild_channel(ctx.channel_id)):
             channel_is_nsfw = channel.is_nsfw
 
         else:
             # TODO: handle retires
-            channel = await ctx.rest_service.rest.fetch_channel(ctx.message.channel_id)
+            channel = await ctx.rest_service.rest.fetch_channel(ctx.channel_id)
             channel_is_nsfw = channel.is_nsfw if isinstance(channel, channels.GuildChannel) else False
 
         if safe_search is None:
@@ -435,9 +435,9 @@ async def youtube_command(
 
     response_paginator = paginaton.Paginator(
         ctx.rest_service,
-        ctx.message.channel_id,
+        ctx.channel_id,
         YoutubePaginator(session, parameters),
-        authors=[ctx.message.author.id],
+        authors=[ctx.author.id],
     )
     try:
         message = await response_paginator.open()
@@ -464,20 +464,20 @@ async def youtube_command(
 
 @youtube_command.with_check
 def _youtube_token_check(
-    _: tanjun_traits.Context, tokens: config_.Tokens = injector.injected(type=config_.Tokens)
+    _: tanjun_traits.MessageContext, tokens: config_.Tokens = injector.injected(type=config_.Tokens)
 ) -> bool:
     return tokens.google is not None
 
 
 # This API is currently dead (always returning 5xxs)
-# @external_component.with_command
+# @external_component.with_message_command
 # @help_util.with_parameter_doc("--source | -s", "The optional argument of a show's title.")
 # @help_util.with_command_doc("Get a random cute anime image.")
 # @parsing.with_option("source", "--source", "-s", default=None)
 # @parsing.with_parser
-# @commands.as_command("moe")  # TODO: https://lewd.bowsette.pictures/api/request
+# @commands.as_message_command("moe")  # TODO: https://lewd.bowsette.pictures/api/request
 async def moe_command(
-    ctx: tanjun_traits.Context,
+    ctx: tanjun_traits.MessageContext,
     source: typing.Optional[str] = None,
     session: aiohttp.ClientSession = injector.injected(type=aiohttp.ClientSession),
 ) -> None:
@@ -552,13 +552,13 @@ async def query_nekos_life(
 
 
 # TODO: add valid options for Options maybe?
-@external_component.with_command
+@external_component.with_message_command
 @parsing.with_option("resource_type", "--type", "-t", default="track")
 @parsing.with_greedy_argument("query")
 @parsing.with_parser
-@commands.as_command("spotify")
+@commands.as_message_command("spotify")
 async def spotify_command(
-    ctx: tanjun_traits.Context,
+    ctx: tanjun_traits.MessageContext,
     query: str,
     resource_type: str,
     session: aiohttp.ClientSession = injector.injected(type=aiohttp.ClientSession),
@@ -583,9 +583,9 @@ async def spotify_command(
 
     response_paginator = paginaton.Paginator(
         ctx.rest_service,
-        ctx.message.channel_id,
+        ctx.channel_id,
         SpotifyPaginator(spotify_auth.acquire_token, session, {"query": query, "type": resource_type}),
-        authors=[ctx.message.author.id],
+        authors=[ctx.author.id],
     )
     try:
         message = await response_paginator.open()
@@ -608,12 +608,12 @@ async def spotify_command(
         paginator_pool.add_paginator(message, response_paginator)
 
 
-@external_component.with_command
+@external_component.with_message_command
 @parsing.with_greedy_argument("path", default=None)
 @parsing.with_parser
-@commands.as_command("docs")
+@commands.as_message_command("docs")
 async def docs_command(
-    ctx: tanjun_traits.Context,
+    ctx: tanjun_traits.MessageContext,
     path: typing.Optional[str],
     session: aiohttp.ClientSession = injector.injected(type=aiohttp.ClientSession),
     doc_fetcher: CachedResource[sphobjinv.Inventory] = injector.injected(
@@ -652,13 +652,13 @@ async def docs_command(
         await error_manager.try_respond(ctx, embed=embed)
 
 
-@external_component.with_command
+@external_component.with_message_command
 @checks.with_owner_check
 @parsing.with_argument("url", converters=urllib.parse.ParseResult)
 @parsing.with_parser
-@commands.as_command("ytdl")
+@commands.as_message_command("ytdl")
 async def ytdl_command(
-    ctx: tanjun_traits.Context,
+    ctx: tanjun_traits.MessageContext,
     url: urllib.parse.ParseResult,
     session: aiohttp.ClientSession = injector.injected(type=aiohttp.ClientSession),
     config: config_.PTFConfig = injector.injected(type=config_.PTFConfig),
