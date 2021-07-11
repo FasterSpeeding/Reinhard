@@ -662,7 +662,9 @@ async def ytdl_command(
     url: urllib.parse.ParseResult,
     session: aiohttp.ClientSession = injector.injected(type=aiohttp.ClientSession),
     config: config_.PTFConfig = injector.injected(type=config_.PTFConfig),
-    ytdl_client: ytdl.YoutubeDownloader = injector.injected(callback=injector.cache_callback(ytdl.YoutubeDownloader)),
+    ytdl_client: ytdl.YoutubeDownloader = injector.injected(
+        callback=injector.cache_callback(ytdl.YoutubeDownloader.spawn)
+    ),
 ) -> None:
     auth = aiohttp.BasicAuth(config.username, config.password)
 

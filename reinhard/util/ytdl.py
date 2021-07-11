@@ -49,6 +49,12 @@ class YoutubeDownloader:
         self._threads.shutdown()
         self._threads = None
 
+    @classmethod
+    def spawn(cls) -> YoutubeDownloader:
+        result = cls()
+        result.start()
+        return result
+
     def start(self) -> None:
         if self._threads:
             raise ValueError("Client already running")
