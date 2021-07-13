@@ -23,6 +23,7 @@ from tanjun import commands
 from tanjun import components
 from tanjun import errors as tanjun_errors
 from tanjun import injector
+from hikari import files
 from tanjun import parsing
 from tanjun import traits as tanjun_traits
 from yuyo import backoff
@@ -153,10 +154,12 @@ async def eval_python_code_no_capture(
 
 @sudo_component.with_message_command
 @parsing.with_option("suppress_response", "-s", "--suppress", converters=bool, default=False, empty_value=True)
+@parsing.with_option("file_output", "-f", "--file-out", "--file", converters=bool, default=False, empty_value=True)
 @parsing.with_parser
-@commands.as_message_command("eval", "exec", "sudo")
+@commands.as_message_command("eval", "exec")
 async def eval_command(
     ctx: tanjun_traits.MessageContext,
+    file_output: bool = False,
     suppress_response: bool = False,
     component: tanjun_traits.Component = injector.injected(type=tanjun_traits.Component),  # type: ignore[misc]
     paginator_pool: paginaton.PaginatorPool = injector.injected(type=paginaton.PaginatorPool),
@@ -180,6 +183,13 @@ async def eval_command(
         return
 
     result, exec_time, failed = await eval_python_code(ctx, component, code[0])
+
+    if file_output:
+        await ctx.message.respond(
+            attachment=files.Bytes("\n".join(result), "output.py", mimetype="text/x-python;charset=utf-8")
+        )
+        return
+
     colour = constants.FAILED_COLOUR if failed else constants.PASS_COLOUR
     string_paginator = paginaton.string_paginator(iter(result), wrapper="```python\n{}\n```", char_limit=2034)
     embed_generator = (
