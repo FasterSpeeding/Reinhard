@@ -332,13 +332,15 @@ def _format_char_line(char: str, to_file: bool) -> str:
 
 
 @util_component.with_command
-@checks.with_check(lambda ctx: bool(ctx.content))
 @commands.as_group("char")
 async def char_command(ctx: tanjun_traits.Context, to_file: bool = False) -> None:
     """Get information about the UTF-8 characters in the executing message.
 
     Running `char file...` will ensure that the output is always sent as a markdown file.
     """
+    if not ctx.content:
+        return
+
     if len(ctx.content) > 20:
         to_file = True
 
