@@ -326,9 +326,9 @@ def _format_char_line(char: str, to_file: bool) -> str:
     code = ord(char)
     name = unicodedata.name(char, "???")
     if to_file:
-        return f"* `\\u{code:08x}`/`{char}`: {name} <http://www.fileformat.info/info/unicode/char/{code:x}>"
+        return f"* `\\U{code:08x}`/`{char}`: {name} <http://www.fileformat.info/info/unicode/char/{code:x}>"
 
-    return f"`\\u{code:08x}`/`{char}`: {name} <http://www.fileformat.info/info/unicode/char/{code:x}>"
+    return f"`\\U{code:08x}`/`{char}`: {name} <http://www.fileformat.info/info/unicode/char/{code:x}>"
 
 
 @util_component.with_command
