@@ -63,8 +63,8 @@ class CachedScripts:
             pattern:
                 The optional regex string to use for matching the names of files to load.
         """
-        root_dir = pathlib.Path(root_dir)
-        for file in root_dir.rglob("*"):
+        root_dir_path = pathlib.Path(root_dir)
+        for file in root_dir_path.rglob("*"):
             if file.is_file() and file.name.endswith(".sql") and re.match(pattern, file.name):
                 self.load_sql_file(str(file.absolute()))
 

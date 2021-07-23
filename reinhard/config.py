@@ -102,9 +102,7 @@ DEFAULT_CACHE = (
 )
 
 
-@dataclasses.dataclass(
-    **_DATACLASS_KWORDS,
-)
+@dataclasses.dataclass(**_DATACLASS_KWORDS)
 class FullConfig(Config):
     database: DatabaseConfig
     tokens: Tokens

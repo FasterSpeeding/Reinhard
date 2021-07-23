@@ -19,7 +19,7 @@ def _download(url: str, /) -> typing.Tuple[pathlib.Path, typing.Dict[str, typing
     data = threading.local()
     client = data.__dict__.get(_CLIENT_ATTRIBUTE)
 
-    if not isinstance(client, youtube_dl.YoutubeDL):
+    if not client or not isinstance(client, youtube_dl.YoutubeDL):
         client = youtube_dl.YoutubeDL(
             # TODO: noplaylist isn't actually respected
             # not sure quiet is respected either

@@ -126,8 +126,8 @@ async def help_command(
                 break
 
         prefix = next(iter(ctx.client.prefixes)) if ctx.client.prefixes else ""
-        for command in ctx.client.check_message_name(command_name):
-            if command_embed := help_util.generate_command_embed(command.command, prefix=prefix):
+        for _, command in ctx.client.check_message_name(command_name):
+            if command_embed := help_util.generate_command_embed(command, prefix=prefix):
                 await ctx.message.respond(embed=command_embed)
                 break
 

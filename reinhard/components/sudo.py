@@ -16,6 +16,7 @@ import typing
 import hikari
 from hikari import embeds
 from hikari import errors as hikari_errors
+from hikari import files
 from hikari import undefined
 from tanjun import checks as checks_
 from tanjun import clients
@@ -23,7 +24,6 @@ from tanjun import commands
 from tanjun import components
 from tanjun import errors as tanjun_errors
 from tanjun import injector
-from hikari import files
 from tanjun import parsing
 from tanjun import traits as tanjun_traits
 from yuyo import backoff

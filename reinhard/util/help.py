@@ -27,7 +27,7 @@ def with_docs(component: traits.Component, name: str, doc: str) -> None:
     component.metadata[COMPONENT_DOC_KEY] = (name, doc)
 
 
-def get_command_doc(command: traits.ExecutableCommand, /) -> typing.Optional[str]:
+def get_command_doc(command: traits.MessageCommand, /) -> typing.Optional[str]:
     return inspect.getdoc(command.function) or None
 
 
@@ -64,7 +64,7 @@ def generate_help_embeds(
     return component_name, embeds
 
 
-def generate_command_embed(command: traits.ExecutableCommand, /, *, prefix: str = "") -> typing.Optional[embeds_.Embed]:
+def generate_command_embed(command: traits.MessageCommand, /, *, prefix: str = "") -> typing.Optional[embeds_.Embed]:
     if not command.names:
         return None
 
