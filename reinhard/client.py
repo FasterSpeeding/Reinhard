@@ -42,7 +42,7 @@ def build(
         config = config_.load_config()
 
     client = (
-        clients.Client(bot, mention_prefix=config.mention_prefix)
+        clients.Client.from_gateway_bot(bot, mention_prefix=config.mention_prefix)
         .set_hooks(
             hooks.Hooks["tanjun_traits.Context"]()
             .set_on_parser_error(command_hooks.on_parser_error)

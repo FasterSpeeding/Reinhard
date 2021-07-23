@@ -17,7 +17,9 @@ import hikari
 from hikari import embeds
 from hikari import errors as hikari_errors
 from hikari import files
+from hikari import traits as hikari_traits
 from hikari import undefined
+from hikari.api import entity_factory as entity_factory_api
 from tanjun import checks as checks_
 from tanjun import clients
 from tanjun import commands
@@ -55,6 +57,7 @@ async def echo_command(
     ctx: tanjun_traits.MessageContext,
     content: undefined.UndefinedOr[str],
     raw_embed: undefined.UndefinedOr[typing.Dict[str, typing.Any]],
+    entity_factory: entity_factory_api.EntityFactory = injector.injected(type=entity_factory_api.EntityFactory),
 ) -> None:
     """Command used for getting the bot to mirror a response.
 
@@ -71,7 +74,7 @@ async def echo_command(
     )
     if raw_embed is not undefined.UNDEFINED:
         try:
-            embed = ctx.rest_service.entity_factory.deserialize_embed(raw_embed)
+            embed = entity_factory.deserialize_embed(raw_embed)
 
             if embed.colour is None:
                 embed.colour = constants.embed_colour()
@@ -96,8 +99,8 @@ def build_eval_globals(
 ) -> typing.Dict[str, typing.Any]:
     return {
         "asyncio": asyncio,
-        "app": ctx.rest_service,
-        "bot": ctx.rest_service,
+        "app": ctx.shards,
+        "bot": ctx.shards,
         "client": ctx.client,
         "component": component,
         "ctx": ctx,
@@ -161,8 +164,9 @@ async def eval_command(
     ctx: tanjun_traits.MessageContext,
     file_output: bool = False,
     suppress_response: bool = False,
-    component: tanjun_traits.Component = injector.injected(type=tanjun_traits.Component),  # type: ignore[misc]
+    component: tanjun_traits.Component = injector.injected(type=tanjun_traits.Component),
     paginator_pool: paginaton.PaginatorPool = injector.injected(type=paginaton.PaginatorPool),
+    rest_service: hikari_traits.RESTAware = injector.injected(type=hikari_traits.RESTAware),
 ) -> None:
     """Dynamically evaluate a script in the bot's environment.
 
@@ -202,7 +206,7 @@ async def eval_command(
         for text, page in string_paginator
     )
     response_paginator = paginaton.Paginator(
-        ctx.rest_service,
+        rest_service,
         ctx.channel_id,
         embed_generator,
         authors=[ctx.author.id],

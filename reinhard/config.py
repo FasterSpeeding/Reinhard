@@ -12,7 +12,7 @@ import typing
 
 import yaml
 from hikari import config as hikari_config
-from hikari import intents
+from hikari import intents as intents_
 from hikari import snowflakes
 
 ConfigT = typing.TypeVar("ConfigT", bound="Config")
@@ -108,7 +108,7 @@ class FullConfig(Config):
     tokens: Tokens
     cache: hikari_config.CacheComponents = DEFAULT_CACHE
     emoji_guild: typing.Optional[snowflakes.Snowflake] = None
-    intents: intents.Intents = intents.Intents.ALL_UNPRIVILEGED
+    intents: intents_.Intents = intents_.Intents.ALL_UNPRIVILEGED
     log_level: typing.Union[None, int, str, typing.Dict[str, typing.Any]] = logging.INFO
     mention_prefix: bool = True
     owner_only: bool = False
@@ -128,7 +128,7 @@ class FullConfig(Config):
             cache=_cast_or_default(mapping, "cache", hikari_config.CacheComponents, DEFAULT_CACHE),
             database=DatabaseConfig.from_mapping(mapping["database"]),
             emoji_guild=_cast_or_default(mapping, "emoji_guild", snowflakes.Snowflake, None),
-            intents=_cast_or_default(mapping, "intents", intents.Intents, intents.Intents.ALL_UNPRIVILEGED),
+            intents=_cast_or_default(mapping, "intents", intents_.Intents, intents_.Intents.ALL_UNPRIVILEGED),
             log_level=log_level,
             mention_prefix=bool(mapping.get("mention_prefix", False)),
             owner_only=bool(mapping.get("owner_only", False)),

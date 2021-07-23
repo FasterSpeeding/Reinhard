@@ -13,6 +13,7 @@ import sphobjinv  # type: ignore[import]
 from hikari import channels
 from hikari import embeds
 from hikari import errors as hikari_errors
+from hikari import traits as hikari_traits
 from hikari import undefined
 from tanjun import checks
 from tanjun import clients
@@ -290,6 +291,7 @@ async def lyrics_command(
     query: str,
     session: aiohttp.ClientSession = injector.injected(type=aiohttp.ClientSession),
     paginator_pool: paginaton.PaginatorPool = injector.injected(type=paginaton.PaginatorPool),
+    rest_service: hikari_traits.RESTAware = injector.injected(type=hikari_traits.RESTAware),
 ) -> None:
     """Get a song's lyrics.
 
@@ -342,7 +344,7 @@ async def lyrics_command(
         for page, index in paginaton.string_paginator(iter(data["lyrics"].splitlines() or ["..."]))
     )
     response_paginator = paginaton.Paginator(
-        ctx.rest_service,
+        rest_service,
         ctx.channel_id,
         pages,
         authors=(ctx.author.id,),
@@ -379,6 +381,7 @@ async def youtube_command(
     session: aiohttp.ClientSession = injector.injected(type=aiohttp.ClientSession),
     tokens: config_.Tokens = injector.injected(type=config_.Tokens),
     paginator_pool: paginaton.PaginatorPool = injector.injected(type=paginaton.PaginatorPool),
+    rest_service: hikari_traits.RESTAware = injector.injected(type=hikari_traits.RESTAware),
 ) -> None:
     """Search for a resource on youtube.
 
@@ -399,12 +402,12 @@ async def youtube_command(
     assert tokens.google is not None
     if safe_search is not False:
         channel: typing.Optional[channels.PartialChannel]
-        if ctx.cache_service and (channel := ctx.cache_service.cache.get_guild_channel(ctx.channel_id)):
+        if ctx.cache and (channel := ctx.cache.get_guild_channel(ctx.channel_id)):
             channel_is_nsfw = channel.is_nsfw
 
         else:
             # TODO: handle retires
-            channel = await ctx.rest_service.rest.fetch_channel(ctx.channel_id)
+            channel = await ctx.rest.fetch_channel(ctx.channel_id)
             channel_is_nsfw = channel.is_nsfw if isinstance(channel, channels.GuildChannel) else False
 
         if safe_search is None:
@@ -434,7 +437,7 @@ async def youtube_command(
         parameters["relevanceLanguage"] = language
 
     response_paginator = paginaton.Paginator(
-        ctx.rest_service,
+        rest_service,
         ctx.channel_id,
         YoutubePaginator(session, parameters),
         authors=[ctx.author.id],
@@ -566,6 +569,7 @@ async def spotify_command(
     spotify_auth: ClientCredentialsOauth2 = injector.injected(
         callback=injector.cache_callback(ClientCredentialsOauth2.spotify)
     ),
+    rest_service: hikari_traits.RESTAware = injector.injected(type=hikari_traits.RESTAware),
 ) -> None:
     """Search for a resource on spotify.
 
@@ -582,7 +586,7 @@ async def spotify_command(
         raise tanjun_errors.CommandError(f"{resource_type!r} is not a valid resource type")
 
     response_paginator = paginaton.Paginator(
-        ctx.rest_service,
+        rest_service,
         ctx.channel_id,
         SpotifyPaginator(spotify_auth.acquire_token, session, {"query": query, "type": resource_type}),
         authors=[ctx.author.id],

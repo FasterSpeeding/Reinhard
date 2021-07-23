@@ -97,7 +97,7 @@ async def member_command(ctx: tanjun_traits.MessageContext, member: typing.Union
     )
     async for _ in retry:
         with error_manager:
-            guild = await ctx.rest_service.rest.fetch_guild(guild=ctx.message.guild_id)
+            guild = await ctx.rest.fetch_guild(guild=ctx.message.guild_id)
             break
 
     else:
@@ -287,7 +287,7 @@ async def mentions_command(
     )
     async for _ in retry:
         with error_manager:
-            message = await ctx.rest_service.rest.fetch_message(channel_id, message_id)
+            message = await ctx.rest.fetch_message(channel_id, message_id)
             break
 
     error_manager.clear_rules(break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError))
@@ -309,7 +309,7 @@ async def members_command(ctx: tanjun_traits.MessageContext, name: str) -> None:
         * name: Greedy argument of the name to search for.
     """
     assert ctx.guild_id is not None
-    members = await ctx.rest_service.rest.search_members(ctx.guild_id, name)
+    members = await ctx.rest.search_members(ctx.guild_id, name)
 
     if members:
         content = "Similar members:\n" + "\n".join(

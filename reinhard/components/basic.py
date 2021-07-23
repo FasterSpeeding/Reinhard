@@ -16,6 +16,7 @@ from hikari import embeds as embeds_
 from hikari import errors as hikari_errors
 from hikari import traits as hikari_traits
 from hikari import undefined
+from hikari.api import cache as cache_api
 from tanjun import checks
 from tanjun import clients
 from tanjun import commands
@@ -36,8 +37,8 @@ if typing.TYPE_CHECKING:
 
 
 def gen_help_embeds(
-    ctx: tanjun_traits.MessageContext = injector.injected(type=tanjun_traits.MessageContext),  # type: ignore[misc]
-    client: tanjun_traits.Client = injector.injected(type=tanjun_traits.Client),  # type: ignore[misc]
+    ctx: tanjun_traits.MessageContext = injector.injected(type=tanjun_traits.MessageContext),
+    client: tanjun_traits.Client = injector.injected(type=tanjun_traits.Client),
 ) -> typing.Dict[str, typing.List[embeds_.Embed]]:
     prefix = next(iter(client.prefixes)) if client and client.prefixes else ""
 
@@ -66,11 +67,7 @@ async def about_command(
     cpu_usage = process.cpu_percent() / psutil.cpu_count()
     memory_percent = process.memory_percent()
 
-    name = (
-        f"Reinhard: Shard {ctx.shard.id} of {ctx.shard_service.shard_count}"
-        if ctx.shard and ctx.shard_service
-        else "Reinhard"
-    )
+    name = f"Reinhard: Shard {ctx.shard.id} of {ctx.shards.shard_count}" if ctx.shard and ctx.shards else "Reinhard"
     description = (
         "An experimental pythonic Hikari bot.\n "
         "The source can be found on [Github](https://github.com/FasterSpeeding/Reinhard)."
@@ -110,6 +107,7 @@ async def help_command(
     help_embeds: typing.Dict[str, typing.List[embeds_.Embed]] = injector.injected(
         callback=injector.cache_callback(gen_help_embeds)
     ),
+    rest_service: hikari_traits.RESTAware = injector.injected(type=hikari_traits.RESTAware),
 ) -> None:
     """Get information about the commands in this bot.
 
@@ -147,7 +145,7 @@ async def help_command(
             (undefined.UNDEFINED, embed) for embed in itertools.chain.from_iterable(list(help_embeds.values()))
         )
 
-    paginator = paginaton.Paginator(ctx.rest_service, ctx.channel_id, embed_generator, authors=(ctx.author,))
+    paginator = paginaton.Paginator(rest_service, ctx.channel_id, embed_generator, authors=(ctx.author,))
     message = await paginator.open()
     paginator_pool.add_paginator(message, paginator)
 
@@ -182,28 +180,28 @@ async def ping_command(ctx: tanjun_traits.MessageContext, /) -> None:
             break
 
 
-_about_lines: typing.Sequence[typing.Tuple[str, typing.Callable[[hikari_traits.CacheAware], int]]] = (
-    ("Guild channels: {0}", lambda c: len(c.cache.get_guild_channels_view())),
-    ("Emojis: {0}", lambda c: len(c.cache.get_emojis_view())),
-    ("Available Guilds: {0}", lambda c: len(c.cache.get_available_guilds_view())),
-    ("Unavailable Guilds: {0}", lambda c: len(c.cache.get_unavailable_guilds_view())),
-    ("Invites: {0}", lambda c: len(c.cache.get_invites_view())),
-    ("Members: {0}", lambda c: sum(len(record) for record in c.cache.get_members_view().values())),
-    ("Messages: {0}", lambda c: len(c.cache.get_messages_view())),
-    ("Presences: {0}", lambda c: sum(len(record) for record in c.cache.get_presences_view().values())),
-    ("Roles: {0}", lambda c: len(c.cache.get_roles_view())),
-    ("Users: {0}", lambda c: len(c.cache.get_users_view())),
-    ("Voice states: {0}", lambda c: sum(len(record) for record in c.cache.get_voice_states_view().values())),
+_about_lines: typing.Sequence[typing.Tuple[str, typing.Callable[[cache_api.Cache], int]]] = (
+    ("Guild channels: {0}", lambda c: len(c.get_guild_channels_view())),
+    ("Emojis: {0}", lambda c: len(c.get_emojis_view())),
+    ("Available Guilds: {0}", lambda c: len(c.get_available_guilds_view())),
+    ("Unavailable Guilds: {0}", lambda c: len(c.get_unavailable_guilds_view())),
+    ("Invites: {0}", lambda c: len(c.get_invites_view())),
+    ("Members: {0}", lambda c: sum(len(record) for record in c.get_members_view().values())),
+    ("Messages: {0}", lambda c: len(c.get_messages_view())),
+    ("Presences: {0}", lambda c: sum(len(record) for record in c.get_presences_view().values())),
+    ("Roles: {0}", lambda c: len(c.get_roles_view())),
+    ("Users: {0}", lambda c: len(c.get_users_view())),
+    ("Voice states: {0}", lambda c: sum(len(record) for record in c.get_voice_states_view().values())),
 )
 
 
 @basic_component.with_message_command
-@checks.with_check(lambda ctx: bool(ctx.cache_service))
+@checks.with_check(lambda ctx: bool(ctx.cache))
 @commands.as_message_command("cache")
 async def cache_command(
     ctx: tanjun_traits.MessageContext,
     process: psutil.Process = injector.injected(callback=injector.cache_callback(psutil.Process)),
-    cache_service: hikari_traits.CacheAware = injector.injected(type=hikari_traits.CacheAware),  # type: ignore[misc]
+    cache: cache_api.Cache = injector.injected(type=cache_api.Cache),
 ) -> None:
     """Get general information about this bot."""
     start_date = datetime.datetime.fromtimestamp(process.create_time())
@@ -217,7 +215,7 @@ async def cache_command(
     storage_start_time = time.perf_counter()
     for line_template, callback in _about_lines:
         line_start_time = time.perf_counter()
-        line = line_template.format(callback(cache_service))
+        line = line_template.format(callback(cache))
         cache_stats_lines.append((line, (time.perf_counter() - line_start_time) * 1_000))
 
     storage_time_taken = time.perf_counter() - storage_start_time
@@ -230,7 +228,7 @@ async def cache_command(
     )
 
     # TODO: try cache first + backoff
-    avatar = (await ctx.rest_service.rest.fetch_my_user()).avatar_url
+    avatar = (await ctx.rest.fetch_my_user()).avatar_url
     embed = (
         embeds_.Embed(description="An experimental pythonic Hikari bot.", color=0x55CDFC)
         .set_author(name="Hikari: testing client", icon=avatar, url=hikari_url)

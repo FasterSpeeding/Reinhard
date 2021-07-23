@@ -2,7 +2,6 @@ from __future__ import annotations
 
 __all__: typing.Sequence[str] = ["AIOHTTPStatusHandler", "HikariErrorManager"]
 
-import logging
 import typing
 
 import aiohttp
@@ -14,8 +13,6 @@ from yuyo import backoff
 if typing.TYPE_CHECKING:
     from hikari import embeds
     from tanjun import traits as tanjun_traits
-
-_LOGGER = logging.getLogger("hikari.reinhard.rest_manager")
 
 
 class HikariErrorManager(backoff.ErrorManager):

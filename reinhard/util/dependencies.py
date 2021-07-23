@@ -57,8 +57,8 @@ class PaginatorPoolDependency:
 
     def __call__(
         self,
-        rest_client: traits.RESTAware = injector.injected(type=traits.RESTAware),  # type: ignore[misc]
-        event_client: traits.EventManagerAware = injector.injected(type=traits.EventManagerAware),  # type: ignore[misc]
+        rest_client: traits.RESTAware = injector.injected(type=traits.RESTAware),
+        event_client: traits.EventManagerAware = injector.injected(type=traits.EventManagerAware),
     ) -> paginaton.PaginatorPool:
         if not self._paginator or self._paginator.is_closed:
             self._paginator = paginaton.PaginatorPool(rest_client, event_client)

@@ -97,7 +97,7 @@ async def clear_command(
     if before is None and after is None:
         before = ctx.message.id
 
-    iterator = ctx.rest_service.rest.fetch_messages(
+    iterator = ctx.rest.fetch_messages(
         ctx.channel_id,
         before=undefined.UNDEFINED if before is None else before,
         after=(undefined.UNDEFINED if after is None else after) if before is None else undefined.UNDEFINED,
@@ -129,7 +129,7 @@ async def clear_command(
         async for messages in iterator:
             retry.reset()
             async for _ in retry:
-                await ctx.rest_service.rest.delete_messages(ctx.channel_id, *messages)
+                await ctx.rest.delete_messages(ctx.channel_id, *messages)
                 break
 
     if not suppress:
