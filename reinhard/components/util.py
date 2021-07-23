@@ -359,7 +359,8 @@ async def char_command(ctx: tanjun_traits.MessageContext, to_file: bool = False)
     await ctx.message.respond(content=content, attachment=file)
 
 
-@char_command.with_command("file")
+@char_command.with_command
+@commands.as_message_command("file")
 async def char_file_command(ctx: tanjun_traits.MessageContext) -> None:
     await char_command(ctx, to_file=True)
 

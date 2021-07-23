@@ -241,12 +241,14 @@ async def note_command(ctx: tanjun_traits.MessageContext) -> None:
     await ctx.message.respond("You have zero tags")
 
 
-@note_command.with_command("add")
+@note_command.with_command
+@commands.as_message_command("add")
 async def note_add_command(ctx: tanjun_traits.MessageContext) -> None:
     await ctx.message.respond("todo")
 
 
-@note_command.with_command("remove")
+@note_command.with_command
+@commands.as_message_command("remove")
 async def note_remove_command(ctx: tanjun_traits.MessageContext) -> None:
     await ctx.message.respond("todo")
 
