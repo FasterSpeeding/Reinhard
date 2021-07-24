@@ -19,7 +19,6 @@ from hikari import errors as hikari_errors
 from hikari import files
 from hikari import traits as hikari_traits
 from hikari import undefined
-from hikari.api import entity_factory as entity_factory_api
 from tanjun import checks as checks_
 from tanjun import clients
 from tanjun import commands
@@ -57,7 +56,7 @@ async def echo_command(
     ctx: tanjun_traits.MessageContext,
     content: undefined.UndefinedOr[str],
     raw_embed: undefined.UndefinedOr[typing.Dict[str, typing.Any]],
-    entity_factory: entity_factory_api.EntityFactory = injector.injected(type=entity_factory_api.EntityFactory),
+    entity_factory: hikari_traits.EntityFactoryAware = injector.injected(type=hikari_traits.EntityFactoryAware),
 ) -> None:
     """Command used for getting the bot to mirror a response.
 
@@ -74,7 +73,7 @@ async def echo_command(
     )
     if raw_embed is not undefined.UNDEFINED:
         try:
-            embed = entity_factory.deserialize_embed(raw_embed)
+            embed = entity_factory.entity_factory.deserialize_embed(raw_embed)
 
             if embed.colour is None:
                 embed.colour = constants.embed_colour()
