@@ -28,7 +28,7 @@ def with_docs(component: traits.Component, name: str, doc: str) -> None:
 
 
 def get_command_doc(command: traits.MessageCommand, /) -> typing.Optional[str]:
-    return inspect.getdoc(command.function) or None
+    return inspect.getdoc(command.callback) or None
 
 
 def get_component_doc(component: traits.Component, /) -> typing.Optional[typing.Tuple[str, str]]:
