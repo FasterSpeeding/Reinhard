@@ -14,19 +14,12 @@ import traceback
 import typing
 
 import hikari
+import tanjun
 from hikari import embeds
 from hikari import errors as hikari_errors
 from hikari import files
 from hikari import traits as hikari_traits
 from hikari import undefined
-from tanjun import checks as checks_
-from tanjun import clients
-from tanjun import commands
-from tanjun import components
-from tanjun import errors as tanjun_errors
-from tanjun import injector
-from tanjun import parsing
-from tanjun import traits as tanjun_traits
 from yuyo import backoff
 from yuyo import paginaton
 
@@ -36,27 +29,27 @@ from ..util import rest_manager
 
 CallbackT = typing.Callable[..., typing.Coroutine[typing.Any, typing.Any, typing.Any]]
 
-sudo_component = components.Component()
+sudo_component = tanjun.Component()
 help_util.with_docs(sudo_component, "Sudo commands", "Component used by this bot's owner.")
 
 
 @sudo_component.with_message_command
-@commands.as_message_command("error")
-async def error_command(_: tanjun_traits.MessageContext) -> None:
+@tanjun.as_message_command("error")
+async def error_command(_: tanjun.traits.MessageContext) -> None:
     """Command used for testing the current error handling."""
     raise Exception("This is an exception, get used to it.")
 
 
 @sudo_component.with_message_command
-@parsing.with_option("raw_embed", "--embed", "-e", converters=json.loads, default=undefined.UNDEFINED)
-@parsing.with_greedy_argument("content", default=undefined.UNDEFINED)
-@parsing.with_parser
-@commands.as_message_command("echo")
+@tanjun.with_option("raw_embed", "--embed", "-e", converters=json.loads, default=undefined.UNDEFINED)
+@tanjun.with_greedy_argument("content", default=undefined.UNDEFINED)
+@tanjun.with_parser
+@tanjun.as_message_command("echo")
 async def echo_command(
-    ctx: tanjun_traits.MessageContext,
+    ctx: tanjun.traits.MessageContext,
     content: undefined.UndefinedOr[str],
     raw_embed: undefined.UndefinedOr[typing.Dict[str, typing.Any]],
-    entity_factory: hikari_traits.EntityFactoryAware = injector.injected(type=hikari_traits.EntityFactoryAware),
+    entity_factory: hikari_traits.EntityFactoryAware = tanjun.injected(type=hikari_traits.EntityFactoryAware),
 ) -> None:
     """Command used for getting the bot to mirror a response.
 
@@ -94,7 +87,7 @@ def _yields_results(*args: io.StringIO) -> typing.Iterator[str]:
 
 
 def build_eval_globals(
-    ctx: tanjun_traits.MessageContext, component: tanjun_traits.Component, /
+    ctx: tanjun.traits.MessageContext, component: tanjun.traits.Component, /
 ) -> typing.Dict[str, typing.Any]:
     return {
         "asyncio": asyncio,
@@ -108,7 +101,7 @@ def build_eval_globals(
 
 
 async def eval_python_code(
-    ctx: tanjun_traits.MessageContext, component: tanjun_traits.Component, code: str
+    ctx: tanjun.traits.MessageContext, component: tanjun.traits.Component, code: str
 ) -> typing.Tuple[typing.Iterable[str], int, bool]:
     globals_ = build_eval_globals(ctx, component)
     stdout = io.StringIO()
@@ -138,7 +131,7 @@ async def eval_python_code(
 
 
 async def eval_python_code_no_capture(
-    ctx: tanjun_traits.MessageContext, component: tanjun_traits.Component, code: str
+    ctx: tanjun.traits.MessageContext, component: tanjun.traits.Component, code: str
 ) -> None:
     globals_ = build_eval_globals(ctx, component)
     try:
@@ -155,17 +148,17 @@ async def eval_python_code_no_capture(
 
 
 @sudo_component.with_message_command
-@parsing.with_option("suppress_response", "-s", "--suppress", converters=bool, default=False, empty_value=True)
-@parsing.with_option("file_output", "-f", "--file-out", "--file", converters=bool, default=False, empty_value=True)
-@parsing.with_parser
-@commands.as_message_command("eval", "exec")
+@tanjun.with_option("suppress_response", "-s", "--suppress", converters=bool, default=False, empty_value=True)
+@tanjun.with_option("file_output", "-f", "--file-out", "--file", converters=bool, default=False, empty_value=True)
+@tanjun.with_parser
+@tanjun.as_message_command("eval", "exec")
 async def eval_command(
-    ctx: tanjun_traits.MessageContext,
+    ctx: tanjun.traits.MessageContext,
     file_output: bool = False,
     suppress_response: bool = False,
-    component: tanjun_traits.Component = injector.injected(type=tanjun_traits.Component),
-    paginator_pool: paginaton.PaginatorPool = injector.injected(type=paginaton.PaginatorPool),
-    rest_service: hikari_traits.RESTAware = injector.injected(type=hikari_traits.RESTAware),
+    component: tanjun.traits.Component = tanjun.injected(type=tanjun.traits.Component),
+    paginator_pool: paginaton.PaginatorPool = tanjun.injected(type=paginaton.PaginatorPool),
+    rest_service: hikari_traits.RESTAware = tanjun.injected(type=hikari_traits.RESTAware),
 ) -> None:
     """Dynamically evaluate a script in the bot's environment.
 
@@ -179,7 +172,7 @@ async def eval_command(
     assert ctx.message.content is not None  # This shouldn't ever be the case in a command client.
     code = re.findall(r"```(?:[\w]*\n?)([\s\S(^\\`{3})]*?)\n*```", ctx.message.content)
     if not code:
-        raise tanjun_errors.CommandError("Expected a python code block.")
+        raise tanjun.CommandError("Expected a python code block.")
 
     if suppress_response:
         await eval_python_code_no_capture(ctx, component, code[0])
@@ -222,8 +215,8 @@ async def eval_command(
 
 
 @sudo_component.with_message_command
-@commands.as_message_command("commands")
-async def commands_command(ctx: tanjun_traits.MessageContext) -> None:
+@tanjun.as_message_command("commands")
+async def commands_command(ctx: tanjun.traits.MessageContext) -> None:
     commands = (
         f"  {type(component).__name__}: " + ", ".join(map(repr, component.message_commands))
         for component in ctx.client.components
@@ -235,23 +228,23 @@ async def commands_command(ctx: tanjun_traits.MessageContext) -> None:
 
 
 @sudo_component.with_message_command
-@commands.as_message_command_group("note", "notes")
-async def note_command(ctx: tanjun_traits.MessageContext) -> None:
+@tanjun.as_message_command_group("note", "notes")
+async def note_command(ctx: tanjun.traits.MessageContext) -> None:
     await ctx.message.respond("You have zero tags")
 
 
 @note_command.with_command
-@commands.as_message_command("add")
-async def note_add_command(ctx: tanjun_traits.MessageContext) -> None:
+@tanjun.as_message_command("add")
+async def note_add_command(ctx: tanjun.traits.MessageContext) -> None:
     await ctx.message.respond("todo")
 
 
 @note_command.with_command
-@commands.as_message_command("remove")
-async def note_remove_command(ctx: tanjun_traits.MessageContext) -> None:
+@tanjun.as_message_command("remove")
+async def note_remove_command(ctx: tanjun.traits.MessageContext) -> None:
     await ctx.message.respond("todo")
 
 
-@clients.as_loader
-def load_component(cli: tanjun_traits.Client, /) -> None:
-    cli.add_component(sudo_component.copy().add_check(checks_.ApplicationOwnerCheck()))
+@tanjun.as_loader
+def load_component(cli: tanjun.traits.Client, /) -> None:
+    cli.add_component(sudo_component.copy().add_check(tanjun.checks.ApplicationOwnerCheck()))

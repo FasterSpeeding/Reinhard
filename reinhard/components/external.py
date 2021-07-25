@@ -10,18 +10,12 @@ import urllib.parse
 
 import aiohttp
 import sphobjinv  # type: ignore[import]
+import tanjun
 from hikari import channels
 from hikari import embeds
 from hikari import errors as hikari_errors
 from hikari import traits as hikari_traits
 from hikari import undefined
-from tanjun import checks
-from tanjun import clients
-from tanjun import commands
-from tanjun import components
-from tanjun import errors as tanjun_errors
-from tanjun import injector
-from tanjun import parsing
 from yuyo import backoff
 from yuyo import paginaton
 
@@ -31,10 +25,6 @@ from ..util import constants
 from ..util import help as help_util
 from ..util import rest_manager
 from ..util import ytdl
-
-if typing.TYPE_CHECKING:
-    from tanjun import traits as tanjun_traits
-
 
 _ValueT = typing.TypeVar("_ValueT")
 
@@ -157,7 +147,7 @@ class SpotifyPaginator(typing.AsyncIterator[typing.Tuple[str, undefined.Undefine
                     break
 
             else:
-                raise tanjun_errors.CommandError(f"Couldn't fetch {resource_type} in time") from None
+                raise tanjun.CommandError(f"Couldn't fetch {resource_type} in time") from None
 
             try:
                 data = await response.json()
@@ -219,12 +209,12 @@ class ClientCredentialsOauth2:
                 response.status,
                 self._path,
             )
-        raise tanjun_errors.CommandError("Couldn't authenticate")
+        raise tanjun.CommandError("Couldn't authenticate")
 
     @classmethod
-    def spotify(cls, config: config_.Tokens = injector.injected(type=config_.Tokens)) -> ClientCredentialsOauth2:
+    def spotify(cls, config: config_.Tokens = tanjun.injected(type=config_.Tokens)) -> ClientCredentialsOauth2:
         if not config.spotify_id or not config.spotify_secret:
-            raise tanjun_errors.MissingDependencyError("Missing spotify secret and/or client id")
+            raise tanjun.MissingDependencyError("Missing spotify secret and/or client id")
 
         return cls("https://accounts.spotify.com/api/token", config.spotify_id, config.spotify_secret)
 
@@ -276,22 +266,22 @@ def make_doc_fetcher() -> CachedResource[sphobjinv.Inventory]:
     return CachedResource(HIKARI_IO + "/objects.inv", datetime.timedelta(hours=12), sphobjinv.Inventory)
 
 
-external_component = components.Component()
+external_component = tanjun.Component()
 help_util.with_docs(
     external_component, "External API commands", "A utility component used for getting data from 3rd party APIs."
 )
 
 
 @external_component.with_message_command
-@parsing.with_greedy_argument("query")
-@parsing.with_parser
-@commands.as_message_command("lyrics")
+@tanjun.with_greedy_argument("query")
+@tanjun.with_parser
+@tanjun.as_message_command("lyrics")
 async def lyrics_command(
-    ctx: tanjun_traits.MessageContext,
+    ctx: tanjun.traits.MessageContext,
     query: str,
-    session: aiohttp.ClientSession = injector.injected(type=aiohttp.ClientSession),
-    paginator_pool: paginaton.PaginatorPool = injector.injected(type=paginaton.PaginatorPool),
-    rest_service: hikari_traits.RESTAware = injector.injected(type=hikari_traits.RESTAware),
+    session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
+    paginator_pool: paginaton.PaginatorPool = tanjun.injected(type=paginaton.PaginatorPool),
+    rest_service: hikari_traits.RESTAware = tanjun.injected(type=hikari_traits.RESTAware),
 ) -> None:
     """Get a song's lyrics.
 
@@ -307,7 +297,7 @@ async def lyrics_command(
             break
 
     else:
-        raise tanjun_errors.CommandError("Couldn't get the lyrics in time") from None
+        raise tanjun.CommandError("Couldn't get the lyrics in time") from None
 
     try:
         data = await response.json()
@@ -323,7 +313,7 @@ async def lyrics_command(
             await response.text(),
             exc_info=exc,
         )
-        raise tanjun_errors.CommandError("Failed to receive lyrics")
+        raise tanjun.CommandError("Failed to receive lyrics")
 
     icon: typing.Optional[str] = None
     if "album" in data and (icon_data := data["album"]["icon"]):
@@ -361,27 +351,27 @@ async def lyrics_command(
 
 
 @external_component.with_message_command
-@parsing.with_option("safe_search", "--safe", "-s", "--safe-search", converters=bool, default=None)
-@parsing.with_option("order", "-o", "--order", default="relevance")
-@parsing.with_option("language", "-l", "--language", default=None)
-@parsing.with_option("region", "-r", "--region", default=None)
+@tanjun.with_option("safe_search", "--safe", "-s", "--safe-search", converters=bool, default=None)
+@tanjun.with_option("order", "-o", "--order", default="relevance")
+@tanjun.with_option("language", "-l", "--language", default=None)
+@tanjun.with_option("region", "-r", "--region", default=None)
 # TODO: should different resource types be split between different sub commands?
-@parsing.with_option("resource_type", "--type", "-t", default="video")
-@parsing.with_greedy_argument("query")
-@parsing.with_parser
-@commands.as_message_command("youtube", "yt")
+@tanjun.with_option("resource_type", "--type", "-t", default="video")
+@tanjun.with_greedy_argument("query")
+@tanjun.with_parser
+@tanjun.as_message_command("youtube", "yt")
 async def youtube_command(
-    ctx: tanjun_traits.MessageContext,
+    ctx: tanjun.traits.MessageContext,
     query: str,
     resource_type: str,
     region: typing.Optional[str],
     language: typing.Optional[str],
     order: str,
     safe_search: typing.Optional[bool],
-    session: aiohttp.ClientSession = injector.injected(type=aiohttp.ClientSession),
-    tokens: config_.Tokens = injector.injected(type=config_.Tokens),
-    paginator_pool: paginaton.PaginatorPool = injector.injected(type=paginaton.PaginatorPool),
-    rest_service: hikari_traits.RESTAware = injector.injected(type=hikari_traits.RESTAware),
+    session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
+    tokens: config_.Tokens = tanjun.injected(type=config_.Tokens),
+    paginator_pool: paginaton.PaginatorPool = tanjun.injected(type=paginaton.PaginatorPool),
+    rest_service: hikari_traits.RESTAware = tanjun.injected(type=hikari_traits.RESTAware),
 ) -> None:
     """Search for a resource on youtube.
 
@@ -414,11 +404,11 @@ async def youtube_command(
             safe_search = not channel_is_nsfw
 
         elif not safe_search and not channel_is_nsfw:
-            raise tanjun_errors.CommandError("Cannot disable safe search in a sfw channel")
+            raise tanjun.CommandError("Cannot disable safe search in a sfw channel")
 
     resource_type = resource_type.lower()
     if resource_type not in ("channel", "playlist", "video"):
-        raise tanjun_errors.CommandError("Resource type must be one of 'channel', 'playist' or 'video'.")
+        raise tanjun.CommandError("Resource type must be one of 'channel', 'playist' or 'video'.")
 
     parameters: typing.Dict[str, typing.Union[str, int]] = {
         "key": tokens.google,
@@ -446,10 +436,10 @@ async def youtube_command(
         message = await response_paginator.open()
 
     except RuntimeError as exc:
-        raise tanjun_errors.CommandError(str(exc)) from None
+        raise tanjun.CommandError(str(exc)) from None
 
     except ValueError:
-        raise tanjun_errors.CommandError(f"Couldn't find `{query}`.") from None
+        raise tanjun.CommandError(f"Couldn't find `{query}`.") from None
         # data["pageInfo"]["totalResults"] will not reliably be `0` when no data is returned and they don't use 404
         # for that so we'll just check to see if nothing is being returned.
 
@@ -467,7 +457,7 @@ async def youtube_command(
 
 @youtube_command.with_check
 def _youtube_token_check(
-    _: tanjun_traits.MessageContext, tokens: config_.Tokens = injector.injected(type=config_.Tokens)
+    _: tanjun.traits.MessageContext, tokens: config_.Tokens = tanjun.injected(type=config_.Tokens)
 ) -> bool:
     return tokens.google is not None
 
@@ -476,13 +466,13 @@ def _youtube_token_check(
 # @external_component.with_message_command
 # @help_util.with_parameter_doc("--source | -s", "The optional argument of a show's title.")
 # @help_util.with_command_doc("Get a random cute anime image.")
-# @parsing.with_option("source", "--source", "-s", default=None)
-# @parsing.with_parser
-# @commands.as_message_command("moe")  # TODO: https://lewd.bowsette.pictures/api/request
+# @tanjun.with_option("source", "--source", "-s", default=None)
+# @tanjun.with_parser
+# @tanjun.as_message_command("moe")  # TODO: https://lewd.bowsette.pictures/api/request
 async def moe_command(
-    ctx: tanjun_traits.MessageContext,
+    ctx: tanjun.traits.MessageContext,
     source: typing.Optional[str] = None,
-    session: aiohttp.ClientSession = injector.injected(type=aiohttp.ClientSession),
+    session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
 ) -> None:
     params = {}
     if source is not None:
@@ -499,7 +489,7 @@ async def moe_command(
             break
 
     else:
-        raise tanjun_errors.CommandError("Couldn't get an image in time") from None
+        raise tanjun.CommandError("Couldn't get an image in time") from None
 
     hikari_error_manager = rest_manager.HikariErrorManager(
         retry, break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
@@ -517,7 +507,7 @@ async def moe_command(
 async def query_nekos_life(
     endpoint: str,
     response_key: str,
-    session: aiohttp.ClientSession = injector.injected(type=aiohttp.ClientSession),
+    session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
 ) -> str:
     # TODO: retries
     response = await session.get(url="https://nekos.life/api/v2" + endpoint)
@@ -539,15 +529,15 @@ async def query_nekos_life(
         status_code = response.status
 
     if status_code == 404:
-        raise tanjun_errors.CommandError("Query not found.") from None
+        raise tanjun.CommandError("Query not found.") from None
 
     if status_code >= 500 or data is None or response_key not in data:
-        raise tanjun_errors.CommandError(
+        raise tanjun.CommandError(
             "Unable to fetch image at the moment due to server error or malformed response."
         ) from None
 
     if status_code >= 300:
-        raise tanjun_errors.CommandError(f"Unable to fetch image due to unexpected error {status_code}") from None
+        raise tanjun.CommandError(f"Unable to fetch image due to unexpected error {status_code}") from None
 
     result = data[response_key]
     assert isinstance(result, str)
@@ -556,20 +546,20 @@ async def query_nekos_life(
 
 # TODO: add valid options for Options maybe?
 @external_component.with_message_command
-@parsing.with_option("resource_type", "--type", "-t", default="track")
-@parsing.with_greedy_argument("query")
-@parsing.with_parser
-@commands.as_message_command("spotify")
+@tanjun.with_option("resource_type", "--type", "-t", default="track")
+@tanjun.with_greedy_argument("query")
+@tanjun.with_parser
+@tanjun.as_message_command("spotify")
 async def spotify_command(
-    ctx: tanjun_traits.MessageContext,
+    ctx: tanjun.traits.MessageContext,
     query: str,
     resource_type: str,
-    session: aiohttp.ClientSession = injector.injected(type=aiohttp.ClientSession),
-    paginator_pool: paginaton.PaginatorPool = injector.injected(type=paginaton.PaginatorPool),
-    spotify_auth: ClientCredentialsOauth2 = injector.injected(
-        callback=injector.cache_callback(ClientCredentialsOauth2.spotify)
+    session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
+    paginator_pool: paginaton.PaginatorPool = tanjun.injected(type=paginaton.PaginatorPool),
+    spotify_auth: ClientCredentialsOauth2 = tanjun.injected(
+        callback=tanjun.cache_callback(ClientCredentialsOauth2.spotify)
     ),
-    rest_service: hikari_traits.RESTAware = injector.injected(type=hikari_traits.RESTAware),
+    rest_service: hikari_traits.RESTAware = tanjun.injected(type=hikari_traits.RESTAware),
 ) -> None:
     """Search for a resource on spotify.
 
@@ -583,7 +573,7 @@ async def spotify_command(
     """
     resource_type = resource_type.lower()
     if resource_type not in SPOTIFY_RESOURCE_TYPES:
-        raise tanjun_errors.CommandError(f"{resource_type!r} is not a valid resource type")
+        raise tanjun.CommandError(f"{resource_type!r} is not a valid resource type")
 
     response_paginator = paginaton.Paginator(
         rest_service,
@@ -595,10 +585,10 @@ async def spotify_command(
         message = await response_paginator.open()
 
     except RuntimeError as exc:
-        raise tanjun_errors.CommandError(str(exc)) from None
+        raise tanjun.CommandError(str(exc)) from None
 
     except ValueError:
-        raise tanjun_errors.CommandError(f"Couldn't find {resource_type}.") from None
+        raise tanjun.CommandError(f"Couldn't find {resource_type}.") from None
 
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError) as exc:
         _LOGGER.exception("Spotify returned invalid data", exc_info=exc)
@@ -613,15 +603,15 @@ async def spotify_command(
 
 
 @external_component.with_message_command
-@parsing.with_greedy_argument("path", default=None)
-@parsing.with_parser
-@commands.as_message_command("docs")
+@tanjun.with_greedy_argument("path", default=None)
+@tanjun.with_parser
+@tanjun.as_message_command("docs")
 async def docs_command(
-    ctx: tanjun_traits.MessageContext,
+    ctx: tanjun.traits.MessageContext,
     path: typing.Optional[str],
-    session: aiohttp.ClientSession = injector.injected(type=aiohttp.ClientSession),
-    doc_fetcher: CachedResource[sphobjinv.Inventory] = injector.injected(
-        callback=injector.cache_callback(make_doc_fetcher)
+    session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
+    doc_fetcher: CachedResource[sphobjinv.Inventory] = tanjun.injected(
+        callback=tanjun.cache_callback(make_doc_fetcher)
     ),
 ) -> None:
     """Search Hikari's documentation.
@@ -657,18 +647,16 @@ async def docs_command(
 
 
 @external_component.with_message_command
-@checks.with_owner_check
-@parsing.with_argument("url", converters=urllib.parse.ParseResult)
-@parsing.with_parser
-@commands.as_message_command("ytdl")
+@tanjun.with_owner_check
+@tanjun.with_argument("url", converters=urllib.parse.ParseResult)
+@tanjun.with_parser
+@tanjun.as_message_command("ytdl")
 async def ytdl_command(
-    ctx: tanjun_traits.MessageContext,
+    ctx: tanjun.traits.MessageContext,
     url: urllib.parse.ParseResult,
-    session: aiohttp.ClientSession = injector.injected(type=aiohttp.ClientSession),
-    config: config_.PTFConfig = injector.injected(type=config_.PTFConfig),
-    ytdl_client: ytdl.YoutubeDownloader = injector.injected(
-        callback=injector.cache_callback(ytdl.YoutubeDownloader.spawn)
-    ),
+    session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
+    config: config_.PTFConfig = tanjun.injected(type=config_.PTFConfig),
+    ytdl_client: ytdl.YoutubeDownloader = tanjun.injected(callback=tanjun.cache_callback(ytdl.YoutubeDownloader.spawn)),
 ) -> None:
     auth = aiohttp.BasicAuth(config.username, config.password)
 
@@ -705,6 +693,6 @@ async def ytdl_command(
     await ctx.message.respond(content=file_path)
 
 
-@clients.as_loader
-def load_component(cli: tanjun_traits.Client, /) -> None:
+@tanjun.as_loader
+def load_component(cli: tanjun.traits.Client, /) -> None:
     cli.add_component(external_component.copy())

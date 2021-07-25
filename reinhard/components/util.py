@@ -5,6 +5,7 @@ __all__: typing.Sequence[str] = ["util_component", "load_component"]
 import typing
 import unicodedata
 
+import tanjun
 from hikari import colours
 from hikari import embeds
 from hikari import errors as hikari_errors
@@ -13,13 +14,6 @@ from hikari import guilds
 from hikari import snowflakes
 from hikari import undefined
 from hikari import users
-from tanjun import checks
-from tanjun import clients
-from tanjun import commands
-from tanjun import components
-from tanjun import errors as tanjun_errors
-from tanjun import parsing
-from tanjun import traits as tanjun_traits
 from yuyo import backoff
 
 from ..util import basic as basic_util
@@ -28,15 +22,15 @@ from ..util import conversion
 from ..util import help as help_util
 from ..util import rest_manager
 
-util_component = components.Component()
+util_component = tanjun.Component()
 help_util.with_docs(util_component, "Utility commands", "Component used for getting miscellaneous Discord information.")
 
 
 @util_component.with_message_command
-@parsing.with_greedy_argument("colour", converters=(conversion.ColorConverter(), conversion.RESTFulRoleConverter()))
-@parsing.with_parser
-@commands.as_message_command("color", "colour")
-async def colour_command(ctx: tanjun_traits.MessageContext, colour: typing.Union[colours.Colour, guilds.Role]) -> None:
+@tanjun.with_greedy_argument("colour", converters=(conversion.ColorConverter(), conversion.RESTFulRoleConverter()))
+@tanjun.with_parser
+@tanjun.as_message_command("color", "colour")
+async def colour_command(ctx: tanjun.traits.MessageContext, colour: typing.Union[colours.Colour, guilds.Role]) -> None:
     """Get a visual representation of a color or role's color.
 
     Argument:
@@ -60,12 +54,12 @@ async def colour_command(ctx: tanjun_traits.MessageContext, colour: typing.Union
 # # @decorators.as_message_command
 # async def copy_command(
 #     self,
-#     ctx: commands.MessageContext,
+#     ctx: tanjun.MessageContext,
 #     message: converters.BaseIDConverter,
 #     channel: typing.Optional[converters.BaseIDConverter] = None,
 # ) -> None:
 #     try:
-#         message = await self.components.rest.fetch_message(
+#         message = await self.tanjun.rest.fetch_message(
 #             message=message, channel=channel or ctx.message.channel_id
 #         )
 #     except (hikari_errors.NotFound, hikari_errors.Forbidden) as exc:
@@ -75,11 +69,11 @@ async def colour_command(ctx: tanjun_traits.MessageContext, colour: typing.Union
 
 
 @util_component.with_message_command
-@parsing.with_greedy_argument("member", converters=conversion.RESTFulMemberConverter(), default=None)
-@parsing.with_parser
-@checks.with_check(lambda ctx: ctx.message.guild_id is not None)
-@commands.as_message_command("member")
-async def member_command(ctx: tanjun_traits.MessageContext, member: typing.Union[guilds.Member, None]) -> None:
+@tanjun.with_greedy_argument("member", converters=conversion.RESTFulMemberConverter(), default=None)
+@tanjun.with_parser
+@tanjun.with_check(lambda ctx: ctx.message.guild_id is not None)
+@tanjun.as_message_command("member")
+async def member_command(ctx: tanjun.traits.MessageContext, member: typing.Union[guilds.Member, None]) -> None:
     """Get information about a member in the current guild.
 
     Arguments:
@@ -102,7 +96,7 @@ async def member_command(ctx: tanjun_traits.MessageContext, member: typing.Union
 
     else:
         if retry.is_depleted:
-            raise tanjun_errors.CommandError("Couldn't get guild in time")
+            raise tanjun.CommandError("Couldn't get guild in time")
 
         return
 
@@ -160,11 +154,11 @@ async def member_command(ctx: tanjun_traits.MessageContext, member: typing.Union
 
 # TODO: the normal role converter is limited to the current guild right?
 @util_component.with_message_command
-@parsing.with_argument("role", converters=conversion.RESTFulRoleConverter())
-@parsing.with_parser
-@checks.with_check(lambda ctx: ctx.message.guild_id is not None)
-@commands.as_message_command("role")
-async def role_command(ctx: tanjun_traits.MessageContext, role: guilds.Role) -> None:
+@tanjun.with_argument("role", converters=conversion.RESTFulRoleConverter())
+@tanjun.with_parser
+@tanjun.with_check(lambda ctx: ctx.message.guild_id is not None)
+@tanjun.as_message_command("role")
+async def role_command(ctx: tanjun.traits.MessageContext, role: guilds.Role) -> None:
     """ "Get information about a role in the current guild.
 
     Arguments:
@@ -198,12 +192,12 @@ async def role_command(ctx: tanjun_traits.MessageContext, role: guilds.Role) -> 
 
 
 @util_component.with_message_command
-@parsing.with_greedy_argument(
+@tanjun.with_greedy_argument(
     "user", converters=(conversion.RESTFulUserConverter(), conversion.RESTFulMemberConverter()), default=None
 )
-@parsing.with_parser
-@commands.as_message_command("user")
-async def user_command(ctx: tanjun_traits.MessageContext, user: typing.Union[users.User, None]) -> None:
+@tanjun.with_parser
+@tanjun.as_message_command("user")
+async def user_command(ctx: tanjun.traits.MessageContext, user: typing.Union[users.User, None]) -> None:
     """ "Get information about a Discord user."
 
     Arguments:
@@ -234,12 +228,12 @@ async def user_command(ctx: tanjun_traits.MessageContext, user: typing.Union[use
 
 
 @util_component.with_message_command
-@parsing.with_greedy_argument(
+@tanjun.with_greedy_argument(
     "user", converters=(conversion.RESTFulUserConverter(), conversion.RESTFulMemberConverter()), default=None
 )
-@parsing.with_parser
-@commands.as_message_command("avatar", "pfp")
-async def avatar_command(ctx: tanjun_traits.MessageContext, user: typing.Union[users.User, None]) -> None:
+@tanjun.with_parser
+@tanjun.as_message_command("avatar", "pfp")
+async def avatar_command(ctx: tanjun.traits.MessageContext, user: typing.Union[users.User, None]) -> None:
     """Get a user's avatar.
 
     Arguments:
@@ -258,12 +252,12 @@ async def avatar_command(ctx: tanjun_traits.MessageContext, user: typing.Union[u
 
 
 @util_component.with_message_command
-@parsing.with_argument("message_id", (snowflakes.Snowflake,))
-@parsing.with_option("channel_id", "--channel", "-c", converters=snowflakes.Snowflake, default=None)
-@parsing.with_parser
-@commands.as_message_command("pings", "mentions")
+@tanjun.with_argument("message_id", (snowflakes.Snowflake,))
+@tanjun.with_option("channel_id", "--channel", "-c", converters=snowflakes.Snowflake, default=None)
+@tanjun.with_parser
+@tanjun.as_message_command("pings", "mentions")
 async def mentions_command(
-    ctx: tanjun_traits.MessageContext,
+    ctx: tanjun.traits.MessageContext,
     message_id: snowflakes.Snowflake,
     channel_id: typing.Optional[snowflakes.Snowflake],
 ) -> None:
@@ -298,11 +292,11 @@ async def mentions_command(
 
 
 @util_component.with_message_command
-@checks.with_guild_check
-@parsing.with_greedy_argument("name")
-@parsing.with_parser
-@commands.as_message_command("members")
-async def members_command(ctx: tanjun_traits.MessageContext, name: str) -> None:
+@tanjun.with_guild_check
+@tanjun.with_greedy_argument("name")
+@tanjun.with_parser
+@tanjun.as_message_command("members")
+async def members_command(ctx: tanjun.traits.MessageContext, name: str) -> None:
     """Search for a member in the current guild.
 
     Arguments
@@ -332,8 +326,8 @@ def _format_char_line(char: str, to_file: bool) -> str:
 
 
 @util_component.with_message_command
-@commands.as_message_command_group("char")
-async def char_command(ctx: tanjun_traits.MessageContext, to_file: bool = False) -> None:
+@tanjun.as_message_command_group("char")
+async def char_command(ctx: tanjun.traits.MessageContext, to_file: bool = False) -> None:
     """Get information about the UTF-8 characters in the executing message.
 
     Running `char file...` will ensure that the output is always sent as a markdown file.
@@ -360,11 +354,11 @@ async def char_command(ctx: tanjun_traits.MessageContext, to_file: bool = False)
 
 
 @char_command.with_command
-@commands.as_message_command("file")
-async def char_file_command(ctx: tanjun_traits.MessageContext) -> None:
+@tanjun.as_message_command("file")
+async def char_file_command(ctx: tanjun.traits.MessageContext) -> None:
     await char_command(ctx, to_file=True)
 
 
-@clients.as_loader
-def load_component(cli: tanjun_traits.Client, /) -> None:
+@tanjun.as_loader
+def load_component(cli: tanjun.traits.Client, /) -> None:
     cli.add_component(util_component.copy())

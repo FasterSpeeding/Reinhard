@@ -3,10 +3,8 @@ from __future__ import annotations
 import typing
 
 import aiohttp
+import tanjun
 from hikari import config as hikari_config
-from tanjun import checks
-from tanjun import clients
-from tanjun import hooks
 from yuyo import paginaton
 
 from . import config as config_
@@ -15,7 +13,6 @@ from .util import dependencies
 
 if typing.TYPE_CHECKING:
     from hikari import traits as hikari_traits
-    from tanjun import traits as tanjun_traits
 
 
 def build_bot(*, config: typing.Optional[config_.FullConfig] = None) -> hikari_traits.GatewayBotAware:
@@ -37,14 +34,14 @@ def build_bot(*, config: typing.Optional[config_.FullConfig] = None) -> hikari_t
 
 def build(
     bot: hikari_traits.GatewayBotAware, /, *, config: typing.Optional[config_.FullConfig] = None
-) -> clients.Client:
+) -> tanjun.Client:
     if config is None:
         config = config_.load_config()
 
     client = (
-        clients.Client.from_gateway_bot(bot, mention_prefix=config.mention_prefix)
+        tanjun.Client.from_gateway_bot(bot, mention_prefix=config.mention_prefix)
         .set_hooks(
-            hooks.Hooks["tanjun_traits.Context"]()
+            tanjun.Hooks["tanjun.traits.Context"]()
             .set_on_parser_error(command_hooks.on_parser_error)
             .set_on_error(command_hooks.on_error)
         )
@@ -68,6 +65,6 @@ def build(
         client.add_type_dependency(config_.PTFConfig, lambda: ptf)
 
     if config.owner_only:
-        client.add_check(checks.ApplicationOwnerCheck())
+        client.add_check(tanjun.checks.ApplicationOwnerCheck())
 
     return client

@@ -5,53 +5,45 @@ __all__: typing.Sequence[str] = ["moderation_component", "load_component"]
 import datetime
 import typing
 
+import tanjun
 from hikari import errors as hikari_errors
 from hikari import permissions
 from hikari import snowflakes
 from hikari import undefined
-from tanjun import checks as checks_
-from tanjun import clients
-from tanjun import commands
-from tanjun import components
-from tanjun import errors as tanjun_errors
-from tanjun import parsing
 from yuyo import backoff
 
 from ..util import help as help_util
 from ..util import rest_manager
 
-if typing.TYPE_CHECKING:
-    from tanjun import traits as tanjun_traits
-
 MAX_MESSAGE_BULK_DELETE = datetime.timedelta(weeks=2)
 
 
-moderation_component = components.Component()
+moderation_component = tanjun.Component()
 help_util.with_docs(moderation_component, "Moderation commands", "Moderation oriented commands.")
 
 
 @moderation_component.with_message_command
-@checks_.with_own_permission_check(
+@tanjun.with_own_permission_check(
     permissions.Permissions.MANAGE_MESSAGES
     | permissions.Permissions.VIEW_CHANNEL
     | permissions.Permissions.READ_MESSAGE_HISTORY
 )
-@checks_.with_author_permission_check(
+@tanjun.with_author_permission_check(
     permissions.Permissions.MANAGE_MESSAGES
     | permissions.Permissions.VIEW_CHANNEL
     | permissions.Permissions.READ_MESSAGE_HISTORY
 )
-@parsing.with_option("suppress", "-s", "--suppress", converters=bool, default=False, empty_value=True)
-@parsing.with_option("after", "--after", converters=snowflakes.Snowflake, default=None)
-@parsing.with_option("before", "--before", converters=snowflakes.Snowflake, default=None)
-@parsing.with_option("bot_only", "--bot", converters=bool, default=False, empty_value=True)
-@parsing.with_option("human_only", "--human", converters=bool, default=False, empty_value=True)
-@parsing.with_multi_option("users", "--user", converters=snowflakes.Snowflake, default=())
-@parsing.with_argument("count", converters=int, default=None)
-@parsing.with_parser
-@commands.as_message_command("clear")
+@tanjun.with_option("suppress", "-s", "--suppress", converters=bool, default=False, empty_value=True)
+@tanjun.with_option("after", "--after", converters=snowflakes.Snowflake, default=None)
+@tanjun.with_option("before", "--before", converters=snowflakes.Snowflake, default=None)
+@tanjun.with_option("bot_only", "--bot", converters=bool, default=False, empty_value=True)
+@tanjun.with_option("human_only", "--human", converters=bool, default=False, empty_value=True)
+@tanjun.with_multi_option("users", "--user", converters=snowflakes.Snowflake, default=())
+@tanjun.with_argument("count", converters=int, default=None)
+@tanjun.with_parser
+@tanjun.as_message_command("clear")
 async def clear_command(
-    ctx: tanjun_traits.MessageContext,
+    ctx: tanjun.traits.MessageContext,
     count: typing.Optional[int],
     after: typing.Optional[snowflakes.Snowflake],
     before: typing.Optional[snowflakes.Snowflake],
@@ -79,20 +71,20 @@ async def clear_command(
             command's finished.
     """
     if human_only and bot_only:
-        raise tanjun_errors.CommandError("Can only specify one of `--human` or `--user`")
+        raise tanjun.CommandError("Can only specify one of `--human` or `--user`")
 
     now = datetime.datetime.now(tz=datetime.timezone.utc)
     after_too_old = after and now - after.created_at >= MAX_MESSAGE_BULK_DELETE
     before_too_old = before and now - before.created_at >= MAX_MESSAGE_BULK_DELETE
 
     if after_too_old or before_too_old:
-        raise tanjun_errors.CommandError("Cannot delete messages that are over 14 days old")
+        raise tanjun.CommandError("Cannot delete messages that are over 14 days old")
 
     if count is None and after is not None:
-        raise tanjun_errors.CommandError("Must specify `count` when `after` is not specified")
+        raise tanjun.CommandError("Must specify `count` when `after` is not specified")
 
     elif count is not None and count <= 0:
-        raise tanjun_errors.CommandError("Count must be greater than 0.")
+        raise tanjun.CommandError("Count must be greater than 0.")
 
     if before is None and after is None:
         before = ctx.message.id
@@ -136,6 +128,6 @@ async def clear_command(
         await error_manager.try_respond(ctx, content="Cleared messages.")
 
 
-@clients.as_loader
-def load_component(cli: tanjun_traits.Client, /) -> None:
+@tanjun.as_loader
+def load_component(cli: tanjun.traits.Client, /) -> None:
     cli.add_component(moderation_component.copy())

@@ -5,14 +5,13 @@ __all__: typing.Sequence[str] = ["AIOHTTPStatusHandler", "HikariErrorManager"]
 import typing
 
 import aiohttp
+import tanjun
 from hikari import errors as hikari_errors
 from hikari import undefined
-from tanjun import errors as tanjun_errors
 from yuyo import backoff
 
 if typing.TYPE_CHECKING:
     from hikari import embeds
-    from tanjun import traits as tanjun_traits
 
 
 class HikariErrorManager(backoff.ErrorManager):
@@ -56,7 +55,7 @@ class HikariErrorManager(backoff.ErrorManager):
 
     async def try_respond(
         self,
-        ctx: tanjun_traits.MessageContext,
+        ctx: tanjun.traits.MessageContext,
         *,
         content: undefined.UndefinedOr[str] = undefined.UNDEFINED,
         embed: undefined.UndefinedOr[embeds.Embed] = undefined.UNDEFINED,
@@ -106,7 +105,7 @@ class AIOHTTPStatusHandler(backoff.ErrorManager):
 
         if self._on_404 is not None and exception.status == 404:
             if isinstance(self._on_404, str):
-                raise tanjun_errors.CommandError(self._on_404) from None
+                raise tanjun.CommandError(self._on_404) from None
 
             else:
                 self._on_404()

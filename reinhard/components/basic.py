@@ -10,6 +10,7 @@ import time
 import typing
 
 import psutil  # type: ignore[import]
+import tanjun
 from hikari import __url__ as hikari_url
 from hikari import __version__ as hikari_version
 from hikari import embeds as embeds_
@@ -17,14 +18,6 @@ from hikari import errors as hikari_errors
 from hikari import traits as hikari_traits
 from hikari import undefined
 from hikari.api import cache as cache_api
-from tanjun import checks
-from tanjun import clients
-from tanjun import commands
-from tanjun import components
-from tanjun import errors as tanjun_errors
-from tanjun import injector
-from tanjun import parsing
-from tanjun import traits as tanjun_traits
 from yuyo import backoff
 from yuyo import paginaton
 
@@ -37,8 +30,8 @@ if typing.TYPE_CHECKING:
 
 
 def gen_help_embeds(
-    ctx: tanjun_traits.MessageContext = injector.injected(type=tanjun_traits.MessageContext),
-    client: tanjun_traits.Client = injector.injected(type=tanjun_traits.Client),
+    ctx: tanjun.traits.MessageContext = tanjun.injected(type=tanjun.traits.MessageContext),
+    client: tanjun.traits.Client = tanjun.injected(type=tanjun.traits.Client),
 ) -> typing.Dict[str, typing.List[embeds_.Embed]]:
     prefix = next(iter(client.prefixes)) if client and client.prefixes else ""
 
@@ -50,15 +43,15 @@ def gen_help_embeds(
     return help_embeds
 
 
-basic_component = components.Component()
+basic_component = tanjun.Component()
 help_util.with_docs(basic_component, "Basic commands", "Commands provided to give information about this bot.")
 
 
 @basic_component.with_message_command
-@commands.as_message_command("about")
+@tanjun.as_message_command("about")
 async def about_command(
-    ctx: tanjun_traits.MessageContext,
-    process: psutil.Process = injector.injected(callback=injector.cache_callback(psutil.Process)),
+    ctx: tanjun.traits.MessageContext,
+    process: psutil.Process = tanjun.injected(callback=tanjun.cache_callback(psutil.Process)),
 ) -> None:
     """Get basic information about the current bot instance."""
     start_date = datetime.datetime.fromtimestamp(process.create_time())
@@ -94,20 +87,20 @@ async def about_command(
 
 
 @basic_component.with_message_command
-@parsing.with_greedy_argument("command_name", default=None)
-@parsing.with_option("component_name", "--component", default=None)
-@parsing.with_parser
+@tanjun.with_greedy_argument("command_name", default=None)
+@tanjun.with_option("component_name", "--component", default=None)
+@tanjun.with_parser
 # TODO: specify a group or command
-@commands.as_message_command("help")
+@tanjun.as_message_command("help")
 async def help_command(
-    ctx: tanjun_traits.MessageContext,
+    ctx: tanjun.traits.MessageContext,
     command_name: typing.Optional[str],
     component_name: typing.Optional[str],
-    paginator_pool: paginaton.PaginatorPool = injector.injected(type=paginaton.PaginatorPool),
-    help_embeds: typing.Dict[str, typing.List[embeds_.Embed]] = injector.injected(
-        callback=injector.cache_callback(gen_help_embeds)
+    paginator_pool: paginaton.PaginatorPool = tanjun.injected(type=paginaton.PaginatorPool),
+    help_embeds: typing.Dict[str, typing.List[embeds_.Embed]] = tanjun.injected(
+        callback=tanjun.cache_callback(gen_help_embeds)
     ),
-    rest_service: hikari_traits.RESTAware = injector.injected(type=hikari_traits.RESTAware),
+    rest_service: hikari_traits.RESTAware = tanjun.injected(type=hikari_traits.RESTAware),
 ) -> None:
     """Get information about the commands in this bot.
 
@@ -136,7 +129,7 @@ async def help_command(
 
     if component_name:
         if component_name.lower() not in help_embeds:
-            raise tanjun_errors.CommandError(f"Couldn't find component `{component_name}`")
+            raise tanjun.CommandError(f"Couldn't find component `{component_name}`")
 
         embed_generator = ((undefined.UNDEFINED, embed) for embed in help_embeds[component_name.lower()])
 
@@ -151,8 +144,8 @@ async def help_command(
 
 
 @basic_component.with_message_command
-@commands.as_message_command("ping")
-async def ping_command(ctx: tanjun_traits.MessageContext, /) -> None:
+@tanjun.as_message_command("ping")
+async def ping_command(ctx: tanjun.traits.MessageContext, /) -> None:
     """Get the bot's current delay."""
     retry = backoff.Backoff(max_retries=5)
     error_manager = rest_manager.HikariErrorManager(
@@ -196,12 +189,12 @@ _about_lines: typing.Sequence[typing.Tuple[str, typing.Callable[[cache_api.Cache
 
 
 @basic_component.with_message_command
-@checks.with_check(lambda ctx: bool(ctx.cache))
-@commands.as_message_command("cache")
+@tanjun.with_check(lambda ctx: bool(ctx.cache))
+@tanjun.as_message_command("cache")
 async def cache_command(
-    ctx: tanjun_traits.MessageContext,
-    process: psutil.Process = injector.injected(callback=injector.cache_callback(psutil.Process)),
-    cache: cache_api.Cache = injector.injected(type=cache_api.Cache),
+    ctx: tanjun.traits.MessageContext,
+    process: psutil.Process = tanjun.injected(callback=tanjun.cache_callback(psutil.Process)),
+    cache: cache_api.Cache = tanjun.injected(type=cache_api.Cache),
 ) -> None:
     """Get general information about this bot."""
     start_date = datetime.datetime.fromtimestamp(process.create_time())
@@ -251,6 +244,6 @@ async def cache_command(
     await error_manager.try_respond(ctx, content=f"{storage_time_taken * 1_000:.4g} ms", embed=embed)
 
 
-@clients.as_loader
-def load_component(cli: tanjun_traits.Client, /) -> None:
+@tanjun.as_loader
+def load_component(cli: tanjun.traits.Client, /) -> None:
     cli.add_component(basic_component.copy())
