@@ -5,15 +5,8 @@ __all__: typing.Sequence[str] = ["util_component", "load_component"]
 import typing
 import unicodedata
 
+import hikari
 import tanjun
-from hikari import colours
-from hikari import embeds
-from hikari import errors as hikari_errors
-from hikari import files
-from hikari import guilds
-from hikari import snowflakes
-from hikari import undefined
-from hikari import users
 from yuyo import backoff
 
 from ..util import basic as basic_util
@@ -30,24 +23,22 @@ help_util.with_docs(util_component, "Utility commands", "Component used for gett
 @tanjun.with_greedy_argument("colour", converters=(conversion.ColorConverter(), conversion.RESTFulRoleConverter()))
 @tanjun.with_parser
 @tanjun.as_message_command("color", "colour")
-async def colour_command(ctx: tanjun.traits.MessageContext, colour: typing.Union[colours.Colour, guilds.Role]) -> None:
+async def colour_command(ctx: tanjun.traits.MessageContext, colour: typing.Union[hikari.Colour, hikari.Role]) -> None:
     """Get a visual representation of a color or role's color.
 
     Argument:
         colour: Either the hex/int literal representation of a colour to show or the ID/mention of a role to get
             the colour of.
     """
-    if isinstance(colour, guilds.Role):
+    if isinstance(colour, hikari.Role):
         colour = colour.colour
 
     embed = (
-        embeds.Embed(colour=colour)
+        hikari.Embed(colour=colour)
         .add_field(name="RGB", value=str(colour.rgb))
         .add_field(name="HEX", value=str(colour.hex_code))
     )
-    error_manager = rest_manager.HikariErrorManager(
-        break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
-    )
+    error_manager = rest_manager.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
     await error_manager.try_respond(ctx, embed=embed)
 
 
@@ -62,7 +53,7 @@ async def colour_command(ctx: tanjun.traits.MessageContext, colour: typing.Union
 #         message = await self.tanjun.rest.fetch_message(
 #             message=message, channel=channel or ctx.message.channel_id
 #         )
-#     except (hikari_errors.NotFound, hikari_errors.Forbidden) as exc:
+#     except (hikari.NotFound, hikari.Forbidden) as exc:
 #         await ctx.message.respond(content="Failed to get message.")
 #     else:
 #         ...  # TODO: Implement this to allow getting the embeds from a suppressed message.
@@ -73,7 +64,7 @@ async def colour_command(ctx: tanjun.traits.MessageContext, colour: typing.Union
 @tanjun.with_parser
 @tanjun.with_check(lambda ctx: ctx.message.guild_id is not None)
 @tanjun.as_message_command("member")
-async def member_command(ctx: tanjun.traits.MessageContext, member: typing.Union[guilds.Member, None]) -> None:
+async def member_command(ctx: tanjun.traits.MessageContext, member: typing.Union[hikari.Member, None]) -> None:
     """Get information about a member in the current guild.
 
     Arguments:
@@ -81,14 +72,12 @@ async def member_command(ctx: tanjun.traits.MessageContext, member: typing.Union
             If not provided then this will return information about the member executing this command.
     """
     assert ctx.message.guild_id is not None  # This is asserted by a previous check.
-    assert ctx.message.member is not None  # This is always the case for messages made in guilds.
+    assert ctx.message.member is not None  # This is always the case for messages made in hikari.
     if member is None:
         member = ctx.message.member
 
     retry = backoff.Backoff(max_retries=5)
-    error_manager = rest_manager.HikariErrorManager(
-        retry, break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
-    )
+    error_manager = rest_manager.HikariErrorManager(retry, break_on=(hikari.ForbiddenError, hikari.NotFoundError))
     async for _ in retry:
         with error_manager:
             guild = await ctx.rest.fetch_guild(guild=ctx.message.guild_id)
@@ -116,7 +105,7 @@ async def member_command(ctx: tanjun.traits.MessageContext, member: typing.Union
             colour = role.colour
             break
     else:
-        colour = colours.Colour(0)
+        colour = hikari.Colour(0)
 
     permissions_grid = basic_util.basic_name_grid(permissions) or "None"
     member_information = [
@@ -139,7 +128,7 @@ async def member_command(ctx: tanjun.traits.MessageContext, member: typing.Union
 
     # TODO: this embed will go over the character limit easily
     embed = (
-        embeds.Embed(
+        hikari.Embed(
             description="\n".join(member_information) + f"\n\nRoles:\n{roles}\n\nPermissions:\n{permissions_grid}",
             colour=colour,
             title=f"{member.user.username}#{member.user.discriminator}",
@@ -158,7 +147,7 @@ async def member_command(ctx: tanjun.traits.MessageContext, member: typing.Union
 @tanjun.with_parser
 @tanjun.with_check(lambda ctx: ctx.message.guild_id is not None)
 @tanjun.as_message_command("role")
-async def role_command(ctx: tanjun.traits.MessageContext, role: guilds.Role) -> None:
+async def role_command(ctx: tanjun.traits.MessageContext, role: hikari.Role) -> None:
     """ "Get information about a role in the current guild.
 
     Arguments:
@@ -180,10 +169,8 @@ async def role_command(ctx: tanjun.traits.MessageContext, role: guilds.Role) -> 
     if role.is_mentionable:
         role_information.append("Can be mentioned")
 
-    error_manager = rest_manager.HikariErrorManager(
-        break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
-    )
-    embed = embeds.Embed(
+    error_manager = rest_manager.HikariErrorManager(break_on=(hikari.ForbiddenError, hikari.NotFoundError))
+    embed = hikari.Embed(
         colour=role.colour,
         title=role.name,
         description="\n".join(role_information) + f"\n\nPermissions:\n{permissions}",
@@ -197,7 +184,7 @@ async def role_command(ctx: tanjun.traits.MessageContext, role: guilds.Role) -> 
 )
 @tanjun.with_parser
 @tanjun.as_message_command("user")
-async def user_command(ctx: tanjun.traits.MessageContext, user: typing.Union[users.User, None]) -> None:
+async def user_command(ctx: tanjun.traits.MessageContext, user: typing.Union[hikari.User, None]) -> None:
     """ "Get information about a Discord user."
 
     Arguments:
@@ -209,7 +196,7 @@ async def user_command(ctx: tanjun.traits.MessageContext, user: typing.Union[use
 
     flags = basic_util.basic_name_grid(user.flags) or "NONE"
     embed = (
-        embeds.Embed(
+        hikari.Embed(
             colour=constants.embed_colour(),
             description=(
                 f"Bot: {user.is_system}\nSystem bot: {user.is_system}\n"
@@ -221,9 +208,7 @@ async def user_command(ctx: tanjun.traits.MessageContext, user: typing.Union[use
         .set_thumbnail(user.avatar_url)
         .set_footer(text=str(user.id), icon=user.default_avatar_url)
     )
-    error_manager = rest_manager.HikariErrorManager(
-        break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
-    )
+    error_manager = rest_manager.HikariErrorManager(break_on=(hikari.ForbiddenError, hikari.NotFoundError))
     await error_manager.try_respond(ctx, embed=embed)
 
 
@@ -233,7 +218,7 @@ async def user_command(ctx: tanjun.traits.MessageContext, user: typing.Union[use
 )
 @tanjun.with_parser
 @tanjun.as_message_command("avatar", "pfp")
-async def avatar_command(ctx: tanjun.traits.MessageContext, user: typing.Union[users.User, None]) -> None:
+async def avatar_command(ctx: tanjun.traits.MessageContext, user: typing.Union[hikari.User, None]) -> None:
     """Get a user's avatar.
 
     Arguments:
@@ -243,23 +228,21 @@ async def avatar_command(ctx: tanjun.traits.MessageContext, user: typing.Union[u
     if user is None:
         user = ctx.message.author
 
-    error_manager = rest_manager.HikariErrorManager(
-        break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
-    )
+    error_manager = rest_manager.HikariErrorManager(break_on=(hikari.ForbiddenError, hikari.NotFoundError))
     avatar = user.avatar_url or user.default_avatar_url
-    embed = embeds.Embed(title=str(user), url=str(avatar), colour=constants.embed_colour()).set_image(avatar)
+    embed = hikari.Embed(title=str(user), url=str(avatar), colour=constants.embed_colour()).set_image(avatar)
     await error_manager.try_respond(ctx, embed=embed)
 
 
 @util_component.with_message_command
-@tanjun.with_argument("message_id", (snowflakes.Snowflake,))
-@tanjun.with_option("channel_id", "--channel", "-c", converters=snowflakes.Snowflake, default=None)
+@tanjun.with_argument("message_id", (hikari.Snowflake,))
+@tanjun.with_option("channel_id", "--channel", "-c", converters=hikari.Snowflake, default=None)
 @tanjun.with_parser
 @tanjun.as_message_command("pings", "mentions")
 async def mentions_command(
     ctx: tanjun.traits.MessageContext,
-    message_id: snowflakes.Snowflake,
-    channel_id: typing.Optional[snowflakes.Snowflake],
+    message_id: hikari.Snowflake,
+    channel_id: typing.Optional[hikari.Snowflake],
 ) -> None:
     """Get a list of the users who were pinged by a message.
 
@@ -276,7 +259,7 @@ async def mentions_command(
     # TODO: set maximum?
     retry = backoff.Backoff()
     error_manager = rest_manager.HikariErrorManager(retry).with_rule(
-        (hikari_errors.NotFoundError, hikari_errors.ForbiddenError, hikari_errors.BadRequestError),
+        (hikari.NotFoundError, hikari.ForbiddenError, hikari.BadRequestError),
         basic_util.raise_error("Message not found."),
     )
     async for _ in retry:
@@ -284,7 +267,7 @@ async def mentions_command(
             message = await ctx.rest.fetch_message(channel_id, message_id)
             break
 
-    error_manager.clear_rules(break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError))
+    error_manager.clear_rules(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
     mentions = ", ".join(map(str, message.mentions.users.values())) if message.mentions.users else None
     await error_manager.try_respond(
         ctx, content=f"Pinging mentions: {mentions}" if mentions else "No pinging mentions."
@@ -338,14 +321,14 @@ async def char_command(ctx: tanjun.traits.MessageContext, to_file: bool = False)
     if len(ctx.content) > 20:
         to_file = True
 
-    content: undefined.UndefinedOr[str]
+    content: hikari.UndefinedOr[str]
     content = "\n".join(_format_char_line(char, to_file) for char in ctx.content)
-    file: undefined.UndefinedOr[files.Bytes] = undefined.UNDEFINED
+    file: hikari.UndefinedOr[hikari.Bytes] = hikari.UNDEFINED
 
     # highly doubt this'll ever be over 1990 when to_file is False but better safe than sorry.
     if to_file or len(content) >= 1990:
-        file = files.Bytes(content.encode(), "character-info.md", mimetype="text/markdown; charset=UTF-8")
-        content = undefined.UNDEFINED
+        file = hikari.Bytes(content.encode(), "character-info.md", mimetype="text/markdown; charset=UTF-8")
+        content = hikari.UNDEFINED
 
     else:
         content = content

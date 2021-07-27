@@ -9,33 +9,24 @@ import platform
 import time
 import typing
 
+import hikari
 import psutil  # type: ignore[import]
 import tanjun
-from hikari import __url__ as hikari_url
-from hikari import __version__ as hikari_version
-from hikari import embeds as embeds_
-from hikari import errors as hikari_errors
-from hikari import traits as hikari_traits
-from hikari import undefined
-from hikari.api import cache as cache_api
-from yuyo import backoff
-from yuyo import paginaton
+import yuyo
+from hikari import traits
 
 from ..util import constants
 from ..util import help as help_util
 from ..util import rest_manager
 
-if typing.TYPE_CHECKING:
-    from hikari import messages
-
 
 def gen_help_embeds(
     ctx: tanjun.traits.MessageContext = tanjun.injected(type=tanjun.traits.MessageContext),
     client: tanjun.traits.Client = tanjun.injected(type=tanjun.traits.Client),
-) -> typing.Dict[str, typing.List[embeds_.Embed]]:
+) -> typing.Dict[str, typing.List[hikari.Embed]]:
     prefix = next(iter(client.prefixes)) if client and client.prefixes else ""
 
-    help_embeds: typing.Dict[str, typing.List[embeds_.Embed]] = {}
+    help_embeds: typing.Dict[str, typing.List[hikari.Embed]] = {}
     for component in ctx.client.components:
         if value := help_util.generate_help_embeds(component, prefix=prefix):
             help_embeds[value[0].lower()] = [v for v in value[1]]
@@ -66,8 +57,8 @@ async def about_command(
         "The source can be found on [Github](https://github.com/FasterSpeeding/Reinhard)."
     )
     embed = (
-        embeds_.Embed(description=description, colour=constants.embed_colour())
-        .set_author(name=name, url=hikari_url)
+        hikari.Embed(description=description, colour=constants.embed_colour())
+        .set_author(name=name, url=hikari.__url__)
         .add_field(name="Uptime", value=str(uptime), inline=True)
         .add_field(
             name="Process",
@@ -76,13 +67,11 @@ async def about_command(
         )
         .set_footer(
             icon="http://i.imgur.com/5BFecvA.png",
-            text=f"Made with Hikari v{hikari_version} (python {platform.python_version()})",
+            text=f"Made with Hikari v{hikari.__version__} (python {platform.python_version()})",
         )
     )
 
-    error_manager = rest_manager.HikariErrorManager(
-        break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
-    )
+    error_manager = rest_manager.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
     await error_manager.try_respond(ctx, embed=embed)
 
 
@@ -96,11 +85,11 @@ async def help_command(
     ctx: tanjun.traits.MessageContext,
     command_name: typing.Optional[str],
     component_name: typing.Optional[str],
-    paginator_pool: paginaton.PaginatorPool = tanjun.injected(type=paginaton.PaginatorPool),
-    help_embeds: typing.Dict[str, typing.List[embeds_.Embed]] = tanjun.injected(
+    paginator_pool: yuyo.PaginatorPool = tanjun.injected(type=yuyo.PaginatorPool),
+    help_embeds: typing.Dict[str, typing.List[hikari.Embed]] = tanjun.injected(
         callback=tanjun.cache_callback(gen_help_embeds)
     ),
-    rest_service: hikari_traits.RESTAware = tanjun.injected(type=hikari_traits.RESTAware),
+    rest_service: traits.RESTAware = tanjun.injected(type=traits.RESTAware),
 ) -> None:
     """Get information about the commands in this bot.
 
@@ -131,14 +120,14 @@ async def help_command(
         if component_name.lower() not in help_embeds:
             raise tanjun.CommandError(f"Couldn't find component `{component_name}`")
 
-        embed_generator = ((undefined.UNDEFINED, embed) for embed in help_embeds[component_name.lower()])
+        embed_generator = ((hikari.UNDEFINED, embed) for embed in help_embeds[component_name.lower()])
 
     else:
         embed_generator = (
-            (undefined.UNDEFINED, embed) for embed in itertools.chain.from_iterable(list(help_embeds.values()))
+            (hikari.UNDEFINED, embed) for embed in itertools.chain.from_iterable(list(help_embeds.values()))
         )
 
-    paginator = paginaton.Paginator(rest_service, ctx.channel_id, embed_generator, authors=(ctx.author,))
+    paginator = yuyo.Paginator(rest_service, ctx.channel_id, embed_generator, authors=(ctx.author,))
     message = await paginator.open()
     paginator_pool.add_paginator(message, paginator)
 
@@ -147,11 +136,9 @@ async def help_command(
 @tanjun.as_message_command("ping")
 async def ping_command(ctx: tanjun.traits.MessageContext, /) -> None:
     """Get the bot's current delay."""
-    retry = backoff.Backoff(max_retries=5)
-    error_manager = rest_manager.HikariErrorManager(
-        retry, break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
-    )
-    message: typing.Optional[messages.Message] = None
+    retry = yuyo.Backoff(max_retries=5)
+    error_manager = rest_manager.HikariErrorManager(retry, break_on=(hikari.NotFoundError, hikari.ForbiddenError))
+    message: typing.Optional[hikari.Message] = None
     start_time = 0.0
     async for _ in retry:
         with error_manager:
@@ -166,14 +153,14 @@ async def ping_command(ctx: tanjun.traits.MessageContext, /) -> None:
     time_taken = (time.perf_counter() - start_time) * 1_000
     heartbeat_latency = ctx.shard.heartbeat_latency * 1_000 if ctx.shard else float("NAN")
     retry.reset()
-    error_manager.clear_rules(break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError))
+    error_manager.clear_rules(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
     async for _ in retry:
         with error_manager:
             await message.edit(f"PONG\n - REST: {time_taken:.0f}ms\n - Gateway: {heartbeat_latency:.0f}ms")
             break
 
 
-_about_lines: typing.Sequence[typing.Tuple[str, typing.Callable[[cache_api.Cache], int]]] = (
+_about_lines: typing.Sequence[typing.Tuple[str, typing.Callable[[hikari.api.Cache], int]]] = (
     ("Guild channels: {0}", lambda c: len(c.get_guild_channels_view())),
     ("Emojis: {0}", lambda c: len(c.get_emojis_view())),
     ("Available Guilds: {0}", lambda c: len(c.get_available_guilds_view())),
@@ -194,7 +181,7 @@ _about_lines: typing.Sequence[typing.Tuple[str, typing.Callable[[cache_api.Cache
 async def cache_command(
     ctx: tanjun.traits.MessageContext,
     process: psutil.Process = tanjun.injected(callback=tanjun.cache_callback(psutil.Process)),
-    cache: cache_api.Cache = tanjun.injected(type=cache_api.Cache),
+    cache: hikari.api.Cache = tanjun.injected(type=hikari.api.Cache),
 ) -> None:
     """Get general information about this bot."""
     start_date = datetime.datetime.fromtimestamp(process.create_time())
@@ -223,8 +210,8 @@ async def cache_command(
     # TODO: try cache first + backoff
     avatar = (await ctx.rest.fetch_my_user()).avatar_url
     embed = (
-        embeds_.Embed(description="An experimental pythonic Hikari bot.", color=0x55CDFC)
-        .set_author(name="Hikari: testing client", icon=avatar, url=hikari_url)
+        hikari.Embed(description="An experimental pythonic Hikari bot.", color=0x55CDFC)
+        .set_author(name="Hikari: testing client", icon=avatar, url=hikari.__url__)
         .add_field(name="Uptime", value=str(uptime), inline=True)
         .add_field(
             name="Process",
@@ -234,13 +221,11 @@ async def cache_command(
         .add_field(name="Standard cache stats", value=f"```{cache_stats}```")
         .set_footer(
             icon="http://i.imgur.com/5BFecvA.png",
-            text=f"Made with Hikari v{hikari_version} (python {platform.python_version()})",
+            text=f"Made with Hikari v{hikari.__version__} (python {platform.python_version()})",
         )
     )
 
-    error_manager = rest_manager.HikariErrorManager(
-        break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
-    )
+    error_manager = rest_manager.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
     await error_manager.try_respond(ctx, content=f"{storage_time_taken * 1_000:.4g} ms", embed=embed)
 
 

@@ -5,11 +5,8 @@ __all__: typing.Sequence[str] = ["moderation_component", "load_component"]
 import datetime
 import typing
 
+import hikari
 import tanjun
-from hikari import errors as hikari_errors
-from hikari import permissions
-from hikari import snowflakes
-from hikari import undefined
 from yuyo import backoff
 
 from ..util import help as help_util
@@ -24,32 +21,28 @@ help_util.with_docs(moderation_component, "Moderation commands", "Moderation ori
 
 @moderation_component.with_message_command
 @tanjun.with_own_permission_check(
-    permissions.Permissions.MANAGE_MESSAGES
-    | permissions.Permissions.VIEW_CHANNEL
-    | permissions.Permissions.READ_MESSAGE_HISTORY
+    hikari.Permissions.MANAGE_MESSAGES | hikari.Permissions.VIEW_CHANNEL | hikari.Permissions.READ_MESSAGE_HISTORY
 )
 @tanjun.with_author_permission_check(
-    permissions.Permissions.MANAGE_MESSAGES
-    | permissions.Permissions.VIEW_CHANNEL
-    | permissions.Permissions.READ_MESSAGE_HISTORY
+    hikari.Permissions.MANAGE_MESSAGES | hikari.Permissions.VIEW_CHANNEL | hikari.Permissions.READ_MESSAGE_HISTORY
 )
 @tanjun.with_option("suppress", "-s", "--suppress", converters=bool, default=False, empty_value=True)
-@tanjun.with_option("after", "--after", converters=snowflakes.Snowflake, default=None)
-@tanjun.with_option("before", "--before", converters=snowflakes.Snowflake, default=None)
+@tanjun.with_option("after", "--after", converters=hikari.Snowflake, default=None)
+@tanjun.with_option("before", "--before", converters=hikari.Snowflake, default=None)
 @tanjun.with_option("bot_only", "--bot", converters=bool, default=False, empty_value=True)
 @tanjun.with_option("human_only", "--human", converters=bool, default=False, empty_value=True)
-@tanjun.with_multi_option("users", "--user", converters=snowflakes.Snowflake, default=())
+@tanjun.with_multi_option("users", "--user", converters=hikari.Snowflake, default=())
 @tanjun.with_argument("count", converters=int, default=None)
 @tanjun.with_parser
 @tanjun.as_message_command("clear")
 async def clear_command(
     ctx: tanjun.traits.MessageContext,
     count: typing.Optional[int],
-    after: typing.Optional[snowflakes.Snowflake],
-    before: typing.Optional[snowflakes.Snowflake],
+    after: typing.Optional[hikari.Snowflake],
+    before: typing.Optional[hikari.Snowflake],
     bot_only: bool,
     human_only: bool,
-    users: typing.Sequence[snowflakes.Snowflake],
+    users: typing.Sequence[hikari.Snowflake],
     suppress: bool,
 ) -> None:
     """Clear new messages from chat.
@@ -91,8 +84,8 @@ async def clear_command(
 
     iterator = ctx.rest.fetch_messages(
         ctx.channel_id,
-        before=undefined.UNDEFINED if before is None else before,
-        after=(undefined.UNDEFINED if after is None else after) if before is None else undefined.UNDEFINED,
+        before=hikari.UNDEFINED if before is None else before,
+        after=(hikari.UNDEFINED if after is None else after) if before is None else hikari.UNDEFINED,
     ).filter(lambda message: now - message.created_at < MAX_MESSAGE_BULK_DELETE)
 
     if before and after:
@@ -113,9 +106,7 @@ async def clear_command(
 
     iterator = iterator.map(lambda x: x.id).chunk(100)
     retry = backoff.Backoff(max_retries=5)
-    error_manager = rest_manager.HikariErrorManager(
-        retry, break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
-    )
+    error_manager = rest_manager.HikariErrorManager(retry, break_on=(hikari.NotFoundError, hikari.ForbiddenError))
 
     with error_manager:
         async for messages in iterator:

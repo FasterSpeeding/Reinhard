@@ -2,6 +2,7 @@ from __future__ import annotations
 
 __all__: typing.Sequence[str] = ["external_component"]
 
+import asyncio
 import datetime
 import logging
 import time
@@ -9,15 +10,11 @@ import typing
 import urllib.parse
 
 import aiohttp
+import hikari
 import sphobjinv  # type: ignore[import]
 import tanjun
-from hikari import channels
-from hikari import embeds
-from hikari import errors as hikari_errors
-from hikari import traits as hikari_traits
-from hikari import undefined
-from yuyo import backoff
-from yuyo import paginaton
+import yuyo
+from hikari import traits
 
 from .. import config as config_
 from ..util import basic as basic_util
@@ -41,7 +38,7 @@ SPOTIFY_RESOURCE_TYPES = ("track", "album", "artist", "playlist")
 HIKARI_IO = "https://hikari-py.github.io/hikari"
 
 
-class YoutubePaginator(typing.AsyncIterator[typing.Tuple[str, undefined.UndefinedType]]):
+class YoutubePaginator(typing.AsyncIterator[typing.Tuple[str, hikari.UndefinedType]]):
     __slots__ = ("_session", "_buffer", "_next_page_token", "_parameters")
 
     def __init__(
@@ -57,9 +54,9 @@ class YoutubePaginator(typing.AsyncIterator[typing.Tuple[str, undefined.Undefine
     def __aiter__(self) -> YoutubePaginator:
         return self
 
-    async def __anext__(self) -> typing.Tuple[str, undefined.UndefinedType]:
+    async def __anext__(self) -> typing.Tuple[str, hikari.UndefinedType]:
         if not self._next_page_token and self._next_page_token is not None:
-            retry = backoff.Backoff(max_retries=5)
+            retry = yuyo.Backoff(max_retries=5)
             error_manager = rest_manager.AIOHTTPStatusHandler(retry, break_on=(404,))
 
             parameters = self._parameters.copy()
@@ -93,12 +90,12 @@ class YoutubePaginator(typing.AsyncIterator[typing.Tuple[str, undefined.Undefine
         while self._buffer:
             page = self._buffer.pop(0)
             if response_type := YOUTUBE_TYPES.get(page["id"]["kind"].lower()):
-                return f"{response_type[1]}{page['id'][response_type[0]]}", undefined.UNDEFINED
+                return f"{response_type[1]}{page['id'][response_type[0]]}", hikari.UNDEFINED
 
         raise RuntimeError(f"Got unexpected 'kind' from youtube {page['id']['kind']}")
 
 
-class SpotifyPaginator(typing.AsyncIterator[typing.Tuple[str, undefined.UndefinedType]]):
+class SpotifyPaginator(typing.AsyncIterator[typing.Tuple[str, hikari.UndefinedType]]):
     __slots__: typing.Sequence[str] = (
         "_acquire_authorization",
         "_session",
@@ -124,9 +121,9 @@ class SpotifyPaginator(typing.AsyncIterator[typing.Tuple[str, undefined.Undefine
     def __aiter__(self) -> SpotifyPaginator:
         return self
 
-    async def __anext__(self) -> typing.Tuple[str, undefined.UndefinedType]:
+    async def __anext__(self) -> typing.Tuple[str, hikari.UndefinedType]:
         if not self._buffer and self._offset is not None:
-            retry = backoff.Backoff(max_retries=5)
+            retry = yuyo.Backoff(max_retries=5)
             resource_type = self._parameters["type"]
             assert isinstance(resource_type, str)
             error_manager = rest_manager.AIOHTTPStatusHandler(
@@ -161,7 +158,7 @@ class SpotifyPaginator(typing.AsyncIterator[typing.Tuple[str, undefined.Undefine
             self._offset = None
             raise StopAsyncIteration
 
-        return (self._buffer.pop(0)["external_urls"]["spotify"], undefined.UNDEFINED)
+        return (self._buffer.pop(0)["external_urls"]["spotify"], hikari.UNDEFINED)
 
 
 class ClientCredentialsOauth2:
@@ -280,15 +277,15 @@ async def lyrics_command(
     ctx: tanjun.traits.MessageContext,
     query: str,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
-    paginator_pool: paginaton.PaginatorPool = tanjun.injected(type=paginaton.PaginatorPool),
-    rest_service: hikari_traits.RESTAware = tanjun.injected(type=hikari_traits.RESTAware),
+    paginator_pool: yuyo.PaginatorPool = tanjun.injected(type=yuyo.PaginatorPool),
+    rest_service: traits.RESTAware = tanjun.injected(type=traits.RESTAware),
 ) -> None:
     """Get a song's lyrics.
 
     Arguments:
         * query: Greedy query string (e.g. name) to search a song by.
     """
-    retry = backoff.Backoff(max_retries=5)
+    retry = yuyo.Backoff(max_retries=5)
     error_manager = rest_manager.AIOHTTPStatusHandler(retry, on_404=f"Couldn't find the lyrics for `{query[:1960]}`")
     async for _ in retry:
         with error_manager:
@@ -303,7 +300,7 @@ async def lyrics_command(
         data = await response.json()
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError) as exc:
         hikari_error_manager = rest_manager.HikariErrorManager(
-            retry, break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
+            retry, break_on=(hikari.NotFoundError, hikari.ForbiddenError)
         )
         await hikari_error_manager.try_respond(ctx, content="Invalid data returned by server.")
 
@@ -326,24 +323,24 @@ async def lyrics_command(
 
     pages = (
         (
-            undefined.UNDEFINED,
-            embeds.Embed(description=page, colour=constants.embed_colour())
+            hikari.UNDEFINED,
+            hikari.Embed(description=page, colour=constants.embed_colour())
             .set_footer(text=f"Page {index + 1}")
             .set_author(icon=icon, name=title),
         )
-        for page, index in paginaton.string_paginator(iter(data["lyrics"].splitlines() or ["..."]))
+        for page, index in yuyo.string_paginator(iter(data["lyrics"].splitlines() or ["..."]))
     )
-    response_paginator = paginaton.Paginator(
+    response_paginator = yuyo.Paginator(
         rest_service,
         ctx.channel_id,
         pages,
         authors=(ctx.author.id,),
         triggers=(
-            paginaton.LEFT_DOUBLE_TRIANGLE,
-            paginaton.LEFT_TRIANGLE,
-            paginaton.STOP_SQUARE,
-            paginaton.RIGHT_TRIANGLE,
-            paginaton.RIGHT_DOUBLE_TRIANGLE,
+            yuyo.paginaton.LEFT_DOUBLE_TRIANGLE,
+            yuyo.paginaton.LEFT_TRIANGLE,
+            yuyo.paginaton.STOP_SQUARE,
+            yuyo.paginaton.RIGHT_TRIANGLE,
+            yuyo.paginaton.RIGHT_DOUBLE_TRIANGLE,
         ),
     )
     message = await response_paginator.open()
@@ -370,8 +367,8 @@ async def youtube_command(
     safe_search: typing.Optional[bool],
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
     tokens: config_.Tokens = tanjun.injected(type=config_.Tokens),
-    paginator_pool: paginaton.PaginatorPool = tanjun.injected(type=paginaton.PaginatorPool),
-    rest_service: hikari_traits.RESTAware = tanjun.injected(type=hikari_traits.RESTAware),
+    paginator_pool: yuyo.PaginatorPool = tanjun.injected(type=yuyo.PaginatorPool),
+    rest_service: traits.RESTAware = tanjun.injected(type=traits.RESTAware),
 ) -> None:
     """Search for a resource on youtube.
 
@@ -391,14 +388,14 @@ async def youtube_command(
     """
     assert tokens.google is not None
     if safe_search is not False:
-        channel: typing.Optional[channels.PartialChannel]
+        channel: typing.Optional[hikari.PartialChannel]
         if ctx.cache and (channel := ctx.cache.get_guild_channel(ctx.channel_id)):
             channel_is_nsfw = channel.is_nsfw
 
         else:
             # TODO: handle retires
             channel = await ctx.rest.fetch_channel(ctx.channel_id)
-            channel_is_nsfw = channel.is_nsfw if isinstance(channel, channels.GuildChannel) else False
+            channel_is_nsfw = channel.is_nsfw if isinstance(channel, hikari.GuildChannel) else False
 
         if safe_search is None:
             safe_search = not channel_is_nsfw
@@ -426,7 +423,7 @@ async def youtube_command(
     if language is not None:
         parameters["relevanceLanguage"] = language
 
-    response_paginator = paginaton.Paginator(
+    response_paginator = yuyo.Paginator(
         rest_service,
         ctx.channel_id,
         YoutubePaginator(session, parameters),
@@ -445,9 +442,7 @@ async def youtube_command(
 
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError) as exc:
         _LOGGER.exception("Youtube returned invalid data", exc_info=exc)
-        error_manager = rest_manager.HikariErrorManager(
-            break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
-        )
+        error_manager = rest_manager.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
         await error_manager.try_respond(ctx, content="Youtube returned invalid data.")
         raise
 
@@ -478,7 +473,7 @@ async def moe_command(
     if source is not None:
         params["source"] = source
 
-    retry = backoff.Backoff(max_retries=5)
+    retry = yuyo.Backoff(max_retries=5)
     error_manager = rest_manager.AIOHTTPStatusHandler(
         retry, on_404=f"Couldn't find source `{source[:1970]}`" if source is not None else "couldn't access api"
     )
@@ -492,7 +487,7 @@ async def moe_command(
         raise tanjun.CommandError("Couldn't get an image in time") from None
 
     hikari_error_manager = rest_manager.HikariErrorManager(
-        retry, break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
+        retry, break_on=(hikari.NotFoundError, hikari.ForbiddenError)
     )
 
     try:
@@ -555,11 +550,11 @@ async def spotify_command(
     query: str,
     resource_type: str,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
-    paginator_pool: paginaton.PaginatorPool = tanjun.injected(type=paginaton.PaginatorPool),
+    paginator_pool: yuyo.PaginatorPool = tanjun.injected(type=yuyo.PaginatorPool),
     spotify_auth: ClientCredentialsOauth2 = tanjun.injected(
         callback=tanjun.cache_callback(ClientCredentialsOauth2.spotify)
     ),
-    rest_service: hikari_traits.RESTAware = tanjun.injected(type=hikari_traits.RESTAware),
+    rest_service: traits.RESTAware = tanjun.injected(type=traits.RESTAware),
 ) -> None:
     """Search for a resource on spotify.
 
@@ -575,7 +570,7 @@ async def spotify_command(
     if resource_type not in SPOTIFY_RESOURCE_TYPES:
         raise tanjun.CommandError(f"{resource_type!r} is not a valid resource type")
 
-    response_paginator = paginaton.Paginator(
+    response_paginator = yuyo.Paginator(
         rest_service,
         ctx.channel_id,
         SpotifyPaginator(spotify_auth.acquire_token, session, {"query": query, "type": resource_type}),
@@ -592,9 +587,7 @@ async def spotify_command(
 
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError) as exc:
         _LOGGER.exception("Spotify returned invalid data", exc_info=exc)
-        error_manager = rest_manager.HikariErrorManager(
-            break_on=(hikari_errors.NotFoundError, hikari_errors.ForbiddenError)
-        )
+        error_manager = rest_manager.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
         await error_manager.try_respond(ctx, content="Spotify returned invalid data.")
         raise
 
@@ -619,9 +612,7 @@ async def docs_command(
     Arguments
         * path: Optional argument to query Hikari's documentation by.
     """
-    error_manager = rest_manager.HikariErrorManager(
-        break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
-    )
+    error_manager = rest_manager.HikariErrorManager(break_on=(hikari.ForbiddenError, hikari.NotFoundError))
 
     if not path:
         await error_manager.try_respond(ctx, content=HIKARI_IO + "/hikari/index.html")
@@ -639,7 +630,7 @@ async def docs_command(
             sphinx_object: sphobjinv.DataObjStr = inventory.objects[result[2]]
             description.append(f"[{sphinx_object.name}]({HIKARI_IO}/{sphinx_object.uri_expanded})")
 
-        embed = embeds.Embed(
+        embed = hikari.Embed(
             description="\n".join(description) if description else "No results found.",
             color=constants.embed_colour(),
         )
@@ -691,6 +682,14 @@ async def ytdl_command(
         path.unlink(missing_ok=True)
 
     await ctx.message.respond(content=file_path)
+
+
+@external_component.with_interaction_command
+@tanjun.as_interaction_command("test", "Just a testing command, ignore me", default_to_ephemeral=True)
+async def test_command(ctx: tanjun.traits.Context) -> None:
+    await asyncio.sleep(5)
+    await ctx.respond("gay")
+    await ctx.respond("no u")
 
 
 @tanjun.as_loader

@@ -20,19 +20,13 @@ __all__: typing.Sequence[str] = [
 
 import typing
 
-from hikari import errors as hikari_errors
-from tanjun import conversion
+import hikari
+import tanjun
 from tanjun.conversion import *
 from yuyo import backoff
 
 from ..util import basic
 from ..util import rest_manager
-
-if typing.TYPE_CHECKING:
-    from hikari import guilds
-    from hikari import snowflakes
-    from hikari import users
-    from tanjun import traits
 
 
 class RESTFulMemberConverter(MemberConverter):
@@ -42,7 +36,7 @@ class RESTFulMemberConverter(MemberConverter):
     def cache_bound(self) -> bool:
         return False
 
-    async def convert(self, ctx: traits.Context, argument: str, /) -> guilds.Member:
+    async def convert(self, ctx: tanjun.traits.Context, argument: str, /) -> hikari.Member:
         if ctx.guild_id is None:
             raise ValueError("Cannot get a member from a DM channel")
 
@@ -52,9 +46,9 @@ class RESTFulMemberConverter(MemberConverter):
         except ValueError:
             pass
 
-        member_id: typing.Optional[snowflakes.Snowflake] = None
+        member_id: typing.Optional[hikari.Snowflake] = None
         try:
-            member_id = conversion.parse_user_id(argument)
+            member_id = tanjun.conversion.parse_user_id(argument)
         except ValueError:
             pass
 
@@ -62,12 +56,12 @@ class RESTFulMemberConverter(MemberConverter):
         error_manager = (
             rest_manager.HikariErrorManager(retry).with_rule(
                 # We catch a IndexError for search_members where a dynamic length list is returned.
-                (hikari_errors.BadRequestError, hikari_errors.NotFoundError, IndexError),
+                (hikari.BadRequestError, hikari.NotFoundError, IndexError),
                 basic.raise_error("Couldn't find member.", error_type=ValueError),
             )
             # If this is the case then we can't access the guild this was triggered in anymore and should stop the
             # command from trying to execute without replying.
-            .with_rule((hikari_errors.ForbiddenError,), basic.raise_error(None))
+            .with_rule((hikari.ForbiddenError,), basic.raise_error(None))
         )
 
         async for _ in retry:
@@ -91,7 +85,7 @@ class RESTFulRoleConverter(RoleConverter):
     def cache_bound(self) -> bool:
         return False
 
-    async def convert(self, ctx: traits.Context, argument: str, /) -> guilds.Role:
+    async def convert(self, ctx: tanjun.traits.Context, argument: str, /) -> hikari.Role:
         # This is more strict than RoleConverter but having it consistently reject DM channels is preferable over it
         # rejecting DM channels once it fails to find anything in the cache.
         if ctx.guild_id is None:
@@ -105,28 +99,28 @@ class RESTFulRoleConverter(RoleConverter):
 
         # Match by ID if we were provided a valid ID.
         try:
-            role_id = conversion.parse_role_id(argument)
+            role_id = tanjun.conversion.parse_role_id(argument)
 
-            def predicate(role: guilds.Role) -> bool:
+            def predicate(role: hikari.Role) -> bool:
                 return role.id == role_id
 
         # Else match by name.
         except ValueError:
             argument = argument.casefold()
 
-            def predicate(role: guilds.Role) -> bool:
+            def predicate(role: hikari.Role) -> bool:
                 return role.name.casefold() == argument
 
         retry = backoff.Backoff(max_retries=5)
         error_manager = (
             rest_manager.HikariErrorManager(retry).with_rule(
                 # next(...) will raise StopIteration if the iterator feed to it doesn't yield anything.
-                (hikari_errors.BadRequestError, hikari_errors.NotFoundError, StopIteration),
+                (hikari.BadRequestError, hikari.NotFoundError, StopIteration),
                 basic.raise_error("Couldn't find role.", error_type=ValueError),
             )
             # If this is the case then we can't access the guild this was triggered in anymore and should stop the
             # command from trying to execute without replying.
-            .with_rule((hikari_errors.ForbiddenError,), basic.raise_error(None))
+            .with_rule((hikari.ForbiddenError,), basic.raise_error(None))
         )
 
         async for _ in retry:
@@ -145,18 +139,18 @@ class RESTFulUserConverter(UserConverter):
     def cache_bound(self) -> bool:
         return False
 
-    async def convert(self, ctx: traits.Context, argument: str, /) -> users.User:
+    async def convert(self, ctx: tanjun.traits.Context, argument: str, /) -> hikari.User:
         try:
             # Always try the cache first.
             return await super().convert(ctx, argument)
         except ValueError:
             pass
 
-        user_id = conversion.parse_user_id(argument, message="No valid user mention or ID found")
+        user_id = tanjun.conversion.parse_user_id(argument, message="No valid user mention or ID found")
 
         retry = backoff.Backoff(max_retries=5)
         error_manager = rest_manager.HikariErrorManager(retry).with_rule(
-            (hikari_errors.BadRequestError, hikari_errors.NotFoundError),
+            (hikari.BadRequestError, hikari.NotFoundError),
             basic.raise_error("Couldn't find user.", error_type=ValueError),
         )
 

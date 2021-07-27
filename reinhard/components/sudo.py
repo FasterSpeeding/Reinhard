@@ -15,13 +15,8 @@ import typing
 
 import hikari
 import tanjun
-from hikari import embeds
-from hikari import errors as hikari_errors
-from hikari import files
-from hikari import traits as hikari_traits
-from hikari import undefined
-from yuyo import backoff
-from yuyo import paginaton
+import yuyo
+from hikari import traits
 
 from ..util import constants
 from ..util import help as help_util
@@ -41,15 +36,15 @@ async def error_command(_: tanjun.traits.MessageContext) -> None:
 
 
 @sudo_component.with_message_command
-@tanjun.with_option("raw_embed", "--embed", "-e", converters=json.loads, default=undefined.UNDEFINED)
-@tanjun.with_greedy_argument("content", default=undefined.UNDEFINED)
+@tanjun.with_option("raw_embed", "--embed", "-e", converters=json.loads, default=hikari.UNDEFINED)
+@tanjun.with_greedy_argument("content", default=hikari.UNDEFINED)
 @tanjun.with_parser
 @tanjun.as_message_command("echo")
 async def echo_command(
     ctx: tanjun.traits.MessageContext,
-    content: undefined.UndefinedOr[str],
-    raw_embed: undefined.UndefinedOr[typing.Dict[str, typing.Any]],
-    entity_factory: hikari_traits.EntityFactoryAware = tanjun.injected(type=hikari_traits.EntityFactoryAware),
+    content: hikari.UndefinedOr[str],
+    raw_embed: hikari.UndefinedOr[typing.Dict[str, typing.Any]],
+    entity_factory: traits.EntityFactoryAware = tanjun.injected(type=traits.EntityFactoryAware),
 ) -> None:
     """Command used for getting the bot to mirror a response.
 
@@ -59,12 +54,10 @@ async def echo_command(
     Options:
         * embed (--embed, -e): String JSON object of an embed for the bot to send.
     """
-    embed: undefined.UndefinedOr[embeds.Embed] = undefined.UNDEFINED
-    retry = backoff.Backoff(max_retries=5)
-    error_manager = rest_manager.HikariErrorManager(
-        retry, break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
-    )
-    if raw_embed is not undefined.UNDEFINED:
+    embed: hikari.UndefinedOr[hikari.Embed] = hikari.UNDEFINED
+    retry = yuyo.Backoff(max_retries=5)
+    error_manager = rest_manager.HikariErrorManager(retry, break_on=(hikari.ForbiddenError, hikari.NotFoundError))
+    if raw_embed is not hikari.UNDEFINED:
         try:
             embed = entity_factory.entity_factory.deserialize_embed(raw_embed)
 
@@ -157,8 +150,8 @@ async def eval_command(
     file_output: bool = False,
     suppress_response: bool = False,
     component: tanjun.traits.Component = tanjun.injected(type=tanjun.traits.Component),
-    paginator_pool: paginaton.PaginatorPool = tanjun.injected(type=paginaton.PaginatorPool),
-    rest_service: hikari_traits.RESTAware = tanjun.injected(type=hikari_traits.RESTAware),
+    paginator_pool: yuyo.PaginatorPool = tanjun.injected(type=yuyo.PaginatorPool),
+    rest_service: traits.RESTAware = tanjun.injected(type=traits.RESTAware),
 ) -> None:
     """Dynamically evaluate a script in the bot's environment.
 
@@ -182,32 +175,32 @@ async def eval_command(
 
     if file_output:
         await ctx.message.respond(
-            attachment=files.Bytes("\n".join(result), "output.py", mimetype="text/x-python;charset=utf-8")
+            attachment=hikari.Bytes("\n".join(result), "output.py", mimetype="text/x-python;charset=utf-8")
         )
         return
 
     colour = constants.FAILED_COLOUR if failed else constants.PASS_COLOUR
-    string_paginator = paginaton.string_paginator(iter(result), wrapper="```python\n{}\n```", char_limit=2034)
+    string_paginator = yuyo.string_paginator(iter(result), wrapper="```python\n{}\n```", char_limit=2034)
     embed_generator = (
         (
-            undefined.UNDEFINED,
-            embeds.Embed(colour=colour, description=text, title=f"Eval page {page}").set_footer(
+            hikari.UNDEFINED,
+            hikari.Embed(colour=colour, description=text, title=f"Eval page {page}").set_footer(
                 text=f"Time taken: {exec_time} ms"
             ),
         )
         for text, page in string_paginator
     )
-    response_paginator = paginaton.Paginator(
+    response_paginator = yuyo.Paginator(
         rest_service,
         ctx.channel_id,
         embed_generator,
         authors=[ctx.author.id],
         triggers=(
-            paginaton.LEFT_DOUBLE_TRIANGLE,
-            paginaton.LEFT_TRIANGLE,
-            paginaton.STOP_SQUARE,
-            paginaton.RIGHT_TRIANGLE,
-            paginaton.RIGHT_DOUBLE_TRIANGLE,
+            yuyo.paginaton.LEFT_DOUBLE_TRIANGLE,
+            yuyo.paginaton.LEFT_TRIANGLE,
+            yuyo.paginaton.STOP_SQUARE,
+            yuyo.paginaton.RIGHT_TRIANGLE,
+            yuyo.paginaton.RIGHT_DOUBLE_TRIANGLE,
         ),
     )
     message = await response_paginator.open()
@@ -221,9 +214,7 @@ async def commands_command(ctx: tanjun.traits.MessageContext) -> None:
         f"  {type(component).__name__}: " + ", ".join(map(repr, component.message_commands))
         for component in ctx.client.components
     )
-    error_manager = rest_manager.HikariErrorManager(
-        break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
-    )
+    error_manager = rest_manager.HikariErrorManager(break_on=(hikari.ForbiddenError, hikari.NotFoundError))
     await error_manager.try_respond(ctx, content="Loaded commands\n" + "\n".join(commands))
 
 

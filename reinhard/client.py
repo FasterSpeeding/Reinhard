@@ -26,6 +26,7 @@ def build_bot(*, config: typing.Optional[config_.FullConfig] = None) -> hikari_t
         logs=config.log_level,
         intents=config.intents,
         cache_settings=hikari_config.CacheSettings(components=config.cache),
+        # rest_url="https://ptb.discord.com/api/v8"
         # rest_url="https://staging.discord.co/api/v8"
     )
     build(bot, config=config)
@@ -39,7 +40,8 @@ def build(
         config = config_.load_config()
 
     client = (
-        tanjun.Client.from_gateway_bot(bot, mention_prefix=config.mention_prefix)
+        tanjun.Client.from_gateway_bot(bot, mention_prefix=config.mention_prefix, set_global_commands=False)
+        .set_auto_defer_after(0.5)
         .set_hooks(
             tanjun.Hooks["tanjun.traits.Context"]()
             .set_on_parser_error(command_hooks.on_parser_error)

@@ -5,13 +5,9 @@ __all__: typing.Sequence[str] = ["AIOHTTPStatusHandler", "HikariErrorManager"]
 import typing
 
 import aiohttp
+import hikari
 import tanjun
-from hikari import errors as hikari_errors
-from hikari import undefined
 from yuyo import backoff
-
-if typing.TYPE_CHECKING:
-    from hikari import embeds
 
 
 class HikariErrorManager(backoff.ErrorManager):
@@ -35,10 +31,10 @@ class HikariErrorManager(backoff.ErrorManager):
         return False
 
     @staticmethod
-    def _on_internal_server_error(_: hikari_errors.InternalServerError) -> bool:
+    def _on_internal_server_error(_: hikari.InternalServerError) -> bool:
         return False
 
-    def _on_rate_limited_error(self, exception: hikari_errors.RateLimitedError) -> bool:
+    def _on_rate_limited_error(self, exception: hikari.RateLimitedError) -> bool:
         if exception.retry_after > 10:
             return True
 
@@ -47,8 +43,8 @@ class HikariErrorManager(backoff.ErrorManager):
 
     def clear_rules(self, *, break_on: typing.Iterable[typing.Type[BaseException]] = ()) -> None:
         super().clear_rules()
-        self.with_rule((hikari_errors.InternalServerError,), self._on_internal_server_error)
-        self.with_rule((hikari_errors.RateLimitedError,), self._on_rate_limited_error)
+        self.with_rule((hikari.InternalServerError,), self._on_internal_server_error)
+        self.with_rule((hikari.RateLimitedError,), self._on_rate_limited_error)
 
         if break_on := tuple(break_on):
             self.with_rule(break_on, self._on_break_on)
@@ -57,8 +53,8 @@ class HikariErrorManager(backoff.ErrorManager):
         self,
         ctx: tanjun.traits.MessageContext,
         *,
-        content: undefined.UndefinedOr[str] = undefined.UNDEFINED,
-        embed: undefined.UndefinedOr[embeds.Embed] = undefined.UNDEFINED,
+        content: hikari.UndefinedOr[str] = hikari.UNDEFINED,
+        embed: hikari.UndefinedOr[hikari.Embed] = hikari.UNDEFINED,
     ) -> None:
         self._backoff_handler.reset()
 

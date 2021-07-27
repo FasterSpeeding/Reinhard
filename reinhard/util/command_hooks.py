@@ -1,26 +1,18 @@
 from __future__ import annotations
 
-import typing
-
-from hikari import embeds
-from hikari import errors as hikari_errors
-from tanjun import errors as tanjun_errors
+import hikari
+import tanjun
 from yuyo import backoff
 
 from ..util import constants
 from ..util import rest_manager
 
-if typing.TYPE_CHECKING:
-    from tanjun import traits
 
-
-async def on_error(ctx: traits.Context, exception: BaseException) -> None:
+async def on_error(ctx: tanjun.traits.Context, exception: BaseException) -> None:
     retry = backoff.Backoff(max_retries=5)
     # TODO: better permission checks
-    error_manager = rest_manager.HikariErrorManager(
-        retry, break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
-    )
-    embed = embeds.Embed(
+    error_manager = rest_manager.HikariErrorManager(retry, break_on=(hikari.ForbiddenError, hikari.NotFoundError))
+    embed = hikari.Embed(
         title=f"An unexpected {type(exception).__name__} occurred",
         colour=constants.FAILED_COLOUR,
         description=f"```python\n{str(exception)[:1950]}```",
@@ -32,16 +24,14 @@ async def on_error(ctx: traits.Context, exception: BaseException) -> None:
             break
 
 
-async def on_parser_error(ctx: traits.Context, exception: tanjun_errors.ParserError) -> None:
+async def on_parser_error(ctx: tanjun.traits.Context, exception: tanjun.ParserError) -> None:
     retry = backoff.Backoff(max_retries=5)
     # TODO: better permission checks
-    error_manager = rest_manager.HikariErrorManager(
-        retry, break_on=(hikari_errors.ForbiddenError, hikari_errors.NotFoundError)
-    )
+    error_manager = rest_manager.HikariErrorManager(retry, break_on=(hikari.ForbiddenError, hikari.NotFoundError))
 
     message = str(exception)
 
-    if isinstance(exception, tanjun_errors.ConversionError) and exception.errors:
+    if isinstance(exception, tanjun.ConversionError) and exception.errors:
         if len(exception.errors) > 1:
             message += ":\n* " + "\n* ".join(map("`{}`".format, exception.errors))
 
