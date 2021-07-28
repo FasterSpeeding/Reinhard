@@ -19,7 +19,7 @@ class _ErrorRaiserT(typing.Protocol):
 
 
 def raise_error(
-    message: typing.Optional[str], /, error_type: typing.Type[BaseException] = errors.CommandError
+    message: str | None, /, error_type: type[BaseException] = errors.CommandError
 ) -> _ErrorRaiserT:  # TODO: better typing for the callable return
     def raise_command_error_(_: typing.Any = None) -> typing.NoReturn:
         if message:

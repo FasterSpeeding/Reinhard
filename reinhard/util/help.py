@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__: typing.Sequence[str] = [
+__all__: list[str] = [
     "generate_command_embed",
     "generate_help_embeds",
     "get_command_doc",
@@ -10,6 +10,7 @@ __all__: typing.Sequence[str] = [
 
 import inspect
 import typing
+from collections import abc as collections
 
 from hikari import embeds as embeds_
 from yuyo import paginaton
@@ -27,24 +28,24 @@ def with_docs(component: traits.Component, name: str, doc: str) -> None:
     component.metadata[COMPONENT_DOC_KEY] = (name, doc)
 
 
-def get_command_doc(command: traits.MessageCommand, /) -> typing.Optional[str]:
+def get_command_doc(command: traits.MessageCommand, /) -> str | None:
     return inspect.getdoc(command.callback) or None
 
 
-def get_component_doc(component: traits.Component, /) -> typing.Optional[typing.Tuple[str, str]]:
+def get_component_doc(component: traits.Component, /) -> tuple[str, str] | None:
     return component.metadata.get(COMPONENT_DOC_KEY)
 
 
 def generate_help_embeds(
     component: traits.Component, /, *, prefix: str = ""
-) -> typing.Optional[typing.Tuple[str, typing.Iterator[embeds_.Embed]]]:
+) -> tuple[str, collections.Iterator[embeds_.Embed]] | None:
     component_info = get_component_doc(component)
 
     if not component_info:
         return None
 
     component_name, component_doc = component_info
-    command_docs: typing.MutableSequence[str] = []
+    command_docs: list[str] = []
 
     for command in component.message_commands:
         command_doc = get_command_doc(command)
@@ -64,7 +65,7 @@ def generate_help_embeds(
     return component_name, embeds
 
 
-def generate_command_embed(command: traits.MessageCommand, /, *, prefix: str = "") -> typing.Optional[embeds_.Embed]:
+def generate_command_embed(command: traits.MessageCommand, /, *, prefix: str = "") -> embeds_.Embed | None:
     if not command.names:
         return None
 

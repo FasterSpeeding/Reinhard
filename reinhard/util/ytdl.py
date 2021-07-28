@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__slots__: typing.Sequence[str] = ["YoutubeDownloader"]
+__all__: list[str] = ["YoutubeDownloader"]
 
 import asyncio
 import concurrent.futures
@@ -15,7 +15,7 @@ _CLIENT_ATTRIBUTE = "REINHARD_YTDL_CLIENT"
 _OUT_DIR = str(pathlib.Path("videos/%(title)s-%(id)s.%(ext)s").absolute())
 
 
-def _download(url: str, /) -> typing.Tuple[pathlib.Path, typing.Dict[str, typing.Any]]:
+def _download(url: str, /) -> tuple[pathlib.Path, dict[str, typing.Any]]:
     data = threading.local()
     client = data.__dict__.get(_CLIENT_ATTRIBUTE)
 
@@ -37,10 +37,10 @@ def _download(url: str, /) -> typing.Tuple[pathlib.Path, typing.Dict[str, typing
 
 
 class YoutubeDownloader:
-    __slots__: typing.Sequence[str] = ("_threads",)
+    __slots__ = ("_threads",)
 
     def __init__(self) -> None:
-        self._threads: typing.Optional[concurrent.futures.Executor] = None
+        self._threads: concurrent.futures.Executor | None = None
 
     def close(self) -> None:
         if not self._threads:
@@ -61,7 +61,7 @@ class YoutubeDownloader:
 
         self._threads = concurrent.futures.ThreadPoolExecutor()
 
-    async def download(self, url: str, /) -> typing.Tuple[pathlib.Path, typing.Dict[str, typing.Any]]:
+    async def download(self, url: str, /) -> tuple[pathlib.Path, dict[str, typing.Any]]:
         if not self._threads:
             raise ValueError("Client is inactive")
 

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-__all__: typing.Sequence[str] = ["basic_component"]
+__all__: list[str] = ["basic_component"]
 
+import collections.abc as collections
 import datetime
 import itertools
 import math
 import platform
 import time
-import typing
 
 import hikari
 import psutil  # type: ignore[import]
@@ -23,10 +23,10 @@ from ..util import rest_manager
 def gen_help_embeds(
     ctx: tanjun.traits.MessageContext = tanjun.injected(type=tanjun.traits.MessageContext),
     client: tanjun.traits.Client = tanjun.injected(type=tanjun.traits.Client),
-) -> typing.Dict[str, typing.List[hikari.Embed]]:
+) -> dict[str, list[hikari.Embed]]:
     prefix = next(iter(client.prefixes)) if client and client.prefixes else ""
 
-    help_embeds: typing.Dict[str, typing.List[hikari.Embed]] = {}
+    help_embeds: dict[str, list[hikari.Embed]] = {}
     for component in ctx.client.components:
         if value := help_util.generate_help_embeds(component, prefix=prefix):
             help_embeds[value[0].lower()] = [v for v in value[1]]
@@ -83,12 +83,10 @@ async def about_command(
 @tanjun.as_message_command("help")
 async def help_command(
     ctx: tanjun.traits.MessageContext,
-    command_name: typing.Optional[str],
-    component_name: typing.Optional[str],
+    command_name: str | None,
+    component_name: str | None,
     paginator_pool: yuyo.PaginatorPool = tanjun.injected(type=yuyo.PaginatorPool),
-    help_embeds: typing.Dict[str, typing.List[hikari.Embed]] = tanjun.injected(
-        callback=tanjun.cache_callback(gen_help_embeds)
-    ),
+    help_embeds: dict[str, list[hikari.Embed]] = tanjun.injected(callback=tanjun.cache_callback(gen_help_embeds)),
     rest_service: traits.RESTAware = tanjun.injected(type=traits.RESTAware),
 ) -> None:
     """Get information about the commands in this bot.
@@ -138,7 +136,7 @@ async def ping_command(ctx: tanjun.traits.MessageContext, /) -> None:
     """Get the bot's current delay."""
     retry = yuyo.Backoff(max_retries=5)
     error_manager = rest_manager.HikariErrorManager(retry, break_on=(hikari.NotFoundError, hikari.ForbiddenError))
-    message: typing.Optional[hikari.Message] = None
+    message: hikari.Message | None = None
     start_time = 0.0
     async for _ in retry:
         with error_manager:
@@ -160,7 +158,7 @@ async def ping_command(ctx: tanjun.traits.MessageContext, /) -> None:
             break
 
 
-_about_lines: typing.Sequence[typing.Tuple[str, typing.Callable[[hikari.api.Cache], int]]] = (
+_about_lines: list[tuple[str, collections.Callable[[hikari.api.Cache], int]]] = [
     ("Guild channels: {0}", lambda c: len(c.get_guild_channels_view())),
     ("Emojis: {0}", lambda c: len(c.get_emojis_view())),
     ("Available Guilds: {0}", lambda c: len(c.get_available_guilds_view())),
@@ -172,7 +170,7 @@ _about_lines: typing.Sequence[typing.Tuple[str, typing.Callable[[hikari.api.Cach
     ("Roles: {0}", lambda c: len(c.get_roles_view())),
     ("Users: {0}", lambda c: len(c.get_users_view())),
     ("Voice states: {0}", lambda c: sum(len(record) for record in c.get_voice_states_view().values())),
-)
+]
 
 
 @basic_component.with_message_command

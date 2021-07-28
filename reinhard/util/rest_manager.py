@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-__all__: typing.Sequence[str] = ["AIOHTTPStatusHandler", "HikariErrorManager"]
+__all__: list[str] = ["AIOHTTPStatusHandler", "HikariErrorManager"]
 
-import typing
+from collections import abc as collections
 
 import aiohttp
 import hikari
@@ -11,14 +11,14 @@ from yuyo import backoff
 
 
 class HikariErrorManager(backoff.ErrorManager):
-    __slots__: typing.Sequence[str] = ("_backoff_handler",)
+    __slots__ = ("_backoff_handler",)
 
     def __init__(
         self,
-        backoff_handler: typing.Optional[backoff.Backoff] = None,
+        backoff_handler: backoff.Backoff | None = None,
         /,
         *,
-        break_on: typing.Iterable[typing.Type[BaseException]] = (),
+        break_on: collections.Iterable[type[BaseException]] = (),
     ) -> None:
         if backoff_handler is None:
             backoff_handler = backoff.Backoff(max_retries=5)
@@ -41,7 +41,7 @@ class HikariErrorManager(backoff.ErrorManager):
         self._backoff_handler.set_next_backoff(exception.retry_after)
         return False
 
-    def clear_rules(self, *, break_on: typing.Iterable[typing.Type[BaseException]] = ()) -> None:
+    def clear_rules(self, *, break_on: collections.Iterable[type[BaseException]] = ()) -> None:
         super().clear_rules()
         self.with_rule((hikari.InternalServerError,), self._on_internal_server_error)
         self.with_rule((hikari.RateLimitedError,), self._on_rate_limited_error)
@@ -65,20 +65,20 @@ class HikariErrorManager(backoff.ErrorManager):
 
 
 class AIOHTTPStatusHandler(backoff.ErrorManager):
-    __slots__: typing.Sequence[str] = ("_backoff_handler", "_break_on", "_on_404")
+    __slots__ = ("_backoff_handler", "_break_on", "_on_404")
 
     def __init__(
         self,
         backoff_handler: backoff.Backoff,
         /,
         *,
-        break_on: typing.Iterable[int] = (),
-        on_404: typing.Union[str, typing.Callable[[], None], None] = None,
+        break_on: collections.Iterable[int] = (),
+        on_404: str | collections.Callable[[], None] | None = None,
     ) -> None:
         super().__init__()
         self._backoff_handler = backoff_handler
-        self._break_on: typing.AbstractSet[int] = set()
-        self._on_404: typing.Union[str, typing.Callable[[], None], None] = None
+        self._break_on: collections.Set[int] = set()
+        self._on_404: str | collections.Callable[[], None] | None = None
         self.clear_rules(break_on=break_on, on_404=on_404)
 
     def _on_client_response_error(self, exception: aiohttp.ClientResponseError) -> bool:
@@ -109,7 +109,7 @@ class AIOHTTPStatusHandler(backoff.ErrorManager):
         return True
 
     def clear_rules(
-        self, *, break_on: typing.Iterable[int] = (), on_404: typing.Union[str, typing.Callable[[], None], None] = None
+        self, *, break_on: collections.Iterable[int] = (), on_404: str | collections.Callable[[], None] | None = None
     ) -> None:
         super().clear_rules()
         self.with_rule((aiohttp.ClientResponseError,), self._on_client_response_error)

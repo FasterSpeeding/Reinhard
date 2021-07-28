@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__: typing.Sequence[str] = ["sudo_component", "load_component"]
+__all__: list[str] = ["sudo_component", "load_component"]
 
 import ast
 import asyncio
@@ -12,6 +12,7 @@ import re
 import time
 import traceback
 import typing
+from collections import abc as collections
 
 import hikari
 import tanjun
@@ -22,7 +23,7 @@ from ..util import constants
 from ..util import help as help_util
 from ..util import rest_manager
 
-CallbackT = typing.Callable[..., typing.Coroutine[typing.Any, typing.Any, typing.Any]]
+CallbackT = collections.Callable[..., collections.Coroutine[typing.Any, typing.Any, typing.Any]]
 
 sudo_component = tanjun.Component()
 help_util.with_docs(sudo_component, "Sudo commands", "Component used by this bot's owner.")
@@ -43,7 +44,7 @@ async def error_command(_: tanjun.traits.MessageContext) -> None:
 async def echo_command(
     ctx: tanjun.traits.MessageContext,
     content: hikari.UndefinedOr[str],
-    raw_embed: hikari.UndefinedOr[typing.Dict[str, typing.Any]],
+    raw_embed: hikari.UndefinedOr[dict[str, typing.Any]],
     entity_factory: traits.EntityFactoryAware = tanjun.injected(type=traits.EntityFactoryAware),
 ) -> None:
     """Command used for getting the bot to mirror a response.
@@ -72,7 +73,7 @@ async def echo_command(
         await error_manager.try_respond(ctx, content=content, embed=embed)
 
 
-def _yields_results(*args: io.StringIO) -> typing.Iterator[str]:
+def _yields_results(*args: io.StringIO) -> collections.Iterator[str]:
     for name, stream in zip("stdout stderr".split(), args):
         yield f"- /dev/{name}:"
         while lines := stream.readlines(25):
@@ -81,7 +82,7 @@ def _yields_results(*args: io.StringIO) -> typing.Iterator[str]:
 
 def build_eval_globals(
     ctx: tanjun.traits.MessageContext, component: tanjun.traits.Component, /
-) -> typing.Dict[str, typing.Any]:
+) -> dict[str, typing.Any]:
     return {
         "asyncio": asyncio,
         "app": ctx.shards,
@@ -95,7 +96,7 @@ def build_eval_globals(
 
 async def eval_python_code(
     ctx: tanjun.traits.MessageContext, component: tanjun.traits.Component, code: str
-) -> typing.Tuple[typing.Iterable[str], int, bool]:
+) -> tuple[collections.Iterable[str], int, bool]:
     globals_ = build_eval_globals(ctx, component)
     stdout = io.StringIO()
     stderr = io.StringIO()

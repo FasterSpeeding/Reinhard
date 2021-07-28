@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-__all__: typing.Sequence[str] = ["util_component", "load_component"]
+__all__: list[str] = ["util_component", "load_component"]
 
-import typing
 import unicodedata
 
 import hikari
@@ -23,7 +22,7 @@ help_util.with_docs(util_component, "Utility commands", "Component used for gett
 @tanjun.with_greedy_argument("colour", converters=(conversion.ColorConverter(), conversion.RESTFulRoleConverter()))
 @tanjun.with_parser
 @tanjun.as_message_command("color", "colour")
-async def colour_command(ctx: tanjun.traits.MessageContext, colour: typing.Union[hikari.Colour, hikari.Role]) -> None:
+async def colour_command(ctx: tanjun.traits.MessageContext, colour: hikari.Colour | hikari.Role) -> None:
     """Get a visual representation of a color or role's color.
 
     Argument:
@@ -47,7 +46,7 @@ async def colour_command(ctx: tanjun.traits.MessageContext, colour: typing.Union
 #     self,
 #     ctx: tanjun.MessageContext,
 #     message: converters.BaseIDConverter,
-#     channel: typing.Optional[converters.BaseIDConverter] = None,
+#     channel: converters.BaseIDConverter | None = None,
 # ) -> None:
 #     try:
 #         message = await self.tanjun.rest.fetch_message(
@@ -64,7 +63,7 @@ async def colour_command(ctx: tanjun.traits.MessageContext, colour: typing.Union
 @tanjun.with_parser
 @tanjun.with_check(lambda ctx: ctx.message.guild_id is not None)
 @tanjun.as_message_command("member")
-async def member_command(ctx: tanjun.traits.MessageContext, member: typing.Union[hikari.Member, None]) -> None:
+async def member_command(ctx: tanjun.traits.MessageContext, member: hikari.Member | None) -> None:
     """Get information about a member in the current guild.
 
     Arguments:
@@ -184,7 +183,7 @@ async def role_command(ctx: tanjun.traits.MessageContext, role: hikari.Role) -> 
 )
 @tanjun.with_parser
 @tanjun.as_message_command("user")
-async def user_command(ctx: tanjun.traits.MessageContext, user: typing.Union[hikari.User, None]) -> None:
+async def user_command(ctx: tanjun.traits.MessageContext, user: hikari.User | None) -> None:
     """ "Get information about a Discord user."
 
     Arguments:
@@ -218,7 +217,7 @@ async def user_command(ctx: tanjun.traits.MessageContext, user: typing.Union[hik
 )
 @tanjun.with_parser
 @tanjun.as_message_command("avatar", "pfp")
-async def avatar_command(ctx: tanjun.traits.MessageContext, user: typing.Union[hikari.User, None]) -> None:
+async def avatar_command(ctx: tanjun.traits.MessageContext, user: hikari.User | None) -> None:
     """Get a user's avatar.
 
     Arguments:
@@ -242,7 +241,7 @@ async def avatar_command(ctx: tanjun.traits.MessageContext, user: typing.Union[h
 async def mentions_command(
     ctx: tanjun.traits.MessageContext,
     message_id: hikari.Snowflake,
-    channel_id: typing.Optional[hikari.Snowflake],
+    channel_id: hikari.Snowflake | None,
 ) -> None:
     """Get a list of the users who were pinged by a message.
 

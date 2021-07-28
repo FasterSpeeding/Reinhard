@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__: typing.Sequence[str] = [
+__all__: list[str] = [
     "RESTFulMemberConverter",
     "RESTFulRoleConverter",
     "RESTFulUserConverter",
@@ -18,8 +18,6 @@ __all__: typing.Sequence[str] = [
     "VoiceStateConverter",
 ]
 
-import typing
-
 import hikari
 import tanjun
 from tanjun.conversion import *
@@ -30,7 +28,7 @@ from ..util import rest_manager
 
 
 class RESTFulMemberConverter(MemberConverter):
-    __slots__: typing.Sequence[str] = ()
+    __slots__ = ()
 
     @property
     def cache_bound(self) -> bool:
@@ -46,7 +44,7 @@ class RESTFulMemberConverter(MemberConverter):
         except ValueError:
             pass
 
-        member_id: typing.Optional[hikari.Snowflake] = None
+        member_id: hikari.Snowflake | None = None
         try:
             member_id = tanjun.conversion.parse_user_id(argument)
         except ValueError:
@@ -79,7 +77,7 @@ class RESTFulMemberConverter(MemberConverter):
 
 
 class RESTFulRoleConverter(RoleConverter):
-    __slots__: typing.Sequence[str] = ()
+    __slots__ = ()
 
     @property
     def cache_bound(self) -> bool:
@@ -133,7 +131,7 @@ class RESTFulRoleConverter(RoleConverter):
 
 
 class RESTFulUserConverter(UserConverter):
-    __slots__: typing.Sequence[str] = ()
+    __slots__ = ()
 
     @property
     def cache_bound(self) -> bool:

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-__all__: typing.Sequence[str] = ["moderation_component", "load_component"]
+__all__: list[str] = ["moderation_component", "load_component"]
 
 import datetime
-import typing
+from collections import abc as collections
 
 import hikari
 import tanjun
@@ -37,12 +37,12 @@ help_util.with_docs(moderation_component, "Moderation commands", "Moderation ori
 @tanjun.as_message_command("clear")
 async def clear_command(
     ctx: tanjun.traits.MessageContext,
-    count: typing.Optional[int],
-    after: typing.Optional[hikari.Snowflake],
-    before: typing.Optional[hikari.Snowflake],
+    count: int | None,
+    after: hikari.Snowflake | None,
+    before: hikari.Snowflake | None,
     bot_only: bool,
     human_only: bool,
-    users: typing.Sequence[hikari.Snowflake],
+    users: collections.Sequence[hikari.Snowflake],
     suppress: bool,
 ) -> None:
     """Clear new messages from chat.

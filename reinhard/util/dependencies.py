@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__: typing.Sequence[str] = ["SessionDependency", "PaginatorPoolDependency"]
+__all__: list[str] = ["SessionDependency", "PaginatorPoolDependency"]
 
 import asyncio
 import logging
@@ -18,14 +18,14 @@ _LOGGER = logging.getLogger("hikari.reinhard")
 
 
 class SessionDependency:  # TODO: add on_closing, closed, opening and opened handlers to Tanjun
-    __slots__: typing.Sequence[str] = ("http_settings", "proxy_settings", "_session", "user_agent")
+    __slots__ = ("http_settings", "proxy_settings", "_session", "user_agent")
 
     def __init__(
         self, http_settings: config.HTTPSettings, proxy_settings: config.ProxySettings, user_agent: str
     ) -> None:
         self.http_settings = http_settings
         self.proxy_settings = proxy_settings
-        self._session: typing.Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
         self.user_agent = user_agent
 
     def __call__(self) -> aiohttp.ClientSession:
@@ -50,10 +50,10 @@ class SessionDependency:  # TODO: add on_closing, closed, opening and opened han
 
 
 class PaginatorPoolDependency:
-    __slots__: typing.Sequence[str] = ("_paginator",)
+    __slots__ = ("_paginator",)
 
     def __init__(self) -> None:
-        self._paginator: typing.Optional[paginaton.PaginatorPool] = None
+        self._paginator: paginaton.PaginatorPool | None = None
 
     def __call__(
         self,

@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import pathlib
 import re
-import typing
 
 import asyncpg  # type: ignore[import]
 
@@ -27,9 +26,9 @@ def script_getter_factory(key: str) -> property:  # Could just make this retriev
 class CachedScripts:
     """A class used for loading and calling sql scripts from a folder."""
 
-    scripts: typing.MutableMapping[str, str]
+    scripts: dict[str, str]
 
-    def __init__(self, root_dir: typing.Optional[str] = "./reinhard/sql", pattern: str = ".") -> None:
+    def __init__(self, root_dir: str | None = "./reinhard/sql", pattern: str = ".") -> None:
         self.scripts = {}
         if root_dir is not None:
             self.load_all_sql_files(root_dir, pattern)

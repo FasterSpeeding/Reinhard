@@ -15,7 +15,7 @@ if typing.TYPE_CHECKING:
     from hikari import traits as hikari_traits
 
 
-def build_bot(*, config: typing.Optional[config_.FullConfig] = None) -> hikari_traits.GatewayBotAware:
+def build_bot(*, config: config_.FullConfig | None = None) -> hikari_traits.GatewayBotAware:
     from hikari.impl import bot as bot_module
 
     if config is None:
@@ -33,14 +33,12 @@ def build_bot(*, config: typing.Optional[config_.FullConfig] = None) -> hikari_t
     return bot
 
 
-def build(
-    bot: hikari_traits.GatewayBotAware, /, *, config: typing.Optional[config_.FullConfig] = None
-) -> tanjun.Client:
+def build(bot: hikari_traits.GatewayBotAware, /, *, config: config_.FullConfig | None = None) -> tanjun.Client:
     if config is None:
         config = config_.load_config()
 
     client = (
-        tanjun.Client.from_gateway_bot(bot, mention_prefix=config.mention_prefix, set_global_commands=True)
+        tanjun.Client.from_gateway_bot(bot, mention_prefix=config.mention_prefix, set_global_commands=False)
         .set_hooks(
             tanjun.Hooks["tanjun.traits.Context"]()
             .set_on_parser_error(command_hooks.on_parser_error)

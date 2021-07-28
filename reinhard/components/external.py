@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-__all__: typing.Sequence[str] = ["external_component"]
+__all__: list[str] = ["external_component"]
 
-import asyncio
+import collections.abc as collections
 import datetime
 import logging
 import time
@@ -38,23 +38,23 @@ SPOTIFY_RESOURCE_TYPES = ("track", "album", "artist", "playlist")
 HIKARI_IO = "https://hikari-py.github.io/hikari"
 
 
-class YoutubePaginator(typing.AsyncIterator[typing.Tuple[str, hikari.UndefinedType]]):
+class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType]]):
     __slots__ = ("_session", "_buffer", "_next_page_token", "_parameters")
 
     def __init__(
         self,
         session: aiohttp.ClientSession,
-        parameters: typing.Dict[str, typing.Union[str, int]],
+        parameters: dict[str, str | int],
     ) -> None:
         self._session = session
-        self._buffer: typing.List[typing.Dict[str, typing.Any]] = []
-        self._next_page_token: typing.Optional[str] = ""
+        self._buffer: list[dict[str, typing.Any]] = []
+        self._next_page_token: str | None = ""
         self._parameters = parameters
 
     def __aiter__(self) -> YoutubePaginator:
         return self
 
-    async def __anext__(self) -> typing.Tuple[str, hikari.UndefinedType]:
+    async def __anext__(self) -> tuple[str, hikari.UndefinedType]:
         if not self._next_page_token and self._next_page_token is not None:
             retry = yuyo.Backoff(max_retries=5)
             error_manager = rest_manager.AIOHTTPStatusHandler(retry, break_on=(404,))
@@ -95,8 +95,8 @@ class YoutubePaginator(typing.AsyncIterator[typing.Tuple[str, hikari.UndefinedTy
         raise RuntimeError(f"Got unexpected 'kind' from youtube {page['id']['kind']}")
 
 
-class SpotifyPaginator(typing.AsyncIterator[typing.Tuple[str, hikari.UndefinedType]]):
-    __slots__: typing.Sequence[str] = (
+class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType]]):
+    __slots__ = (
         "_acquire_authorization",
         "_session",
         "_buffer",
@@ -108,20 +108,20 @@ class SpotifyPaginator(typing.AsyncIterator[typing.Tuple[str, hikari.UndefinedTy
 
     def __init__(
         self,
-        acquire_authorization: typing.Callable[[aiohttp.ClientSession], typing.Awaitable[str]],
+        acquire_authorization: collections.Callable[[aiohttp.ClientSession], collections.Awaitable[str]],
         session: aiohttp.ClientSession,
-        parameters: typing.Dict[str, typing.Union[str, int]],
+        parameters: dict[str, str | int],
     ) -> None:
         self._acquire_authorization = acquire_authorization
         self._session = session
-        self._buffer: typing.List[typing.Dict[str, typing.Any]] = []
-        self._offset: typing.Optional[int] = 0
+        self._buffer: list[dict[str, typing.Any]] = []
+        self._offset: int | None = 0
         self._parameters = parameters
 
     def __aiter__(self) -> SpotifyPaginator:
         return self
 
-    async def __anext__(self) -> typing.Tuple[str, hikari.UndefinedType]:
+    async def __anext__(self) -> tuple[str, hikari.UndefinedType]:
         if not self._buffer and self._offset is not None:
             retry = yuyo.Backoff(max_retries=5)
             resource_type = self._parameters["type"]
@@ -162,14 +162,14 @@ class SpotifyPaginator(typing.AsyncIterator[typing.Tuple[str, hikari.UndefinedTy
 
 
 class ClientCredentialsOauth2:
-    __slots__: typing.Sequence[str] = ("_authorization", "_expire_at", "_path", "_prefix", "_token")
+    __slots__ = ("_authorization", "_expire_at", "_path", "_prefix", "_token")
 
     def __init__(self, path: str, client_id: str, client_secret: str, *, prefix: str = "Bearer ") -> None:
         self._authorization = aiohttp.BasicAuth(client_id, client_secret)
         self._expire_at = 0
         self._path = path
         self._prefix = prefix
-        self._token: typing.Optional[str] = None
+        self._token: str | None = None
 
     @property
     def _expired(self) -> bool:
@@ -217,7 +217,7 @@ class ClientCredentialsOauth2:
 
 
 class CachedResource(typing.Generic[_ValueT]):
-    __slots__: typing.Sequence[str] = (
+    __slots__ = (
         "_authorization",
         "_data",
         "_expire_after",
@@ -231,13 +231,13 @@ class CachedResource(typing.Generic[_ValueT]):
         self,
         path: str,
         expire_after: datetime.timedelta,
-        parse_data: typing.Callable[[bytes], _ValueT],
+        parse_data: collections.Callable[[bytes], _ValueT],
         *,
-        authorization: typing.Optional[aiohttp.BasicAuth] = None,
-        headers: typing.Optional[typing.Dict[str, typing.Any]] = None,
+        authorization: aiohttp.BasicAuth | None = None,
+        headers: dict[str, typing.Any] | None = None,
     ) -> None:
         self._authorization = authorization
-        self._data: typing.Optional[_ValueT] = None
+        self._data: _ValueT | None = None
         self._expire_after = expire_after.total_seconds()
         self._headers = headers
         self._parse_data = parse_data
@@ -312,7 +312,7 @@ async def lyrics_command(
         )
         raise tanjun.CommandError("Failed to receive lyrics")
 
-    icon: typing.Optional[str] = None
+    icon: str | None = None
     if "album" in data and (icon_data := data["album"]["icon"]):
         icon = icon_data.get("url")
 
@@ -361,10 +361,10 @@ async def youtube_command(
     ctx: tanjun.traits.MessageContext,
     query: str,
     resource_type: str,
-    region: typing.Optional[str],
-    language: typing.Optional[str],
+    region: str | None,
+    language: str | None,
     order: str,
-    safe_search: typing.Optional[bool],
+    safe_search: bool | None,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
     tokens: config_.Tokens = tanjun.injected(type=config_.Tokens),
     paginator_pool: yuyo.PaginatorPool = tanjun.injected(type=yuyo.PaginatorPool),
@@ -388,7 +388,7 @@ async def youtube_command(
     """
     assert tokens.google is not None
     if safe_search is not False:
-        channel: typing.Optional[hikari.PartialChannel]
+        channel: hikari.PartialChannel | None
         if ctx.cache and (channel := ctx.cache.get_guild_channel(ctx.channel_id)):
             channel_is_nsfw = channel.is_nsfw
 
@@ -407,7 +407,7 @@ async def youtube_command(
     if resource_type not in ("channel", "playlist", "video"):
         raise tanjun.CommandError("Resource type must be one of 'channel', 'playist' or 'video'.")
 
-    parameters: typing.Dict[str, typing.Union[str, int]] = {
+    parameters: dict[str, str | int] = {
         "key": tokens.google,
         "maxResults": 50,
         "order": order,
@@ -466,7 +466,7 @@ def _youtube_token_check(
 # @tanjun.as_message_command("moe")  # TODO: https://lewd.bowsette.pictures/api/request
 async def moe_command(
     ctx: tanjun.traits.MessageContext,
-    source: typing.Optional[str] = None,
+    source: str | None = None,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
 ) -> None:
     params = {}
@@ -601,7 +601,7 @@ async def spotify_command(
 @tanjun.as_message_command("docs")
 async def docs_command(
     ctx: tanjun.traits.MessageContext,
-    path: typing.Optional[str],
+    path: str | None,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
     doc_fetcher: CachedResource[sphobjinv.Inventory] = tanjun.injected(
         callback=tanjun.cache_callback(make_doc_fetcher)
@@ -620,9 +620,9 @@ async def docs_command(
     else:
         path = path.replace(" ", "_")
         inventory = await doc_fetcher.acquire_resource(session)
-        description: typing.List[str] = []
+        description: list[str] = []
         # TODO: this line blocks for 2 seconds
-        entries: typing.Iterator[typing.Tuple[str, int, int]] = iter(
+        entries: collections.Iterator[tuple[str, int, int]] = iter(
             inventory.suggest(path, thresh=70, with_index=True, with_score=True)
         )
 
@@ -685,11 +685,13 @@ async def ytdl_command(
 
 
 @external_component.with_interaction_command
-@tanjun.as_interaction_command("test", "Just a testing command, ignore me", default_to_ephemeral=True)
+@tanjun.as_interaction_command("hello", "hi senpai-kyun!!!! >///<", default_to_ephemeral=True)
 async def test_command(ctx: tanjun.traits.Context) -> None:
-    await asyncio.sleep(5)
-    await ctx.respond("gay")
-    await ctx.respond("no u")
+    await ctx.respond(
+        embed=hikari.Embed().set_image(
+            hikari.URL("https://media.discordapp.net/attachments/673607501630930957/869809812312047676/unknown.png")
+        )
+    )
 
 
 @tanjun.as_loader
