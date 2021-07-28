@@ -40,8 +40,7 @@ def build(
         config = config_.load_config()
 
     client = (
-        tanjun.Client.from_gateway_bot(bot, mention_prefix=config.mention_prefix, set_global_commands=False)
-        .set_auto_defer_after(0.5)
+        tanjun.Client.from_gateway_bot(bot, mention_prefix=config.mention_prefix, set_global_commands=True)
         .set_hooks(
             tanjun.Hooks["tanjun.traits.Context"]()
             .set_on_parser_error(command_hooks.on_parser_error)
