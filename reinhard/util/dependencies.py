@@ -8,7 +8,7 @@ import typing
 
 import aiohttp
 from hikari import traits
-from tanjun import injector
+from tanjun import injecting
 from yuyo import paginaton
 
 if typing.TYPE_CHECKING:
@@ -57,8 +57,8 @@ class PaginatorPoolDependency:
 
     def __call__(
         self,
-        rest_client: traits.RESTAware = injector.injected(type=traits.RESTAware),
-        event_client: traits.EventManagerAware = injector.injected(type=traits.EventManagerAware),
+        rest_client: traits.RESTAware = injecting.injected(type=traits.RESTAware),
+        event_client: traits.EventManagerAware = injecting.injected(type=traits.EventManagerAware),
     ) -> paginaton.PaginatorPool:
         if not self._paginator or self._paginator.is_closed:
             self._paginator = paginaton.PaginatorPool(rest_client, event_client)
