@@ -15,7 +15,7 @@ from ..util import rest_manager
 MAX_MESSAGE_BULK_DELETE = datetime.timedelta(weeks=2)
 
 
-moderation_component = tanjun.Component()
+moderation_component = tanjun.StrictComponent()
 help_util.with_docs(moderation_component, "Moderation commands", "Moderation oriented commands.")
 
 
