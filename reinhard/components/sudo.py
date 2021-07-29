@@ -25,7 +25,7 @@ from ..util import rest_manager
 
 CallbackT = collections.Callable[..., collections.Coroutine[typing.Any, typing.Any, typing.Any]]
 
-sudo_component = tanjun.StrictComponent()
+sudo_component = tanjun.Component(strict=True)
 help_util.with_docs(sudo_component, "Sudo commands", "Component used by this bot's owner.")
 
 

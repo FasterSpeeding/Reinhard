@@ -263,7 +263,7 @@ def make_doc_fetcher() -> CachedResource[sphobjinv.Inventory]:
     return CachedResource(HIKARI_IO + "/objects.inv", datetime.timedelta(hours=12), sphobjinv.Inventory)
 
 
-external_component = tanjun.StrictComponent()
+external_component = tanjun.Component(strict=True)
 help_util.with_docs(
     external_component, "External API commands", "A utility component used for getting data from 3rd party APIs."
 )

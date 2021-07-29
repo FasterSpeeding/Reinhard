@@ -34,7 +34,7 @@ def gen_help_embeds(
     return help_embeds
 
 
-basic_component = tanjun.StrictComponent()
+basic_component = tanjun.Component(strict=True)
 help_util.with_docs(basic_component, "Basic commands", "Commands provided to give information about this bot.")
 
 

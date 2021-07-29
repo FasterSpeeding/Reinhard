@@ -14,7 +14,7 @@ from ..util import conversion
 from ..util import help as help_util
 from ..util import rest_manager
 
-util_component = tanjun.StrictComponent()
+util_component = tanjun.Component(strict=True)
 help_util.with_docs(util_component, "Utility commands", "Component used for getting miscellaneous Discord information.")
 
 
