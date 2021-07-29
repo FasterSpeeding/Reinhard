@@ -10,7 +10,6 @@ from yuyo import backoff
 
 from ..util import basic as basic_util
 from ..util import constants
-from ..util import conversion
 from ..util import help as help_util
 from ..util import rest_manager
 
@@ -19,7 +18,7 @@ help_util.with_docs(util_component, "Utility commands", "Component used for gett
 
 
 @util_component.with_message_command
-@tanjun.with_greedy_argument("colour", converters=(conversion.ColorConverter(), conversion.RESTFulRoleConverter()))
+@tanjun.with_greedy_argument("colour", converters=(tanjun.to_colour, tanjun.to_role))
 @tanjun.with_parser
 @tanjun.as_message_command("color", "colour")
 async def colour_command(ctx: tanjun.traits.MessageContext, colour: hikari.Colour | hikari.Role) -> None:
@@ -59,7 +58,7 @@ async def colour_command(ctx: tanjun.traits.MessageContext, colour: hikari.Colou
 
 
 @util_component.with_message_command
-@tanjun.with_greedy_argument("member", converters=conversion.RESTFulMemberConverter(), default=None)
+@tanjun.with_greedy_argument("member", converters=tanjun.to_member, default=None)
 @tanjun.with_parser
 @tanjun.with_check(lambda ctx: ctx.message.guild_id is not None)
 @tanjun.as_message_command("member")
@@ -142,7 +141,7 @@ async def member_command(ctx: tanjun.traits.MessageContext, member: hikari.Membe
 
 # TODO: the normal role converter is limited to the current guild right?
 @util_component.with_message_command
-@tanjun.with_argument("role", converters=conversion.RESTFulRoleConverter())
+@tanjun.with_argument("role", converters=tanjun.to_role)
 @tanjun.with_parser
 @tanjun.with_check(lambda ctx: ctx.message.guild_id is not None)
 @tanjun.as_message_command("role")
@@ -178,9 +177,7 @@ async def role_command(ctx: tanjun.traits.MessageContext, role: hikari.Role) -> 
 
 
 @util_component.with_message_command
-@tanjun.with_greedy_argument(
-    "user", converters=(conversion.RESTFulUserConverter(), conversion.RESTFulMemberConverter()), default=None
-)
+@tanjun.with_greedy_argument("user", converters=(tanjun.to_user, tanjun.to_member), default=None)
 @tanjun.with_parser
 @tanjun.as_message_command("user")
 async def user_command(ctx: tanjun.traits.MessageContext, user: hikari.User | None) -> None:
@@ -212,9 +209,7 @@ async def user_command(ctx: tanjun.traits.MessageContext, user: hikari.User | No
 
 
 @util_component.with_message_command
-@tanjun.with_greedy_argument(
-    "user", converters=(conversion.RESTFulUserConverter(), conversion.RESTFulMemberConverter()), default=None
-)
+@tanjun.with_greedy_argument("user", converters=(tanjun.to_user, tanjun.to_member), default=None)
 @tanjun.with_parser
 @tanjun.as_message_command("avatar", "pfp")
 async def avatar_command(ctx: tanjun.traits.MessageContext, user: hikari.User | None) -> None:
