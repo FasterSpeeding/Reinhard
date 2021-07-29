@@ -220,7 +220,7 @@ async def commands_command(ctx: tanjun.traits.MessageContext) -> None:
 
 
 @sudo_component.with_message_command
-@tanjun.as_message_command_group("note", "notes")
+@tanjun.as_message_command_group("note", "notes", strict=True)
 async def note_command(ctx: tanjun.traits.MessageContext) -> None:
     await ctx.message.respond("You have zero tags")
 

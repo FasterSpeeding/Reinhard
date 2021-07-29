@@ -308,7 +308,7 @@ def _format_char_line(char: str, to_file: bool) -> str:
 
 
 @util_component.with_message_command
-@tanjun.as_message_command_group("char")
+@tanjun.as_message_command_group("char", strict=True)
 async def char_command(ctx: tanjun.traits.MessageContext, to_file: bool = False) -> None:
     """Get information about the UTF-8 characters in the executing message.
 
