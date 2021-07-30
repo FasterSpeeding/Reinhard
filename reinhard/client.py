@@ -38,7 +38,9 @@ def build(bot: hikari_traits.GatewayBotAware, /, *, config: config_.FullConfig |
         config = config_.load_config()
 
     client = (
-        tanjun.Client.from_gateway_bot(bot, mention_prefix=config.mention_prefix, set_global_commands=False)
+        tanjun.Client.from_gateway_bot(
+            bot, mention_prefix=config.mention_prefix, set_global_commands=config.set_global_commands
+        )
         .set_hooks(
             tanjun.Hooks["tanjun.traits.Context"]()
             .set_on_parser_error(command_hooks.on_parser_error)

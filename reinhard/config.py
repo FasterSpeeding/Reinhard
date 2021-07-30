@@ -111,6 +111,7 @@ class FullConfig(Config):
     owner_only: bool = False
     prefixes: collections.Set[str] = frozenset("r.")
     ptf: PTFConfig | None = None
+    set_global_commands: bool = True
 
     @classmethod
     def from_mapping(cls, mapping: collections.Mapping[str, typing.Any], /) -> FullConfig:
@@ -132,6 +133,7 @@ class FullConfig(Config):
             prefixes=frozenset(map(str, mapping["prefixes"])) if "prefixes" in mapping else {"r."},
             ptf=_cast_or_default(mapping, "ptf", PTFConfig.from_mapping, None),
             tokens=Tokens.from_mapping(mapping["tokens"]),
+            set_global_commands=bool(mapping.get("set_global_commands", True)),
         )
 
 
