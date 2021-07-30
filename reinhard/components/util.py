@@ -21,7 +21,7 @@ help_util.with_docs(util_component, "Utility commands", "Component used for gett
 @tanjun.with_greedy_argument("colour", converters=(tanjun.to_colour, tanjun.to_role))
 @tanjun.with_parser
 @tanjun.as_message_command("color", "colour")
-async def colour_command(ctx: tanjun.traits.MessageContext, colour: hikari.Colour | hikari.Role) -> None:
+async def colour_command(ctx: tanjun.traits.Context, colour: hikari.Colour | hikari.Role) -> None:
     """Get a visual representation of a color or role's color.
 
     Argument:
@@ -49,10 +49,10 @@ async def colour_command(ctx: tanjun.traits.MessageContext, colour: hikari.Colou
 # ) -> None:
 #     try:
 #         message = await self.tanjun.rest.fetch_message(
-#             message=message, channel=channel or ctx.message.channel_id
+#             message=message, channel=channel or ctx.channel_id
 #         )
 #     except (hikari.NotFound, hikari.Forbidden) as exc:
-#         await ctx.message.respond(content="Failed to get message.")
+#         await ctx.respond(content="Failed to get message.")
 #     else:
 #         ...  # TODO: Implement this to allow getting the embeds from a suppressed message.
 
@@ -60,25 +60,25 @@ async def colour_command(ctx: tanjun.traits.MessageContext, colour: hikari.Colou
 @util_component.with_message_command
 @tanjun.with_greedy_argument("member", converters=tanjun.to_member, default=None)
 @tanjun.with_parser
-@tanjun.with_check(lambda ctx: ctx.message.guild_id is not None)
+@tanjun.with_check(lambda ctx: ctx.guild_id is not None)
 @tanjun.as_message_command("member")
-async def member_command(ctx: tanjun.traits.MessageContext, member: hikari.Member | None) -> None:
+async def member_command(ctx: tanjun.traits.Context, member: hikari.Member | None) -> None:
     """Get information about a member in the current guild.
 
     Arguments:
         * member: The optional argument of the mention or ID of a member to get information about.
             If not provided then this will return information about the member executing this command.
     """
-    assert ctx.message.guild_id is not None  # This is asserted by a previous check.
-    assert ctx.message.member is not None  # This is always the case for messages made in hikari.
+    assert ctx.guild_id is not None  # This is asserted by a previous check.
+    assert ctx.member is not None  # This is always the case for messages made in hikari.
     if member is None:
-        member = ctx.message.member
+        member = ctx.member
 
     retry = backoff.Backoff(max_retries=5)
     error_manager = rest_manager.HikariErrorManager(retry, break_on=(hikari.ForbiddenError, hikari.NotFoundError))
     async for _ in retry:
         with error_manager:
-            guild = await ctx.rest.fetch_guild(guild=ctx.message.guild_id)
+            guild = await ctx.rest.fetch_guild(guild=ctx.guild_id)
             break
 
     else:
@@ -143,9 +143,9 @@ async def member_command(ctx: tanjun.traits.MessageContext, member: hikari.Membe
 @util_component.with_message_command
 @tanjun.with_argument("role", converters=tanjun.to_role)
 @tanjun.with_parser
-@tanjun.with_check(lambda ctx: ctx.message.guild_id is not None)
+@tanjun.with_check(lambda ctx: ctx.guild_id is not None)
 @tanjun.as_message_command("role")
-async def role_command(ctx: tanjun.traits.MessageContext, role: hikari.Role) -> None:
+async def role_command(ctx: tanjun.traits.Context, role: hikari.Role) -> None:
     """ "Get information about a role in the current guild.
 
     Arguments:
@@ -180,7 +180,7 @@ async def role_command(ctx: tanjun.traits.MessageContext, role: hikari.Role) -> 
 @tanjun.with_greedy_argument("user", converters=(tanjun.to_user, tanjun.to_member), default=None)
 @tanjun.with_parser
 @tanjun.as_message_command("user")
-async def user_command(ctx: tanjun.traits.MessageContext, user: hikari.User | None) -> None:
+async def user_command(ctx: tanjun.traits.Context, user: hikari.User | None) -> None:
     """ "Get information about a Discord user."
 
     Arguments:
@@ -188,7 +188,7 @@ async def user_command(ctx: tanjun.traits.MessageContext, user: hikari.User | No
             If not supplied then this will return information about the triggering user.
     """
     if user is None:
-        user = ctx.message.author
+        user = ctx.author
 
     flags = basic_util.basic_name_grid(user.flags) or "NONE"
     embed = (
@@ -212,7 +212,7 @@ async def user_command(ctx: tanjun.traits.MessageContext, user: hikari.User | No
 @tanjun.with_greedy_argument("user", converters=(tanjun.to_user, tanjun.to_member), default=None)
 @tanjun.with_parser
 @tanjun.as_message_command("avatar", "pfp")
-async def avatar_command(ctx: tanjun.traits.MessageContext, user: hikari.User | None) -> None:
+async def avatar_command(ctx: tanjun.traits.Context, user: hikari.User | None) -> None:
     """Get a user's avatar.
 
     Arguments:
@@ -220,7 +220,7 @@ async def avatar_command(ctx: tanjun.traits.MessageContext, user: hikari.User | 
             If this isn't provided then this command will return the avatar of the user who triggerred it.
     """
     if user is None:
-        user = ctx.message.author
+        user = ctx.author
 
     error_manager = rest_manager.HikariErrorManager(break_on=(hikari.ForbiddenError, hikari.NotFoundError))
     avatar = user.avatar_url or user.default_avatar_url
@@ -234,7 +234,7 @@ async def avatar_command(ctx: tanjun.traits.MessageContext, user: hikari.User | 
 @tanjun.with_parser
 @tanjun.as_message_command("pings", "mentions")
 async def mentions_command(
-    ctx: tanjun.traits.MessageContext,
+    ctx: tanjun.traits.Context,
     message_id: hikari.Snowflake,
     channel_id: hikari.Snowflake | None,
 ) -> None:
@@ -248,7 +248,7 @@ async def mentions_command(
             If this isn't provided then the command will assume the message is in the current channel.
     """
     if channel_id is None:
-        channel_id = ctx.message.channel_id
+        channel_id = ctx.channel_id
 
     # TODO: set maximum?
     retry = backoff.Backoff()
@@ -268,12 +268,11 @@ async def mentions_command(
     )
 
 
-@util_component.with_message_command
+@util_component.with_slash_command
 @tanjun.with_guild_check
-@tanjun.with_greedy_argument("name")
-@tanjun.with_parser
-@tanjun.as_message_command("members")
-async def members_command(ctx: tanjun.traits.MessageContext, name: str) -> None:
+@tanjun.with_str_slash_option("name", "Greedy argument of the name to search for.")
+@tanjun.as_slash_command("members", "Search for a member in the current guild.")
+async def members_command(ctx: tanjun.traits.Context, name: str) -> None:
     """Search for a member in the current guild.
 
     Arguments
@@ -302,21 +301,19 @@ def _format_char_line(char: str, to_file: bool) -> str:
     return f"`\\U{code:08x}`/`{char}`: {name} <http://www.fileformat.info/info/unicode/char/{code:x}>"
 
 
-@util_component.with_message_command
-@tanjun.as_message_command_group("char", strict=True)
-async def char_command(ctx: tanjun.traits.MessageContext, to_file: bool = False) -> None:
+@util_component.with_slash_command
+@tanjun.with_str_slash_option("characters", "The UTF-8 characters to get information about")
+@tanjun.as_slash_command("char", "Get information about the UTF-8 characters in the executing message.")
+async def char_command(ctx: tanjun.traits.Context, characters: str, to_file: bool = False) -> None:
     """Get information about the UTF-8 characters in the executing message.
 
     Running `char file...` will ensure that the output is always sent as a markdown file.
     """
-    if not ctx.content:
-        return
-
-    if len(ctx.content) > 20:
+    if len(characters) > 20:
         to_file = True
 
     content: hikari.UndefinedOr[str]
-    content = "\n".join(_format_char_line(char, to_file) for char in ctx.content)
+    content = "\n".join(_format_char_line(char, to_file) for char in characters)
     file: hikari.UndefinedOr[hikari.Bytes] = hikari.UNDEFINED
 
     # highly doubt this'll ever be over 1990 when to_file is False but better safe than sorry.
@@ -327,13 +324,16 @@ async def char_command(ctx: tanjun.traits.MessageContext, to_file: bool = False)
     else:
         content = content
 
-    await ctx.message.respond(content=content, attachment=file)
+    await ctx.respond(content=content or "hi there")
+
+    if file is not hikari.UNDEFINED:
+        await ctx.edit_last_response(content=None, attachment=file)
 
 
-@char_command.with_command
-@tanjun.as_message_command("file")
-async def char_file_command(ctx: tanjun.traits.MessageContext) -> None:
-    await char_command(ctx, to_file=True)
+# @char_command.with_command
+# @tanjun.as_message_command("file")
+# async def char_file_command(ctx: tanjun.traits.Context) -> None:
+#     await char_command(ctx, to_file=True)
 
 
 @tanjun.as_loader

@@ -13,6 +13,7 @@ import hikari
 import psutil  # type: ignore[import]
 import tanjun
 import yuyo
+from hikari import snowflakes
 from hikari import traits
 
 from ..util import constants
@@ -21,7 +22,7 @@ from ..util import rest_manager
 
 
 def gen_help_embeds(
-    ctx: tanjun.traits.MessageContext = tanjun.injected(type=tanjun.traits.MessageContext),
+    ctx: tanjun.traits.Context = tanjun.injected(type=tanjun.traits.Context),
     client: tanjun.traits.Client = tanjun.injected(type=tanjun.traits.Client),
 ) -> dict[str, list[hikari.Embed]]:
     prefix = next(iter(client.prefixes)) if client and client.prefixes else ""
@@ -38,10 +39,10 @@ basic_component = tanjun.Component(strict=True)
 help_util.with_docs(basic_component, "Basic commands", "Commands provided to give information about this bot.")
 
 
-@basic_component.with_message_command
-@tanjun.as_message_command("about")
+@basic_component.with_slash_command
+@tanjun.as_slash_command("about", "Get basic information about the current bot instance.")
 async def about_command(
-    ctx: tanjun.traits.MessageContext,
+    ctx: tanjun.traits.Context,
     process: psutil.Process = tanjun.injected(callback=tanjun.cache_callback(psutil.Process)),
 ) -> None:
     """Get basic information about the current bot instance."""
@@ -51,7 +52,13 @@ async def about_command(
     cpu_usage = process.cpu_percent() / psutil.cpu_count()
     memory_percent = process.memory_percent()
 
-    name = f"Reinhard: Shard {ctx.shard.id} of {ctx.shards.shard_count}" if ctx.shard and ctx.shards else "Reinhard"
+    if ctx.shards:
+        shard_id = snowflakes.calculate_shard_id(ctx.shards.shard_count, ctx.guild_id) if ctx.guild_id else 0
+        name = f"Reinhard: Shard {shard_id} of {ctx.shards.shard_count}"
+
+    else:
+        name = "Reinhard: REST Server"
+
     description = (
         "An experimental pythonic Hikari bot.\n "
         "The source can be found on [Github](https://github.com/FasterSpeeding/Reinhard)."
@@ -82,7 +89,7 @@ async def about_command(
 # TODO: specify a group or command
 @tanjun.as_message_command("help")
 async def help_command(
-    ctx: tanjun.traits.MessageContext,
+    ctx: tanjun.traits.Context,
     command_name: str | None,
     component_name: str | None,
     paginator_pool: yuyo.PaginatorPool = tanjun.injected(type=yuyo.PaginatorPool),
@@ -106,11 +113,11 @@ async def help_command(
         prefix = next(iter(ctx.client.prefixes)) if ctx.client.prefixes else ""
         for _, command in ctx.client.check_message_name(command_name):
             if command_embed := help_util.generate_command_embed(command, prefix=prefix):
-                await ctx.message.respond(embed=command_embed)
+                await ctx.respond(embed=command_embed)
                 break
 
         else:
-            await ctx.message.respond(f"Couldn't find `{command_name}` command.")
+            await ctx.respond(f"Couldn't find `{command_name}` command.")
 
         return
 
@@ -130,32 +137,15 @@ async def help_command(
     paginator_pool.add_paginator(message, paginator)
 
 
-@basic_component.with_message_command
-@tanjun.as_message_command("ping")
-async def ping_command(ctx: tanjun.traits.MessageContext, /) -> None:
+@basic_component.with_slash_command
+@tanjun.as_slash_command("ping", "Get the bot's current delay.")
+async def ping_command(ctx: tanjun.traits.Context, /) -> None:
     """Get the bot's current delay."""
-    retry = yuyo.Backoff(max_retries=5)
-    error_manager = rest_manager.HikariErrorManager(retry, break_on=(hikari.NotFoundError, hikari.ForbiddenError))
-    message: hikari.Message | None = None
-    start_time = 0.0
-    async for _ in retry:
-        with error_manager:
-            start_time = time.perf_counter()
-            message = await ctx.message.respond(content="Nyaa master!!!")
-            break
-
-    # Assume we can't access the channel anymore if this is still None.
-    if message is None:
-        return
-
+    start_time = time.perf_counter()
+    await ctx.rest.fetch_my_user()
     time_taken = (time.perf_counter() - start_time) * 1_000
-    heartbeat_latency = ctx.shard.heartbeat_latency * 1_000 if ctx.shard else float("NAN")
-    retry.reset()
-    error_manager.clear_rules(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
-    async for _ in retry:
-        with error_manager:
-            await message.edit(f"PONG\n - REST: {time_taken:.0f}ms\n - Gateway: {heartbeat_latency:.0f}ms")
-            break
+    heartbeat_latency = ctx.shards.heartbeat_latency * 1_000 if ctx.shards else float("NAN")
+    await ctx.respond(f"PONG\n - REST: {time_taken:.0f}ms\n - Gateway: {heartbeat_latency:.0f}ms")
 
 
 _about_lines: list[tuple[str, collections.Callable[[hikari.api.Cache], int]]] = [
@@ -173,11 +163,11 @@ _about_lines: list[tuple[str, collections.Callable[[hikari.api.Cache], int]]] = 
 ]
 
 
-@basic_component.with_message_command
+@basic_component.with_slash_command
 @tanjun.with_check(lambda ctx: bool(ctx.cache))
-@tanjun.as_message_command("cache")
+@tanjun.as_slash_command("cache", "Get general information about this bot's cache.")
 async def cache_command(
-    ctx: tanjun.traits.MessageContext,
+    ctx: tanjun.traits.Context,
     process: psutil.Process = tanjun.injected(callback=tanjun.cache_callback(psutil.Process)),
     cache: hikari.api.Cache = tanjun.injected(type=hikari.api.Cache),
 ) -> None:

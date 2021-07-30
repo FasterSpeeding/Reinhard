@@ -31,18 +31,30 @@ help_util.with_docs(sudo_component, "Sudo commands", "Component used by this bot
 
 @sudo_component.with_message_command
 @tanjun.as_message_command("error")
-async def error_command(_: tanjun.traits.MessageContext) -> None:
+async def error_message_command(_: tanjun.traits.Context) -> None:
     """Command used for testing the current error handling."""
     raise Exception("This is an exception, get used to it.")
 
 
-@sudo_component.with_message_command
-@tanjun.with_option("raw_embed", "--embed", "-e", converters=json.loads, default=hikari.UNDEFINED)
-@tanjun.with_greedy_argument("content", default=hikari.UNDEFINED)
-@tanjun.with_parser
-@tanjun.as_message_command("echo")
+@sudo_component.with_slash_command
+@tanjun.as_slash_command("error", "Command used for testing the current error handling.")
+async def error_slash_command(_: tanjun.traits.Context) -> None:
+    """Command used for testing the current error handling."""
+    raise Exception("This is an exception, get used to it.")
+
+
+@sudo_component.with_slash_command
+@tanjun.with_str_slash_option(
+    "raw_embed", "String JSON object of an embed for the bot to send.", converters=json.loads, default=hikari.UNDEFINED
+)
+@tanjun.with_str_slash_option(
+    "content",
+    "The greedy string content the bot should send back. This must be included if `embed` is not.",
+    default=hikari.UNDEFINED,
+)
+@tanjun.as_slash_command("echo", "Command used for getting the bot to mirror a response.")
 async def echo_command(
-    ctx: tanjun.traits.MessageContext,
+    ctx: tanjun.traits.Context,
     content: hikari.UndefinedOr[str],
     raw_embed: hikari.UndefinedOr[dict[str, typing.Any]],
     entity_factory: traits.EntityFactoryAware = tanjun.injected(type=traits.EntityFactoryAware),
@@ -80,9 +92,7 @@ def _yields_results(*args: io.StringIO) -> collections.Iterator[str]:
             yield from (line[:-1] for line in lines)
 
 
-def build_eval_globals(
-    ctx: tanjun.traits.MessageContext, component: tanjun.traits.Component, /
-) -> dict[str, typing.Any]:
+def build_eval_globals(ctx: tanjun.traits.Context, component: tanjun.traits.Component, /) -> dict[str, typing.Any]:
     return {
         "asyncio": asyncio,
         "app": ctx.shards,
@@ -95,7 +105,7 @@ def build_eval_globals(
 
 
 async def eval_python_code(
-    ctx: tanjun.traits.MessageContext, component: tanjun.traits.Component, code: str
+    ctx: tanjun.traits.Context, component: tanjun.traits.Component, code: str
 ) -> tuple[collections.Iterable[str], int, bool]:
     globals_ = build_eval_globals(ctx, component)
     stdout = io.StringIO()
@@ -125,7 +135,7 @@ async def eval_python_code(
 
 
 async def eval_python_code_no_capture(
-    ctx: tanjun.traits.MessageContext, component: tanjun.traits.Component, code: str
+    ctx: tanjun.traits.Context, component: tanjun.traits.Component, code: str
 ) -> None:
     globals_ = build_eval_globals(ctx, component)
     try:
@@ -175,7 +185,7 @@ async def eval_command(
     result, exec_time, failed = await eval_python_code(ctx, component, code[0])
 
     if file_output:
-        await ctx.message.respond(
+        await ctx.respond(
             attachment=hikari.Bytes("\n".join(result), "output.py", mimetype="text/x-python;charset=utf-8")
         )
         return
@@ -208,33 +218,17 @@ async def eval_command(
     paginator_pool.add_paginator(message, response_paginator)
 
 
-@sudo_component.with_message_command
-@tanjun.as_message_command("commands")
-async def commands_command(ctx: tanjun.traits.MessageContext) -> None:
-    commands = (
-        f"  {type(component).__name__}: " + ", ".join(map(repr, component.message_commands))
-        for component in ctx.client.components
-    )
+@sudo_component.with_slash_command
+@tanjun.as_slash_command("commands", "Get a list of the loaded commands")
+async def commands_command(ctx: tanjun.traits.Context) -> None:
+    lines: list[str] = []
+    for index, component in enumerate(ctx.client.components):
+        lines.append(f"Component {index}:")
+        lines.append("    Message commands: " + ", ".join(map(repr, component.message_commands)))
+        lines.append("    Slash commands: " + ", ".join(map(repr, component.slash_commands)))
+
     error_manager = rest_manager.HikariErrorManager(break_on=(hikari.ForbiddenError, hikari.NotFoundError))
-    await error_manager.try_respond(ctx, content="Loaded commands\n" + "\n".join(commands))
-
-
-@sudo_component.with_message_command
-@tanjun.as_message_command_group("note", "notes", strict=True)
-async def note_command(ctx: tanjun.traits.MessageContext) -> None:
-    await ctx.message.respond("You have zero tags")
-
-
-@note_command.with_command
-@tanjun.as_message_command("add")
-async def note_add_command(ctx: tanjun.traits.MessageContext) -> None:
-    await ctx.message.respond("todo")
-
-
-@note_command.with_command
-@tanjun.as_message_command("remove")
-async def note_remove_command(ctx: tanjun.traits.MessageContext) -> None:
-    await ctx.message.respond("todo")
+    await error_manager.try_respond(ctx, content="Loaded Commands\n" + "\n".join(lines))
 
 
 @tanjun.as_loader

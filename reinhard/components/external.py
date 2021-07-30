@@ -274,7 +274,7 @@ help_util.with_docs(
 @tanjun.with_parser
 @tanjun.as_message_command("lyrics")
 async def lyrics_command(
-    ctx: tanjun.traits.MessageContext,
+    ctx: tanjun.traits.Context,
     query: str,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
     paginator_pool: yuyo.PaginatorPool = tanjun.injected(type=yuyo.PaginatorPool),
@@ -358,7 +358,7 @@ async def lyrics_command(
 @tanjun.with_parser
 @tanjun.as_message_command("youtube", "yt")
 async def youtube_command(
-    ctx: tanjun.traits.MessageContext,
+    ctx: tanjun.traits.Context,
     query: str,
     resource_type: str,
     region: str | None,
@@ -452,7 +452,7 @@ async def youtube_command(
 
 @youtube_command.with_check
 def _youtube_token_check(
-    _: tanjun.traits.MessageContext, tokens: config_.Tokens = tanjun.injected(type=config_.Tokens)
+    _: tanjun.traits.Context, tokens: config_.Tokens = tanjun.injected(type=config_.Tokens)
 ) -> bool:
     return tokens.google is not None
 
@@ -465,7 +465,7 @@ def _youtube_token_check(
 # @tanjun.with_parser
 # @tanjun.as_message_command("moe")  # TODO: https://lewd.bowsette.pictures/api/request
 async def moe_command(
-    ctx: tanjun.traits.MessageContext,
+    ctx: tanjun.traits.Context,
     source: str | None = None,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
 ) -> None:
@@ -546,7 +546,7 @@ async def query_nekos_life(
 @tanjun.with_parser
 @tanjun.as_message_command("spotify")
 async def spotify_command(
-    ctx: tanjun.traits.MessageContext,
+    ctx: tanjun.traits.Context,
     query: str,
     resource_type: str,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
@@ -562,7 +562,7 @@ async def spotify_command(
         * query: The greedy string query to search by.
 
     Options:
-        * resource type (--type, -t):
+        * resource_type:
             Type of resource to search for. This can be one of "track", "album", "artist" or "playlist" and defaults
             to track.
     """
@@ -595,12 +595,11 @@ async def spotify_command(
         paginator_pool.add_paginator(message, response_paginator)
 
 
-@external_component.with_message_command
-@tanjun.with_greedy_argument("path", default=None)
-@tanjun.with_parser
-@tanjun.as_message_command("docs")
+@external_component.with_slash_command
+@tanjun.with_str_slash_option("path", "Optional path to query Hikari's documentation by.", default=None)
+@tanjun.as_slash_command("docs", "Search Hikari's documentation")
 async def docs_command(
-    ctx: tanjun.traits.MessageContext,
+    ctx: tanjun.traits.Context,
     path: str | None,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
     doc_fetcher: CachedResource[sphobjinv.Inventory] = tanjun.injected(
@@ -637,13 +636,12 @@ async def docs_command(
         await error_manager.try_respond(ctx, embed=embed)
 
 
-@external_component.with_message_command
+@external_component.with_slash_command
 @tanjun.with_owner_check
-@tanjun.with_argument("url", converters=urllib.parse.ParseResult)
-@tanjun.with_parser
-@tanjun.as_message_command("ytdl")
+@tanjun.with_str_slash_option("url", "The url to download from", converters=urllib.parse.ParseResult)
+@tanjun.as_slash_command("ytdl", "Owner only command to download a vid using youtube-dl")
 async def ytdl_command(
-    ctx: tanjun.traits.MessageContext,
+    ctx: tanjun.traits.Context,
     url: urllib.parse.ParseResult,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
     config: config_.PTFConfig = tanjun.injected(type=config_.PTFConfig),
@@ -652,7 +650,7 @@ async def ytdl_command(
     auth = aiohttp.BasicAuth(config.username, config.password)
 
     # Download video
-    path, data = await ytdl_client.download(url.geturl())
+    path, _ = await ytdl_client.download(url.geturl())
     filename = urllib.parse.quote(path.name)
 
     try:
@@ -681,17 +679,7 @@ async def ytdl_command(
     finally:
         path.unlink(missing_ok=True)
 
-    await ctx.message.respond(content=file_path)
-
-
-@external_component.with_interaction_command
-@tanjun.as_interaction_command("hello", "hi senpai-kyun!!!! >///<", default_to_ephemeral=True)
-async def test_command(ctx: tanjun.traits.Context) -> None:
-    await ctx.respond(
-        embed=hikari.Embed().set_image(
-            hikari.URL("https://media.discordapp.net/attachments/673607501630930957/869809812312047676/unknown.png")
-        )
-    )
+    await ctx.respond(content=file_path)
 
 
 @tanjun.as_loader

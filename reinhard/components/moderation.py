@@ -2,8 +2,9 @@ from __future__ import annotations
 
 __all__: list[str] = ["moderation_component", "load_component"]
 
+import asyncio
 import datetime
-from collections import abc as collections
+import typing
 
 import hikari
 import tanjun
@@ -19,31 +20,38 @@ moderation_component = tanjun.Component(strict=True)
 help_util.with_docs(moderation_component, "Moderation commands", "Moderation oriented commands.")
 
 
-@moderation_component.with_message_command
+@moderation_component.with_slash_command
 @tanjun.with_own_permission_check(
     hikari.Permissions.MANAGE_MESSAGES | hikari.Permissions.VIEW_CHANNEL | hikari.Permissions.READ_MESSAGE_HISTORY
 )
 @tanjun.with_author_permission_check(
     hikari.Permissions.MANAGE_MESSAGES | hikari.Permissions.VIEW_CHANNEL | hikari.Permissions.READ_MESSAGE_HISTORY
 )
-@tanjun.with_option("suppress", "-s", "--suppress", converters=bool, default=False, empty_value=True)
-@tanjun.with_option("after", "--after", converters=hikari.Snowflake, default=None)
-@tanjun.with_option("before", "--before", converters=hikari.Snowflake, default=None)
-@tanjun.with_option("bot_only", "--bot", converters=bool, default=False, empty_value=True)
-@tanjun.with_option("human_only", "--human", converters=bool, default=False, empty_value=True)
-@tanjun.with_multi_option("users", "--user", converters=hikari.Snowflake, default=())
-@tanjun.with_argument("count", converters=int, default=None)
-@tanjun.with_parser
-@tanjun.as_message_command("clear")
+@tanjun.with_str_slash_option(
+    "after", "ID of a message to delete messages which were sent after.", converters=hikari.Snowflake, default=None
+)
+@tanjun.with_str_slash_option(
+    "before", "ID of a message to delete messages which were sent before.", converters=hikari.Snowflake, default=None
+)
+@tanjun.with_bool_slash_option(
+    "bot_only", "Whether this should only delete messages sent by bots and webhooks.", default=False
+)
+@tanjun.with_bool_slash_option(
+    "human_only", "Whether this should only delete messages sent by actual users.", default=False
+)
+@tanjun.with_user_slash_option("user", "User to delete messages for", default=())
+# @tanjun.with_multi_option("users", "IDs of the users to delete messages from.", converters=hikari.Snowflake, default=())
+@tanjun.with_int_slash_option("count", "The amount of messages to delete.", default=None)
+@tanjun.as_slash_command("clear", "Clear new messages from chat as a moderator.")
 async def clear_command(
-    ctx: tanjun.traits.MessageContext,
+    ctx: tanjun.traits.Context,
     count: int | None,
     after: hikari.Snowflake | None,
     before: hikari.Snowflake | None,
     bot_only: bool,
     human_only: bool,
-    users: collections.Sequence[hikari.Snowflake],
-    suppress: bool,
+    user: typing.Optional[hikari.Snowflake],
+    # users: collections.Sequence[hikari.Snowflake],
 ) -> None:
     """Clear new messages from chat.
 
@@ -80,7 +88,7 @@ async def clear_command(
         raise tanjun.CommandError("Count must be greater than 0.")
 
     if before is None and after is None:
-        before = ctx.message.id
+        before = hikari.Snowflake.from_datetime(ctx.created_at)
 
     iterator = ctx.rest.fetch_messages(
         ctx.channel_id,
@@ -97,8 +105,10 @@ async def clear_command(
     elif bot_only:
         iterator = iterator.filter(lambda message: message.author.is_bot)
 
-    if users:
-        iterator = iterator.filter(lambda message: message.author.id in users)
+    # if users:
+    #     iterator = iterator.filter(lambda message: message.author.id in users)
+    if user:
+        iterator = iterator.filter(lambda message: message.author == user)
 
     # TODO: Should we limit count or at least default it to something other than no limit?
     if count:
@@ -115,8 +125,12 @@ async def clear_command(
                 await ctx.rest.delete_messages(ctx.channel_id, *messages)
                 break
 
-    if not suppress:
-        await error_manager.try_respond(ctx, content="Cleared messages.")
+    await ctx.respond(content="Cleared messages.")
+    await asyncio.sleep(2)
+    try:
+        await ctx.delete_last_response()
+    except hikari.NotFoundError:
+        pass
 
 
 @tanjun.as_loader
