@@ -17,24 +17,29 @@ util_component = tanjun.Component(strict=True)
 help_util.with_docs(util_component, "Utility commands", "Component used for getting miscellaneous Discord information.")
 
 
-@util_component.with_message_command
-@tanjun.with_greedy_argument("colour", converters=(tanjun.to_colour, tanjun.to_role))
-@tanjun.with_parser
-@tanjun.as_message_command("color", "colour")
-async def colour_command(ctx: tanjun.traits.Context, colour: hikari.Colour | hikari.Role) -> None:
+@util_component.with_slash_command
+@tanjun.with_role_slash_option("role", "A role to get the colour for.", default=None)
+@tanjun.with_str_slash_option(
+    "color", "the hex/int literal representation of a colour to show", converters=tanjun.to_colour, default=None
+)
+@tanjun.as_slash_command("color", "Get a visual representation of a color or role's color.")
+async def colour_command(ctx: tanjun.traits.Context, color: hikari.Colour | None, role: hikari.Role | None) -> None:
     """Get a visual representation of a color or role's color.
 
     Argument:
         colour: Either the hex/int literal representation of a colour to show or the ID/mention of a role to get
             the colour of.
     """
-    if isinstance(colour, hikari.Role):
-        colour = colour.colour
+    if role:
+        color = role.color
+
+    elif color is None:
+        raise tanjun.CommandError("Either role or colour must be provided")
 
     embed = (
-        hikari.Embed(colour=colour)
-        .add_field(name="RGB", value=str(colour.rgb))
-        .add_field(name="HEX", value=str(colour.hex_code))
+        hikari.Embed(colour=color)
+        .add_field(name="RGB", value=str(color.rgb))
+        .add_field(name="HEX", value=str(color.hex_code))
     )
     error_manager = rest_manager.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
     await error_manager.try_respond(ctx, embed=embed)
@@ -57,11 +62,14 @@ async def colour_command(ctx: tanjun.traits.Context, colour: hikari.Colour | hik
 #         ...  # TODO: Implement this to allow getting the embeds from a suppressed message.
 
 
-@util_component.with_message_command
-@tanjun.with_greedy_argument("member", converters=tanjun.to_member, default=None)
-@tanjun.with_parser
-@tanjun.with_check(lambda ctx: ctx.guild_id is not None)
-@tanjun.as_message_command("member")
+@util_component.with_slash_command
+@tanjun.with_guild_check
+@tanjun.with_member_slash_option(
+    "member",
+    "The member to get information about. If not provided then this will default to the command's author",
+    default=None,
+)
+@tanjun.as_slash_command("member", "Get information about a member in the current guild.")
 async def member_command(ctx: tanjun.traits.Context, member: hikari.Member | None) -> None:
     """Get information about a member in the current guild.
 
@@ -140,13 +148,12 @@ async def member_command(ctx: tanjun.traits.Context, member: hikari.Member | Non
 
 
 # TODO: the normal role converter is limited to the current guild right?
-@util_component.with_message_command
-@tanjun.with_argument("role", converters=tanjun.to_role)
-@tanjun.with_parser
-@tanjun.with_check(lambda ctx: ctx.guild_id is not None)
-@tanjun.as_message_command("role")
+@util_component.with_slash_command
+@tanjun.with_role_slash_option("role", "The role to get information about.")
+@tanjun.with_guild_check
+@tanjun.as_slash_command("role", "Get information about a role in the current guild.")
 async def role_command(ctx: tanjun.traits.Context, role: hikari.Role) -> None:
-    """ "Get information about a role in the current guild.
+    """Get information about a role in the current guild.
 
     Arguments:
         * role: Mention or ID of the role to get information about.
@@ -176,12 +183,13 @@ async def role_command(ctx: tanjun.traits.Context, role: hikari.Role) -> None:
     await error_manager.try_respond(ctx, embed=embed)
 
 
-@util_component.with_message_command
-@tanjun.with_greedy_argument("user", converters=(tanjun.to_user, tanjun.to_member), default=None)
-@tanjun.with_parser
-@tanjun.as_message_command("user")
+@util_component.with_slash_command
+@tanjun.with_user_slash_option(
+    "user", "The user to target. If left as None then this will target the command's author.", default=None
+)
+@tanjun.as_slash_command("user", "Get information about a Discord user.")
 async def user_command(ctx: tanjun.traits.Context, user: hikari.User | None) -> None:
-    """ "Get information about a Discord user."
+    """Get information about a Discord user.
 
     Arguments:
         * user: Optional argument of the mention or ID of the user to target.
@@ -208,10 +216,11 @@ async def user_command(ctx: tanjun.traits.Context, user: hikari.User | None) -> 
     await error_manager.try_respond(ctx, embed=embed)
 
 
-@util_component.with_message_command
-@tanjun.with_greedy_argument("user", converters=(tanjun.to_user, tanjun.to_member), default=None)
-@tanjun.with_parser
-@tanjun.as_message_command("avatar", "pfp")
+@util_component.with_slash_command
+@tanjun.with_user_slash_option(
+    "user", "User to get the avatar for. If not provided then this returns the current user's avatar.", default=None
+)
+@tanjun.as_slash_command("avatar", "Get a user's avatar.")
 async def avatar_command(ctx: tanjun.traits.Context, user: hikari.User | None) -> None:
     """Get a user's avatar.
 
@@ -228,15 +237,17 @@ async def avatar_command(ctx: tanjun.traits.Context, user: hikari.User | None) -
     await error_manager.try_respond(ctx, embed=embed)
 
 
-@util_component.with_message_command
-@tanjun.with_argument("message_id", (hikari.Snowflake,))
-@tanjun.with_option("channel_id", "--channel", "-c", converters=hikari.Snowflake, default=None)
-@tanjun.with_parser
-@tanjun.as_message_command("pings", "mentions")
+# TODO: check if the user can access the provided channel
+@util_component.with_slash_command
+@tanjun.with_channel_slash_option("channel", "The channel the message is in.", default=None)
+@tanjun.with_str_slash_option(
+    "message_id", "ID of the message to get the ping list for.", converters=(hikari.Snowflake,)
+)
+@tanjun.as_slash_command("mentions", "Get a list of the users who were pinged by a message.")
 async def mentions_command(
     ctx: tanjun.traits.Context,
     message_id: hikari.Snowflake,
-    channel_id: hikari.Snowflake | None,
+    channel: hikari.PartialChannel | None,
 ) -> None:
     """Get a list of the users who were pinged by a message.
 
@@ -247,8 +258,7 @@ async def mentions_command(
         * channel: ID or mention of the channel the message is in.
             If this isn't provided then the command will assume the message is in the current channel.
     """
-    if channel_id is None:
-        channel_id = ctx.channel_id
+    channel_id = channel.id if channel else ctx.channel_id
 
     # TODO: set maximum?
     retry = backoff.Backoff()
