@@ -111,7 +111,7 @@ class FullConfig(Config):
     owner_only: bool = False
     prefixes: collections.Set[str] = frozenset("r.")
     ptf: PTFConfig | None = None
-    set_global_commands: bool = True
+    set_global_commands: typing.Union[bool, hikari.Snowflake] = True
 
     @classmethod
     def from_mapping(cls, mapping: collections.Mapping[str, typing.Any], /) -> FullConfig:
@@ -121,6 +121,10 @@ class FullConfig(Config):
 
         elif isinstance(log_level, str):
             log_level = log_level.upper()
+
+        set_global_commands = mapping.get("set_global_commands", True)
+        if not isinstance(set_global_commands, bool):
+            set_global_commands = hikari.Snowflake(set_global_commands)
 
         return cls(
             cache=_cast_or_default(mapping, "cache", hikari.CacheComponents, DEFAULT_CACHE),
@@ -133,7 +137,7 @@ class FullConfig(Config):
             prefixes=frozenset(map(str, mapping["prefixes"])) if "prefixes" in mapping else {"r."},
             ptf=_cast_or_default(mapping, "ptf", PTFConfig.from_mapping, None),
             tokens=Tokens.from_mapping(mapping["tokens"]),
-            set_global_commands=bool(mapping.get("set_global_commands", True)),
+            set_global_commands=set_global_commands,
         )
 
 
