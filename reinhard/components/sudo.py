@@ -84,6 +84,9 @@ async def echo_command(
     if content or embed:
         await error_manager.try_respond(ctx, content=content, embed=embed)
 
+    else:
+        await error_manager.try_respond(ctx, content="No content provided")
+
 
 def _yields_results(*args: io.StringIO) -> collections.Iterator[str]:
     for name, stream in zip("stdout stderr".split(), args):

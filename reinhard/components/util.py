@@ -34,7 +34,7 @@ async def colour_command(ctx: tanjun.traits.Context, color: hikari.Colour | None
         color = role.color
 
     elif color is None:
-        raise tanjun.CommandError("Either role or colour must be provided")
+        raise tanjun.CommandError("Either role or color must be provided")
 
     embed = (
         hikari.Embed(colour=color)

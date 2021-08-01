@@ -164,7 +164,6 @@ _about_lines: list[tuple[str, collections.Callable[[hikari.api.Cache], int]]] = 
 
 
 @basic_component.with_slash_command
-@tanjun.with_check(lambda ctx: bool(ctx.cache))
 @tanjun.as_slash_command("cache", "Get general information about this bot's cache.")
 async def cache_command(
     ctx: tanjun.traits.Context,
@@ -215,6 +214,14 @@ async def cache_command(
 
     error_manager = rest_manager.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
     await error_manager.try_respond(ctx, content=f"{storage_time_taken * 1_000:.4g} ms", embed=embed)
+
+
+@cache_command.with_check
+def _cache_command_check(ctx: tanjun.traits.Context) -> bool:
+    if ctx.cache:
+        return True
+
+    raise tanjun.CommandError("Client is cache-less")
 
 
 @tanjun.as_loader

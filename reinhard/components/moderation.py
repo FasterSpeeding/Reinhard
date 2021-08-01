@@ -4,7 +4,6 @@ __all__: list[str] = ["moderation_component", "load_component"]
 
 import asyncio
 import datetime
-import typing
 
 import hikari
 import tanjun
@@ -50,7 +49,7 @@ async def clear_command(
     before: hikari.Snowflake | None,
     bot_only: bool,
     human_only: bool,
-    user: typing.Optional[hikari.Snowflake],
+    user: hikari.Snowflake | None,
     # users: collections.Sequence[hikari.Snowflake],
 ) -> None:
     """Clear new messages from chat.
