@@ -8,7 +8,7 @@ from ..util import constants
 from ..util import rest_manager
 
 
-async def on_error(ctx: tanjun.traits.Context, exception: BaseException) -> None:
+async def on_error(ctx: tanjun.abc.Context, exception: BaseException) -> None:
     retry = backoff.Backoff(max_retries=5)
     # TODO: better permission checks
     error_manager = rest_manager.HikariErrorManager(retry, break_on=(hikari.ForbiddenError, hikari.NotFoundError))
@@ -24,7 +24,7 @@ async def on_error(ctx: tanjun.traits.Context, exception: BaseException) -> None
             break
 
 
-async def on_parser_error(ctx: tanjun.traits.Context, exception: tanjun.ParserError) -> None:
+async def on_parser_error(ctx: tanjun.abc.Context, exception: tanjun.ParserError) -> None:
     retry = backoff.Backoff(max_retries=5)
     # TODO: better permission checks
     error_manager = rest_manager.HikariErrorManager(retry, break_on=(hikari.ForbiddenError, hikari.NotFoundError))

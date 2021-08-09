@@ -22,8 +22,8 @@ from ..util import rest_manager
 
 
 def gen_help_embeds(
-    ctx: tanjun.traits.Context = tanjun.injected(type=tanjun.traits.Context),
-    client: tanjun.traits.Client = tanjun.injected(type=tanjun.traits.Client),
+    ctx: tanjun.abc.Context = tanjun.injected(type=tanjun.abc.Context),
+    client: tanjun.abc.Client = tanjun.injected(type=tanjun.abc.Client),
 ) -> dict[str, list[hikari.Embed]]:
     prefix = next(iter(client.prefixes)) if client and client.prefixes else ""
 
@@ -42,7 +42,7 @@ help_util.with_docs(basic_component, "Basic commands", "Commands provided to giv
 @basic_component.with_slash_command
 @tanjun.as_slash_command("about", "Get basic information about the current bot instance.")
 async def about_command(
-    ctx: tanjun.traits.Context,
+    ctx: tanjun.abc.Context,
     process: psutil.Process = tanjun.injected(callback=tanjun.cache_callback(psutil.Process)),
 ) -> None:
     """Get basic information about the current bot instance."""
@@ -89,7 +89,7 @@ async def about_command(
 # TODO: specify a group or command
 @tanjun.as_message_command("help")
 async def help_command(
-    ctx: tanjun.traits.Context,
+    ctx: tanjun.abc.Context,
     command_name: str | None,
     component_name: str | None,
     paginator_pool: yuyo.PaginatorPool = tanjun.injected(type=yuyo.PaginatorPool),
@@ -139,7 +139,7 @@ async def help_command(
 
 @basic_component.with_slash_command
 @tanjun.as_slash_command("ping", "Get the bot's current delay.")
-async def ping_command(ctx: tanjun.traits.Context, /) -> None:
+async def ping_command(ctx: tanjun.abc.Context, /) -> None:
     """Get the bot's current delay."""
     start_time = time.perf_counter()
     await ctx.rest.fetch_my_user()
@@ -166,7 +166,7 @@ _about_lines: list[tuple[str, collections.Callable[[hikari.api.Cache], int]]] = 
 @basic_component.with_slash_command
 @tanjun.as_slash_command("cache", "Get general information about this bot's cache.")
 async def cache_command(
-    ctx: tanjun.traits.Context,
+    ctx: tanjun.abc.Context,
     process: psutil.Process = tanjun.injected(callback=tanjun.cache_callback(psutil.Process)),
     cache: hikari.api.Cache = tanjun.injected(type=hikari.api.Cache),
 ) -> None:
@@ -217,7 +217,7 @@ async def cache_command(
 
 
 @cache_command.with_check
-def _cache_command_check(ctx: tanjun.traits.Context) -> bool:
+def _cache_command_check(ctx: tanjun.abc.Context) -> bool:
     if ctx.cache:
         return True
 
@@ -225,5 +225,5 @@ def _cache_command_check(ctx: tanjun.traits.Context) -> bool:
 
 
 @tanjun.as_loader
-def load_component(cli: tanjun.traits.Client, /) -> None:
+def load_component(cli: tanjun.abc.Client, /) -> None:
     cli.add_component(basic_component.copy())

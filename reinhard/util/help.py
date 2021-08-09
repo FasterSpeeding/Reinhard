@@ -18,26 +18,26 @@ from yuyo import paginaton
 from ..util import constants
 
 if typing.TYPE_CHECKING:
-    from tanjun import traits
+    from tanjun import abc as tanjun_abc
 
 
 COMPONENT_DOC_KEY: typing.Final[str] = "REINHARD_COMPONENT_DOC"
 
 
-def with_docs(component: traits.Component, name: str, doc: str) -> None:
+def with_docs(component: tanjun_abc.Component, name: str, doc: str) -> None:
     component.metadata[COMPONENT_DOC_KEY] = (name, doc)
 
 
-def get_command_doc(command: traits.MessageCommand, /) -> str | None:
+def get_command_doc(command: tanjun_abc.MessageCommand, /) -> str | None:
     return inspect.getdoc(command.callback) or None
 
 
-def get_component_doc(component: traits.Component, /) -> tuple[str, str] | None:
+def get_component_doc(component: tanjun_abc.Component, /) -> tuple[str, str] | None:
     return component.metadata.get(COMPONENT_DOC_KEY)
 
 
 def generate_help_embeds(
-    component: traits.Component, /, *, prefix: str = ""
+    component: tanjun_abc.Component, /, *, prefix: str = ""
 ) -> tuple[str, collections.Iterator[embeds_.Embed]] | None:
     component_info = get_component_doc(component)
 
@@ -65,7 +65,7 @@ def generate_help_embeds(
     return component_name, embeds
 
 
-def generate_command_embed(command: traits.MessageCommand, /, *, prefix: str = "") -> embeds_.Embed | None:
+def generate_command_embed(command: tanjun_abc.MessageCommand, /, *, prefix: str = "") -> embeds_.Embed | None:
     if not command.names:
         return None
 

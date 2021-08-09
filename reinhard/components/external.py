@@ -274,7 +274,7 @@ help_util.with_docs(
 @tanjun.with_parser
 @tanjun.as_message_command("lyrics")
 async def lyrics_command(
-    ctx: tanjun.traits.Context,
+    ctx: tanjun.abc.Context,
     query: str,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
     paginator_pool: yuyo.PaginatorPool = tanjun.injected(type=yuyo.PaginatorPool),
@@ -358,7 +358,7 @@ async def lyrics_command(
 @tanjun.with_parser
 @tanjun.as_message_command("youtube", "yt")
 async def youtube_command(
-    ctx: tanjun.traits.Context,
+    ctx: tanjun.abc.Context,
     query: str,
     resource_type: str,
     region: str | None,
@@ -451,9 +451,7 @@ async def youtube_command(
 
 
 @youtube_command.with_check
-def _youtube_token_check(
-    _: tanjun.traits.Context, tokens: config_.Tokens = tanjun.injected(type=config_.Tokens)
-) -> bool:
+def _youtube_token_check(_: tanjun.abc.Context, tokens: config_.Tokens = tanjun.injected(type=config_.Tokens)) -> bool:
     return tokens.google is not None
 
 
@@ -465,7 +463,7 @@ def _youtube_token_check(
 # @tanjun.with_parser
 # @tanjun.as_message_command("moe")  # TODO: https://lewd.bowsette.pictures/api/request
 async def moe_command(
-    ctx: tanjun.traits.Context,
+    ctx: tanjun.abc.Context,
     source: str | None = None,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
 ) -> None:
@@ -546,7 +544,7 @@ async def query_nekos_life(
 @tanjun.with_parser
 @tanjun.as_message_command("spotify")
 async def spotify_command(
-    ctx: tanjun.traits.Context,
+    ctx: tanjun.abc.Context,
     query: str,
     resource_type: str,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
@@ -599,7 +597,7 @@ async def spotify_command(
 @tanjun.with_str_slash_option("path", "Optional path to query Hikari's documentation by.", default=None)
 @tanjun.as_slash_command("docs", "Search Hikari's documentation")
 async def docs_command(
-    ctx: tanjun.traits.Context,
+    ctx: tanjun.abc.Context,
     path: str | None,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
     doc_fetcher: CachedResource[sphobjinv.Inventory] = tanjun.injected(
@@ -641,7 +639,7 @@ async def docs_command(
 @tanjun.with_str_slash_option("url", "The url to download from", converters=urllib.parse.ParseResult)
 @tanjun.as_slash_command("ytdl", "Owner only command to download a vid using youtube-dl")
 async def ytdl_command(
-    ctx: tanjun.traits.Context,
+    ctx: tanjun.abc.Context,
     url: urllib.parse.ParseResult,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
     config: config_.PTFConfig = tanjun.injected(type=config_.PTFConfig),
@@ -683,5 +681,5 @@ async def ytdl_command(
 
 
 @tanjun.as_loader
-def load_component(cli: tanjun.traits.Client, /) -> None:
+def load_component(cli: tanjun.abc.Client, /) -> None:
     cli.add_component(external_component.copy())

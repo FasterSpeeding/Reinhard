@@ -23,7 +23,7 @@ help_util.with_docs(util_component, "Utility commands", "Component used for gett
     "color", "the hex/int literal representation of a colour to show", converters=tanjun.to_colour, default=None
 )
 @tanjun.as_slash_command("color", "Get a visual representation of a color or role's color.")
-async def colour_command(ctx: tanjun.traits.Context, color: hikari.Colour | None, role: hikari.Role | None) -> None:
+async def colour_command(ctx: tanjun.abc.Context, color: hikari.Colour | None, role: hikari.Role | None) -> None:
     """Get a visual representation of a color or role's color.
 
     Argument:
@@ -70,7 +70,7 @@ async def colour_command(ctx: tanjun.traits.Context, color: hikari.Colour | None
     default=None,
 )
 @tanjun.as_slash_command("member", "Get information about a member in the current guild.")
-async def member_command(ctx: tanjun.traits.Context, member: hikari.Member | None) -> None:
+async def member_command(ctx: tanjun.abc.Context, member: hikari.Member | None) -> None:
     """Get information about a member in the current guild.
 
     Arguments:
@@ -152,7 +152,7 @@ async def member_command(ctx: tanjun.traits.Context, member: hikari.Member | Non
 @tanjun.with_role_slash_option("role", "The role to get information about.")
 @tanjun.with_guild_check
 @tanjun.as_slash_command("role", "Get information about a role in the current guild.")
-async def role_command(ctx: tanjun.traits.Context, role: hikari.Role) -> None:
+async def role_command(ctx: tanjun.abc.Context, role: hikari.Role) -> None:
     """Get information about a role in the current guild.
 
     Arguments:
@@ -188,7 +188,7 @@ async def role_command(ctx: tanjun.traits.Context, role: hikari.Role) -> None:
     "user", "The user to target. If left as None then this will target the command's author.", default=None
 )
 @tanjun.as_slash_command("user", "Get information about a Discord user.")
-async def user_command(ctx: tanjun.traits.Context, user: hikari.User | None) -> None:
+async def user_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> None:
     """Get information about a Discord user.
 
     Arguments:
@@ -221,7 +221,7 @@ async def user_command(ctx: tanjun.traits.Context, user: hikari.User | None) -> 
     "user", "User to get the avatar for. If not provided then this returns the current user's avatar.", default=None
 )
 @tanjun.as_slash_command("avatar", "Get a user's avatar.")
-async def avatar_command(ctx: tanjun.traits.Context, user: hikari.User | None) -> None:
+async def avatar_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> None:
     """Get a user's avatar.
 
     Arguments:
@@ -245,7 +245,7 @@ async def avatar_command(ctx: tanjun.traits.Context, user: hikari.User | None) -
 )
 @tanjun.as_slash_command("mentions", "Get a list of the users who were pinged by a message.")
 async def mentions_command(
-    ctx: tanjun.traits.Context,
+    ctx: tanjun.abc.Context,
     message_id: hikari.Snowflake,
     channel: hikari.PartialChannel | None,
 ) -> None:
@@ -282,7 +282,7 @@ async def mentions_command(
 @tanjun.with_guild_check
 @tanjun.with_str_slash_option("name", "Greedy argument of the name to search for.")
 @tanjun.as_slash_command("members", "Search for a member in the current guild.")
-async def members_command(ctx: tanjun.traits.Context, name: str) -> None:
+async def members_command(ctx: tanjun.abc.Context, name: str) -> None:
     """Search for a member in the current guild.
 
     Arguments
@@ -317,7 +317,7 @@ def _format_char_line(char: str, to_file: bool) -> str:
 )
 @tanjun.with_str_slash_option("characters", "The UTF-8 characters to get information about")
 @tanjun.as_slash_command("char", "Get information about the UTF-8 characters in the executing message.")
-async def char_command(ctx: tanjun.traits.Context, characters: str, file: bool = False) -> None:
+async def char_command(ctx: tanjun.abc.Context, characters: str, file: bool = False) -> None:
     """Get information about the UTF-8 characters in the executing message.
 
     Running `char file...` will ensure that the output is always sent as a markdown file.
@@ -344,5 +344,5 @@ async def char_command(ctx: tanjun.traits.Context, characters: str, file: bool =
 
 
 @tanjun.as_loader
-def load_component(cli: tanjun.traits.Client, /) -> None:
+def load_component(cli: tanjun.abc.Client, /) -> None:
     cli.add_component(util_component.copy())

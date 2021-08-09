@@ -51,7 +51,7 @@ class HikariErrorManager(backoff.ErrorManager):
 
     async def try_respond(
         self,
-        ctx: tanjun.traits.Context,
+        ctx: tanjun.abc.Context,
         *,
         content: hikari.UndefinedOr[str] = hikari.UNDEFINED,
         embed: hikari.UndefinedOr[hikari.Embed] = hikari.UNDEFINED,

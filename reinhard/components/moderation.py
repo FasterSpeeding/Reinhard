@@ -43,7 +43,7 @@ help_util.with_docs(moderation_component, "Moderation commands", "Moderation ori
 @tanjun.with_int_slash_option("count", "The amount of messages to delete.", default=None)
 @tanjun.as_slash_command("clear", "Clear new messages from chat as a moderator.")
 async def clear_command(
-    ctx: tanjun.traits.Context,
+    ctx: tanjun.abc.Context,
     count: int | None,
     after: hikari.Snowflake | None,
     before: hikari.Snowflake | None,
@@ -133,5 +133,5 @@ async def clear_command(
 
 
 @tanjun.as_loader
-def load_component(cli: tanjun.traits.Client, /) -> None:
+def load_component(cli: tanjun.abc.Client, /) -> None:
     cli.add_component(moderation_component.copy())

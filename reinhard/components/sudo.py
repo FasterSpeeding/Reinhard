@@ -31,14 +31,14 @@ help_util.with_docs(sudo_component, "Sudo commands", "Component used by this bot
 
 @sudo_component.with_message_command
 @tanjun.as_message_command("error")
-async def error_message_command(_: tanjun.traits.Context) -> None:
+async def error_message_command(_: tanjun.abc.Context) -> None:
     """Command used for testing the current error handling."""
     raise Exception("This is an exception, get used to it.")
 
 
 @sudo_component.with_slash_command
 @tanjun.as_slash_command("error", "Command used for testing the current error handling.")
-async def error_slash_command(_: tanjun.traits.Context) -> None:
+async def error_slash_command(_: tanjun.abc.Context) -> None:
     """Command used for testing the current error handling."""
     raise Exception("This is an exception, get used to it.")
 
@@ -54,7 +54,7 @@ async def error_slash_command(_: tanjun.traits.Context) -> None:
 )
 @tanjun.as_slash_command("echo", "Command used for getting the bot to mirror a response.")
 async def echo_command(
-    ctx: tanjun.traits.Context,
+    ctx: tanjun.abc.Context,
     content: hikari.UndefinedOr[str],
     raw_embed: hikari.UndefinedOr[dict[str, typing.Any]],
     entity_factory: traits.EntityFactoryAware = tanjun.injected(type=traits.EntityFactoryAware),
@@ -95,7 +95,7 @@ def _yields_results(*args: io.StringIO) -> collections.Iterator[str]:
             yield from (line[:-1] for line in lines)
 
 
-def build_eval_globals(ctx: tanjun.traits.Context, component: tanjun.traits.Component, /) -> dict[str, typing.Any]:
+def build_eval_globals(ctx: tanjun.abc.Context, component: tanjun.abc.Component, /) -> dict[str, typing.Any]:
     return {
         "asyncio": asyncio,
         "app": ctx.shards,
@@ -104,11 +104,12 @@ def build_eval_globals(ctx: tanjun.traits.Context, component: tanjun.traits.Comp
         "component": component,
         "ctx": ctx,
         "hikari": hikari,
+        "tanjun": tanjun
     }
 
 
 async def eval_python_code(
-    ctx: tanjun.traits.Context, component: tanjun.traits.Component, code: str
+    ctx: tanjun.abc.Context, component: tanjun.abc.Component, code: str
 ) -> tuple[collections.Iterable[str], int, bool]:
     globals_ = build_eval_globals(ctx, component)
     stdout = io.StringIO()
@@ -137,9 +138,7 @@ async def eval_python_code(
     return _yields_results(stdout, stderr), exec_time, failed
 
 
-async def eval_python_code_no_capture(
-    ctx: tanjun.traits.Context, component: tanjun.traits.Component, code: str
-) -> None:
+async def eval_python_code_no_capture(ctx: tanjun.abc.Context, component: tanjun.abc.Component, code: str) -> None:
     globals_ = build_eval_globals(ctx, component)
     try:
         compiled_code = compile(code, "", "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
@@ -160,10 +159,10 @@ async def eval_python_code_no_capture(
 @tanjun.with_parser
 @tanjun.as_message_command("eval", "exec")
 async def eval_command(
-    ctx: tanjun.traits.MessageContext,
+    ctx: tanjun.abc.MessageContext,
     file_output: bool = False,
     suppress_response: bool = False,
-    component: tanjun.traits.Component = tanjun.injected(type=tanjun.traits.Component),
+    component: tanjun.abc.Component = tanjun.injected(type=tanjun.abc.Component),
     paginator_pool: yuyo.PaginatorPool = tanjun.injected(type=yuyo.PaginatorPool),
     rest_service: traits.RESTAware = tanjun.injected(type=traits.RESTAware),
 ) -> None:
@@ -223,7 +222,7 @@ async def eval_command(
 
 @sudo_component.with_slash_command
 @tanjun.as_slash_command("commands", "Get a list of the loaded commands")
-async def commands_command(ctx: tanjun.traits.Context) -> None:
+async def commands_command(ctx: tanjun.abc.Context) -> None:
     lines: list[str] = []
     for index, component in enumerate(ctx.client.components):
         lines.append(f"Component {index}:")
@@ -235,5 +234,5 @@ async def commands_command(ctx: tanjun.traits.Context) -> None:
 
 
 @tanjun.as_loader
-def load_component(cli: tanjun.traits.Client, /) -> None:
+def load_component(cli: tanjun.abc.Client, /) -> None:
     cli.add_component(sudo_component.copy().add_check(tanjun.checks.ApplicationOwnerCheck()))
