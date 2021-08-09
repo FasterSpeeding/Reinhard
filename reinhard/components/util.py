@@ -312,23 +312,26 @@ def _format_char_line(char: str, to_file: bool) -> str:
 
 
 @util_component.with_slash_command
+@tanjun.with_bool_slash_option(
+    "file", "Whether this should send a file repsonse regardless of response length", default=False
+)
 @tanjun.with_str_slash_option("characters", "The UTF-8 characters to get information about")
 @tanjun.as_slash_command("char", "Get information about the UTF-8 characters in the executing message.")
-async def char_command(ctx: tanjun.traits.Context, characters: str, to_file: bool = False) -> None:
+async def char_command(ctx: tanjun.traits.Context, characters: str, file: bool = False) -> None:
     """Get information about the UTF-8 characters in the executing message.
 
     Running `char file...` will ensure that the output is always sent as a markdown file.
     """
     if len(characters) > 20:
-        to_file = True
+        file = True
 
     content: hikari.UndefinedOr[str]
-    content = "\n".join(_format_char_line(char, to_file) for char in characters)
-    file: hikari.UndefinedOr[hikari.Bytes] = hikari.UNDEFINED
+    content = "\n".join(_format_char_line(char, file) for char in characters)
+    response_file: hikari.UndefinedOr[hikari.Bytes] = hikari.UNDEFINED
 
-    # highly doubt this'll ever be over 1990 when to_file is False but better safe than sorry.
-    if to_file or len(content) >= 1990:
-        file = hikari.Bytes(content.encode(), "character-info.md", mimetype="text/markdown; charset=UTF-8")
+    # highly doubt this'll ever be over 1990 when file is False but better safe than sorry.
+    if file or len(content) >= 1990:
+        response_file = hikari.Bytes(content.encode(), "character-info.md", mimetype="text/markdown; charset=UTF-8")
         content = hikari.UNDEFINED
 
     else:
@@ -336,14 +339,8 @@ async def char_command(ctx: tanjun.traits.Context, characters: str, to_file: boo
 
     await ctx.respond(content=content or "hi there")
 
-    if file is not hikari.UNDEFINED:
-        await ctx.edit_last_response(content=None, attachment=file)
-
-
-# @char_command.with_command
-# @tanjun.as_message_command("file")
-# async def char_file_command(ctx: tanjun.traits.Context) -> None:
-#     await char_command(ctx, to_file=True)
+    if response_file is not hikari.UNDEFINED:
+        await ctx.edit_last_response(content=None, attachment=response_file)
 
 
 @tanjun.as_loader
