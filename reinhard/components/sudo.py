@@ -104,7 +104,7 @@ def build_eval_globals(ctx: tanjun.abc.Context, component: tanjun.abc.Component,
         "component": component,
         "ctx": ctx,
         "hikari": hikari,
-        "tanjun": tanjun
+        "tanjun": tanjun,
     }
 
 

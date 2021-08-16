@@ -42,9 +42,7 @@ def build(bot: hikari_traits.GatewayBotAware, /, *, config: config_.FullConfig |
             bot, mention_prefix=config.mention_prefix, set_global_commands=config.set_global_commands
         )
         .set_hooks(
-            tanjun.Hooks["tanjun.abc.Context"]()
-            .set_on_parser_error(command_hooks.on_parser_error)
-            .set_on_error(command_hooks.on_error)
+            tanjun.AnyHooks().set_on_parser_error(command_hooks.on_parser_error).set_on_error(command_hooks.on_error)
         )
         .add_prefix(config.prefixes)
         .add_type_dependency(
