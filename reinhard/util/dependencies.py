@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__all__: list[str] = ["SessionDependency", "ReactionClientDependency"]  # , "ComponentClientDependency"]
+__all__: list[str] = ["SessionDependency", "ReactionClientDependency", "ComponentClientDependency"]
 
 import asyncio
 import logging
@@ -61,25 +61,25 @@ class ReactionClientDependency:
         event_client: traits.EventManagerAware = injecting.injected(type=traits.EventManagerAware),
     ) -> yuyo.ReactionClient:
         if not self._client or self._client.is_closed:
-            self._client = yuyo.ReactionClient(rest=rest_client.rest, event_manger=event_client.event_manager)
+            self._client = yuyo.ReactionClient(rest=rest_client.rest, event_manager=event_client.event_manager)
             asyncio.create_task(self._client.open())
 
         return self._client
 
 
-# class ComponentClientDependency:
-#     __slots__ = ("_client",)
+class ComponentClientDependency:
+    __slots__ = ("_client",)
 
-#     def __init__(self) -> None:
-#         self._client: yuyo.ComponentClient | None = None
+    def __init__(self) -> None:
+        self._client: yuyo.ComponentClient | None = None
 
-#     def __call__(
-#         self,
-#         event_client: traits.EventManagerAware = injecting.injected(type=traits.EventManagerAware),
-#         # interaction_client: traits.InteractionServerAware  # TODO: needs defaults for this to work
-#     ) -> yuyo.ComponentClient:
-#         if not self._client:
-#             self._client = yuyo.ComponentClient(event_manager=event_client.event_manager)
-#             self._client.open()
+    def __call__(
+        self,
+        event_client: traits.EventManagerAware = injecting.injected(type=traits.EventManagerAware),
+        # interaction_client: traits.InteractionServerAware  # TODO: needs defaults for this to work
+    ) -> yuyo.ComponentClient:
+        if not self._client:
+            self._client = yuyo.ComponentClient(event_manager=event_client.event_manager)
+            self._client.open()
 
-#         return self._client
+        return self._client

@@ -81,17 +81,17 @@ async def about_command(
     await error_manager.try_respond(ctx, embed=embed)
 
 
-@basic_component.with_message_command
-@tanjun.with_greedy_argument("command_name", default=None)
-@tanjun.with_option("component_name", "--component", default=None)
-@tanjun.with_parser
-# TODO: specify a group or command
-@tanjun.as_message_command("help")
+# @basic_component.with_message_command
+# @tanjun.with_greedy_argument("command_name", default=None)
+# @tanjun.with_option("component_name", "--component", default=None)
+# @tanjun.with_parser
+# # TODO: specify a group or command
+# @tanjun.as_message_command("help")
 async def help_command(
     ctx: tanjun.abc.Context,
     command_name: str | None,
     component_name: str | None,
-    reaction_client: yuyo.ReactionClient = tanjun.injected(type=yuyo.ReactionClient),
+    component_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
     help_embeds: dict[str, list[hikari.Embed]] = tanjun.injected(callback=tanjun.cache_callback(gen_help_embeds)),
 ) -> None:
     """Get information about the commands in this bot.
@@ -130,9 +130,12 @@ async def help_command(
             (hikari.UNDEFINED, embed) for embed in itertools.chain.from_iterable(list(help_embeds.values()))
         )
 
-    paginator = yuyo.ReactionPaginator(embed_generator, authors=(ctx.author,))
-    message = await paginator.create_message(ctx.rest, ctx.channel_id)
-    reaction_client.add_handler(message, paginator)
+    paginator = yuyo.ComponentPaginator(embed_generator, authors=(ctx.author,))
+
+    if first_entry := await paginator.get_next_entry():
+        content, embed = first_entry
+        message = await ctx.respond(content=content, embed=embed, component=paginator, ensure_result=True)
+        component_client.add_executor(message, paginator)
 
 
 @basic_component.with_slash_command

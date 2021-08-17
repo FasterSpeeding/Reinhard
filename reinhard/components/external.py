@@ -14,7 +14,6 @@ import hikari
 import sphobjinv  # type: ignore[import]
 import tanjun
 import yuyo
-from hikari import traits
 
 from .. import config as config_
 from ..util import basic as basic_util
@@ -269,15 +268,14 @@ help_util.with_docs(
 )
 
 
-@external_component.with_message_command
-@tanjun.with_greedy_argument("query")
-@tanjun.with_parser
-@tanjun.as_message_command("lyrics")
+@external_component.with_slash_command
+@tanjun.with_str_slash_option("query", "Query string (e.g. name) to search a song by.")
+@tanjun.as_slash_command("lyrics", "Get a song's lyrics.")
 async def lyrics_command(
     ctx: tanjun.abc.Context,
     query: str,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
-    reaction_client: yuyo.ReactionClient = tanjun.injected(type=yuyo.ReactionClient),
+    reaction_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
 ) -> None:
     """Get a song's lyrics.
 
@@ -329,7 +327,7 @@ async def lyrics_command(
         )
         for page, index in yuyo.string_paginator(iter(data["lyrics"].splitlines() or ["..."]))
     )
-    response_paginator = yuyo.ReactionPaginator(
+    response_paginator = yuyo.ComponentPaginator(
         pages,
         authors=(ctx.author.id,),
         triggers=(
@@ -340,20 +338,38 @@ async def lyrics_command(
             yuyo.pagination.RIGHT_DOUBLE_TRIANGLE,
         ),
     )
-    message = await response_paginator.create_message(ctx.rest, ctx.channel_id)
-    reaction_client.add_handler(message, response_paginator)
+    first_response = await response_paginator.get_next_entry()
+    assert first_response
+    content, embed = first_response
+    message = await ctx.respond(content=content, embed=embed, component=response_paginator, ensure_result=True)
+    reaction_client.add_executor(message, response_paginator)
 
 
-@external_component.with_message_command
-@tanjun.with_option("safe_search", "--safe", "-s", "--safe-search", converters=bool, default=None)
-@tanjun.with_option("order", "-o", "--order", default="relevance")
-@tanjun.with_option("language", "-l", "--language", default=None)
-@tanjun.with_option("region", "-r", "--region", default=None)
+@external_component.with_slash_command
+@tanjun.with_bool_slash_option(
+    "safe_search",
+    "Whether safe search should be enabled or not. The default for this is based on the current channel.",
+    default=None,
+)
+@tanjun.with_str_slash_option(
+    "order",
+    "The order to return results in. Defaults to relevance.",
+    choices=("date", "relevance", "title", "videoCount", "viewCount"),
+    default="relevance",
+)
+@tanjun.with_str_slash_option(
+    "language", "The ISO 639-1 two letter identifier of the language to limit search to.", default=None
+)
+@tanjun.with_str_slash_option("region", "The ISO 3166-1 code of the region to search for results in.", default=None)
 # TODO: should different resource types be split between different sub commands?
-@tanjun.with_option("resource_type", "--type", "-t", default="video")
-@tanjun.with_greedy_argument("query")
-@tanjun.with_parser
-@tanjun.as_message_command("youtube", "yt")
+@tanjun.with_str_slash_option(
+    "resource_type",
+    "The type of resource to search for. Defaults to video.",
+    choices=("channel", "playlist", "video"),
+    default="video",
+)
+@tanjun.with_str_slash_option("query", "Query string to search for a resource by.")
+@tanjun.as_slash_command("youtube", "Search for a resource on youtube.")
 async def youtube_command(
     ctx: tanjun.abc.Context,
     query: str,
@@ -364,8 +380,7 @@ async def youtube_command(
     safe_search: bool | None,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
     tokens: config_.Tokens = tanjun.injected(type=config_.Tokens),
-    reaction_client: yuyo.ReactionClient = tanjun.injected(type=yuyo.ReactionClient),
-    rest_service: traits.RESTAware = tanjun.injected(type=traits.RESTAware),
+    reaction_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
 ) -> None:
     """Search for a resource on youtube.
 
@@ -380,7 +395,7 @@ async def youtube_command(
             This can be one of "date", "relevance", "title", "videoCount" or "viewCount" and defaults to "relevance".
         * language (-l, --language): The ISO 639-1 two letter identifier of the language to limit search to.
         * region (-r, --region): The ISO 3166-1 code of the region to search for results in.
-        * resource type (--type, -t): The type of resource to search for.
+        * resource type (--type, -t):
             This can be one of "channel", "playlist" or "video" and defaults to "video".
     """
     assert tokens.google is not None
@@ -400,10 +415,6 @@ async def youtube_command(
         elif not safe_search and not channel_is_nsfw:
             raise tanjun.CommandError("Cannot disable safe search in a sfw channel")
 
-    resource_type = resource_type.lower()
-    if resource_type not in ("channel", "playlist", "video"):
-        raise tanjun.CommandError("Resource type must be one of 'channel', 'playist' or 'video'.")
-
     parameters: dict[str, str | int] = {
         "key": tokens.google,
         "maxResults": 50,
@@ -420,17 +431,15 @@ async def youtube_command(
     if language is not None:
         parameters["relevanceLanguage"] = language
 
-    response_paginator = yuyo.ReactionPaginator(YoutubePaginator(session, parameters), authors=[ctx.author.id])
+    response_paginator = yuyo.ComponentPaginator(YoutubePaginator(session, parameters), authors=[ctx.author.id])
     try:
-        message = await response_paginator.create_message(ctx.rest, ctx.channel_id)
+        if not (first_response := await response_paginator.get_next_entry()):
+            # data["pageInfo"]["totalResults"] will not reliably be `0` when no data is returned and they don't use 404
+            # for that so we'll just check to see if nothing is being returned.
+            raise tanjun.CommandError(f"Couldn't find `{query}`.")
 
     except RuntimeError as exc:
         raise tanjun.CommandError(str(exc)) from None
-
-    except ValueError:
-        raise tanjun.CommandError(f"Couldn't find `{query}`.") from None
-        # data["pageInfo"]["totalResults"] will not reliably be `0` when no data is returned and they don't use 404
-        # for that so we'll just check to see if nothing is being returned.
 
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError) as exc:
         _LOGGER.exception("Youtube returned invalid data", exc_info=exc)
@@ -439,7 +448,9 @@ async def youtube_command(
         raise
 
     else:
-        reaction_client.add_handler(message, response_paginator)
+        content, embed = first_response
+        message = await ctx.respond(content, embed=embed, component=response_paginator, ensure_result=True)
+        reaction_client.add_executor(message, response_paginator)
 
 
 @youtube_command.with_check
@@ -530,11 +541,15 @@ async def query_nekos_life(
 
 
 # TODO: add valid options for Options maybe?
-@external_component.with_message_command
-@tanjun.with_option("resource_type", "--type", "-t", default="track")
-@tanjun.with_greedy_argument("query")
-@tanjun.with_parser
-@tanjun.as_message_command("spotify")
+@external_component.with_slash_command
+@tanjun.with_str_slash_option(
+    "resource_type",
+    "Type of resource to search for. Defaults to track.",
+    choices=("track", "album", "artist", "playlist"),
+    default="track",
+)
+@tanjun.with_str_slash_option("query", "The string query to search by.")
+@tanjun.as_slash_command("spotify", "Search for a resource on spotify.")
 async def spotify_command(
     ctx: tanjun.abc.Context,
     query: str,
@@ -544,7 +559,6 @@ async def spotify_command(
     spotify_auth: ClientCredentialsOauth2 = tanjun.injected(
         callback=tanjun.cache_callback(ClientCredentialsOauth2.spotify)
     ),
-    rest_service: traits.RESTAware = tanjun.injected(type=traits.RESTAware),
 ) -> None:
     """Search for a resource on spotify.
 
@@ -560,18 +574,17 @@ async def spotify_command(
     if resource_type not in SPOTIFY_RESOURCE_TYPES:
         raise tanjun.CommandError(f"{resource_type!r} is not a valid resource type")
 
-    response_paginator = yuyo.ReactionPaginator(
+    response_paginator = yuyo.ComponentPaginator(
         SpotifyPaginator(spotify_auth.acquire_token, session, {"query": query, "type": resource_type}),
         authors=[ctx.author.id],
     )
+
     try:
-        message = await response_paginator.create_message(ctx.rest, ctx.channel_id)
+        if not (first_response := await response_paginator.get_next_entry()):
+            raise tanjun.CommandError(f"Couldn't find {resource_type}") from None
 
     except RuntimeError as exc:
         raise tanjun.CommandError(str(exc)) from None
-
-    except ValueError:
-        raise tanjun.CommandError(f"Couldn't find {resource_type}.") from None
 
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError) as exc:
         _LOGGER.exception("Spotify returned invalid data", exc_info=exc)
@@ -580,7 +593,9 @@ async def spotify_command(
         raise
 
     else:
-        reaction_client.add_handler(message, response_paginator)
+        content, embed = first_response
+        message = await ctx.respond(content, embed=embed, component=response_paginator, ensure_result=True)
+        reaction_client.add_executor(message, response_paginator)
 
 
 @external_component.with_slash_command

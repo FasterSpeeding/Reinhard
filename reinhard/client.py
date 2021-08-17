@@ -52,7 +52,7 @@ def build(bot: hikari_traits.GatewayBotAware, /, *, config: config_.FullConfig |
         .add_type_dependency(config_.FullConfig, lambda: typing.cast(config_.FullConfig, config))
         .add_type_dependency(config_.Tokens, lambda: typing.cast(config_.FullConfig, config).tokens)
         .add_type_dependency(yuyo.ReactionClient, dependencies.ReactionClientDependency())
-        # .add_type_dependency(yuyo.ComponentClient, dependencies.ComponentClientDependency())
+        .add_type_dependency(yuyo.ComponentClient, dependencies.ComponentClientDependency())
         .load_modules("reinhard.components.basic")
         .load_modules("reinhard.components.external")
         .load_modules("reinhard.components.moderation")

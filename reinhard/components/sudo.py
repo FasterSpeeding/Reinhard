@@ -163,8 +163,7 @@ async def eval_command(
     file_output: bool = False,
     suppress_response: bool = False,
     component: tanjun.abc.Component = tanjun.injected(type=tanjun.abc.Component),
-    reaction_client: yuyo.ReactionClient = tanjun.injected(type=yuyo.ReactionClient),
-    rest_service: traits.RESTAware = tanjun.injected(type=traits.RESTAware),
+    component_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
 ) -> None:
     """Dynamically evaluate a script in the bot's environment.
 
@@ -203,7 +202,7 @@ async def eval_command(
         )
         for text, page in string_paginator
     )
-    response_paginator = yuyo.ReactionPaginator(
+    response_paginator = yuyo.ComponentPaginator(
         embed_generator,
         authors=[ctx.author.id],
         triggers=(
@@ -214,8 +213,11 @@ async def eval_command(
             yuyo.pagination.RIGHT_DOUBLE_TRIANGLE,
         ),
     )
-    message = await response_paginator.create_message(ctx.rest, ctx.channel_id)
-    reaction_client.add_handler(message, response_paginator)
+    first_response = await response_paginator.get_next_entry()
+    assert first_response is not None
+    content, embed = first_response
+    message = await ctx.respond(content=content, embed=embed, component=response_paginator, ensure_result=True)
+    component_client.add_executor(message, response_paginator)
 
 
 @sudo_component.with_slash_command
