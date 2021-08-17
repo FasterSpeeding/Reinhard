@@ -125,5 +125,7 @@ dmypy.json
 
 .idea/
 
+**/*config*.json
+**/*config*.yaml
 **/*config.json
 **/*config.yaml

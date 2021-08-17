@@ -13,7 +13,7 @@ import typing
 from collections import abc as collections
 
 from hikari import embeds as embeds_
-from yuyo import paginaton
+from yuyo import pagination
 
 from ..util import constants
 
@@ -54,7 +54,7 @@ def generate_help_embeds(
 
         command_docs.append(f" - {prefix}{command_name}: {command_doc.splitlines()[0]}")
 
-    pages = paginaton.string_paginator(iter(command_docs), wrapper=f"{component_doc}\n {'{}'}")
+    pages = pagination.string_paginator(iter(command_docs), wrapper=f"{component_doc}\n {'{}'}")
     embeds = (
         embeds_.Embed(title=f"{component_name}", description=content, colour=constants.embed_colour()).set_footer(
             text=f"page {page + 1}"

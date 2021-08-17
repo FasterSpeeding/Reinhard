@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-__all__: list[str] = ["SessionDependency", "PaginatorPoolDependency"]
+__all__: list[str] = ["SessionDependency", "ReactionClientDependency"]  # , "ComponentClientDependency"]
 
 import asyncio
 import logging
 import typing
 
 import aiohttp
+import yuyo
 from hikari import traits
 from tanjun import injecting
-from yuyo import paginaton
 
 if typing.TYPE_CHECKING:
     from hikari import config
@@ -49,19 +49,37 @@ class SessionDependency:  # TODO: add on_closing, closed, opening and opened han
         return self._session
 
 
-class PaginatorPoolDependency:
-    __slots__ = ("_paginator",)
+class ReactionClientDependency:
+    __slots__ = ("_client",)
 
     def __init__(self) -> None:
-        self._paginator: paginaton.PaginatorPool | None = None
+        self._client: yuyo.ReactionClient | None = None
 
     def __call__(
         self,
         rest_client: traits.RESTAware = injecting.injected(type=traits.RESTAware),
         event_client: traits.EventManagerAware = injecting.injected(type=traits.EventManagerAware),
-    ) -> paginaton.PaginatorPool:
-        if not self._paginator or self._paginator.is_closed:
-            self._paginator = paginaton.PaginatorPool(rest_client, event_client)
-            asyncio.create_task(self._paginator.open())
+    ) -> yuyo.ReactionClient:
+        if not self._client or self._client.is_closed:
+            self._client = yuyo.ReactionClient(rest=rest_client.rest, event_manger=event_client.event_manager)
+            asyncio.create_task(self._client.open())
 
-        return self._paginator
+        return self._client
+
+
+# class ComponentClientDependency:
+#     __slots__ = ("_client",)
+
+#     def __init__(self) -> None:
+#         self._client: yuyo.ComponentClient | None = None
+
+#     def __call__(
+#         self,
+#         event_client: traits.EventManagerAware = injecting.injected(type=traits.EventManagerAware),
+#         # interaction_client: traits.InteractionServerAware  # TODO: needs defaults for this to work
+#     ) -> yuyo.ComponentClient:
+#         if not self._client:
+#             self._client = yuyo.ComponentClient(event_manager=event_client.event_manager)
+#             self._client.open()
+
+#         return self._client

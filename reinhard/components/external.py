@@ -277,8 +277,7 @@ async def lyrics_command(
     ctx: tanjun.abc.Context,
     query: str,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
-    paginator_pool: yuyo.PaginatorPool = tanjun.injected(type=yuyo.PaginatorPool),
-    rest_service: traits.RESTAware = tanjun.injected(type=traits.RESTAware),
+    reaction_client: yuyo.ReactionClient = tanjun.injected(type=yuyo.ReactionClient),
 ) -> None:
     """Get a song's lyrics.
 
@@ -330,21 +329,19 @@ async def lyrics_command(
         )
         for page, index in yuyo.string_paginator(iter(data["lyrics"].splitlines() or ["..."]))
     )
-    response_paginator = yuyo.Paginator(
-        rest_service,
-        ctx.channel_id,
+    response_paginator = yuyo.ReactionPaginator(
         pages,
         authors=(ctx.author.id,),
         triggers=(
-            yuyo.paginaton.LEFT_DOUBLE_TRIANGLE,
-            yuyo.paginaton.LEFT_TRIANGLE,
-            yuyo.paginaton.STOP_SQUARE,
-            yuyo.paginaton.RIGHT_TRIANGLE,
-            yuyo.paginaton.RIGHT_DOUBLE_TRIANGLE,
+            yuyo.pagination.LEFT_DOUBLE_TRIANGLE,
+            yuyo.pagination.LEFT_TRIANGLE,
+            yuyo.pagination.STOP_SQUARE,
+            yuyo.pagination.RIGHT_TRIANGLE,
+            yuyo.pagination.RIGHT_DOUBLE_TRIANGLE,
         ),
     )
-    message = await response_paginator.open()
-    paginator_pool.add_paginator(message, response_paginator)
+    message = await response_paginator.create_message(ctx.rest, ctx.channel_id)
+    reaction_client.add_handler(message, response_paginator)
 
 
 @external_component.with_message_command
@@ -367,7 +364,7 @@ async def youtube_command(
     safe_search: bool | None,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
     tokens: config_.Tokens = tanjun.injected(type=config_.Tokens),
-    paginator_pool: yuyo.PaginatorPool = tanjun.injected(type=yuyo.PaginatorPool),
+    reaction_client: yuyo.ReactionClient = tanjun.injected(type=yuyo.ReactionClient),
     rest_service: traits.RESTAware = tanjun.injected(type=traits.RESTAware),
 ) -> None:
     """Search for a resource on youtube.
@@ -423,14 +420,9 @@ async def youtube_command(
     if language is not None:
         parameters["relevanceLanguage"] = language
 
-    response_paginator = yuyo.Paginator(
-        rest_service,
-        ctx.channel_id,
-        YoutubePaginator(session, parameters),
-        authors=[ctx.author.id],
-    )
+    response_paginator = yuyo.ReactionPaginator(YoutubePaginator(session, parameters), authors=[ctx.author.id])
     try:
-        message = await response_paginator.open()
+        message = await response_paginator.create_message(ctx.rest, ctx.channel_id)
 
     except RuntimeError as exc:
         raise tanjun.CommandError(str(exc)) from None
@@ -447,7 +439,7 @@ async def youtube_command(
         raise
 
     else:
-        paginator_pool.add_paginator(message, response_paginator)
+        reaction_client.add_handler(message, response_paginator)
 
 
 @youtube_command.with_check
@@ -548,7 +540,7 @@ async def spotify_command(
     query: str,
     resource_type: str,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
-    paginator_pool: yuyo.PaginatorPool = tanjun.injected(type=yuyo.PaginatorPool),
+    reaction_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
     spotify_auth: ClientCredentialsOauth2 = tanjun.injected(
         callback=tanjun.cache_callback(ClientCredentialsOauth2.spotify)
     ),
@@ -568,14 +560,12 @@ async def spotify_command(
     if resource_type not in SPOTIFY_RESOURCE_TYPES:
         raise tanjun.CommandError(f"{resource_type!r} is not a valid resource type")
 
-    response_paginator = yuyo.Paginator(
-        rest_service,
-        ctx.channel_id,
+    response_paginator = yuyo.ReactionPaginator(
         SpotifyPaginator(spotify_auth.acquire_token, session, {"query": query, "type": resource_type}),
         authors=[ctx.author.id],
     )
     try:
-        message = await response_paginator.open()
+        message = await response_paginator.create_message(ctx.rest, ctx.channel_id)
 
     except RuntimeError as exc:
         raise tanjun.CommandError(str(exc)) from None
@@ -590,7 +580,7 @@ async def spotify_command(
         raise
 
     else:
-        paginator_pool.add_paginator(message, response_paginator)
+        reaction_client.add_handler(message, response_paginator)
 
 
 @external_component.with_slash_command

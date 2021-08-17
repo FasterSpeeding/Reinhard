@@ -163,7 +163,7 @@ async def eval_command(
     file_output: bool = False,
     suppress_response: bool = False,
     component: tanjun.abc.Component = tanjun.injected(type=tanjun.abc.Component),
-    paginator_pool: yuyo.PaginatorPool = tanjun.injected(type=yuyo.PaginatorPool),
+    reaction_client: yuyo.ReactionClient = tanjun.injected(type=yuyo.ReactionClient),
     rest_service: traits.RESTAware = tanjun.injected(type=traits.RESTAware),
 ) -> None:
     """Dynamically evaluate a script in the bot's environment.
@@ -203,21 +203,19 @@ async def eval_command(
         )
         for text, page in string_paginator
     )
-    response_paginator = yuyo.Paginator(
-        rest_service,
-        ctx.channel_id,
+    response_paginator = yuyo.ReactionPaginator(
         embed_generator,
         authors=[ctx.author.id],
         triggers=(
-            yuyo.paginaton.LEFT_DOUBLE_TRIANGLE,
-            yuyo.paginaton.LEFT_TRIANGLE,
-            yuyo.paginaton.STOP_SQUARE,
-            yuyo.paginaton.RIGHT_TRIANGLE,
-            yuyo.paginaton.RIGHT_DOUBLE_TRIANGLE,
+            yuyo.pagination.LEFT_DOUBLE_TRIANGLE,
+            yuyo.pagination.LEFT_TRIANGLE,
+            yuyo.pagination.STOP_SQUARE,
+            yuyo.pagination.RIGHT_TRIANGLE,
+            yuyo.pagination.RIGHT_DOUBLE_TRIANGLE,
         ),
     )
-    message = await response_paginator.open()
-    paginator_pool.add_paginator(message, response_paginator)
+    message = await response_paginator.create_message(ctx.rest, ctx.channel_id)
+    reaction_client.add_handler(message, response_paginator)
 
 
 @sudo_component.with_slash_command

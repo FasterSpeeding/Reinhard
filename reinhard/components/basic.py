@@ -14,7 +14,6 @@ import psutil  # type: ignore[import]
 import tanjun
 import yuyo
 from hikari import snowflakes
-from hikari import traits
 
 from ..util import constants
 from ..util import help as help_util
@@ -48,9 +47,9 @@ async def about_command(
     """Get basic information about the current bot instance."""
     start_date = datetime.datetime.fromtimestamp(process.create_time())
     uptime = datetime.datetime.now() - start_date
-    memory_usage = process.memory_full_info().uss / 1024 ** 2
-    cpu_usage = process.cpu_percent() / psutil.cpu_count()
-    memory_percent = process.memory_percent()
+    memory_usage: float = process.memory_full_info().uss / 1024 ** 2
+    cpu_usage: float = process.cpu_percent() / psutil.cpu_count()
+    memory_percent: float = process.memory_percent()
 
     if ctx.shards:
         shard_id = snowflakes.calculate_shard_id(ctx.shards.shard_count, ctx.guild_id) if ctx.guild_id else 0
@@ -92,9 +91,8 @@ async def help_command(
     ctx: tanjun.abc.Context,
     command_name: str | None,
     component_name: str | None,
-    paginator_pool: yuyo.PaginatorPool = tanjun.injected(type=yuyo.PaginatorPool),
+    reaction_client: yuyo.ReactionClient = tanjun.injected(type=yuyo.ReactionClient),
     help_embeds: dict[str, list[hikari.Embed]] = tanjun.injected(callback=tanjun.cache_callback(gen_help_embeds)),
-    rest_service: traits.RESTAware = tanjun.injected(type=traits.RESTAware),
 ) -> None:
     """Get information about the commands in this bot.
 
@@ -132,9 +130,9 @@ async def help_command(
             (hikari.UNDEFINED, embed) for embed in itertools.chain.from_iterable(list(help_embeds.values()))
         )
 
-    paginator = yuyo.Paginator(rest_service, ctx.channel_id, embed_generator, authors=(ctx.author,))
-    message = await paginator.open()
-    paginator_pool.add_paginator(message, paginator)
+    paginator = yuyo.ReactionPaginator(embed_generator, authors=(ctx.author,))
+    message = await paginator.create_message(ctx.rest, ctx.channel_id)
+    reaction_client.add_handler(message, paginator)
 
 
 @basic_component.with_slash_command
@@ -173,11 +171,11 @@ async def cache_command(
     """Get general information about this bot."""
     start_date = datetime.datetime.fromtimestamp(process.create_time())
     uptime = datetime.datetime.now() - start_date
-    memory_usage = process.memory_full_info().uss / 1024 ** 2
-    cpu_usage = process.cpu_percent() / psutil.cpu_count()
-    memory_percent = process.memory_percent()
+    memory_usage: float = process.memory_full_info().uss / 1024 ** 2
+    cpu_usage: float = process.cpu_percent() / psutil.cpu_count()
+    memory_percent: float = process.memory_percent()
 
-    cache_stats_lines = []
+    cache_stats_lines: list[tuple[str, float]] = []
 
     storage_start_time = time.perf_counter()
     for line_template, callback in _about_lines:

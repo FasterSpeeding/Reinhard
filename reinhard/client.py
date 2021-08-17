@@ -4,8 +4,8 @@ import typing
 
 import aiohttp
 import tanjun
+import yuyo
 from hikari import config as hikari_config
-from yuyo import paginaton
 
 from . import config as config_
 from .util import command_hooks
@@ -51,7 +51,8 @@ def build(bot: hikari_traits.GatewayBotAware, /, *, config: config_.FullConfig |
         )
         .add_type_dependency(config_.FullConfig, lambda: typing.cast(config_.FullConfig, config))
         .add_type_dependency(config_.Tokens, lambda: typing.cast(config_.FullConfig, config).tokens)
-        .add_type_dependency(paginaton.PaginatorPool, dependencies.PaginatorPoolDependency())
+        .add_type_dependency(yuyo.ReactionClient, dependencies.ReactionClientDependency())
+        # .add_type_dependency(yuyo.ComponentClient, dependencies.ComponentClientDependency())
         .load_modules("reinhard.components.basic")
         .load_modules("reinhard.components.external")
         .load_modules("reinhard.components.moderation")
