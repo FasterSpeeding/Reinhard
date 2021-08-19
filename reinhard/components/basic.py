@@ -81,13 +81,19 @@ async def about_command(
     await error_manager.try_respond(ctx, embed=embed)
 
 
+@basic_component.with_message_command
+@tanjun.as_message_command("help")
+async def help_command(ctx: tanjun.abc.Context) -> None:
+    await ctx.respond("See the slash command menu")
+
+
 # @basic_component.with_message_command
 # @tanjun.with_greedy_argument("command_name", default=None)
 # @tanjun.with_option("component_name", "--component", default=None)
 # @tanjun.with_parser
 # # TODO: specify a group or command
 # @tanjun.as_message_command("help")
-async def help_command(
+async def old_help_command(
     ctx: tanjun.abc.Context,
     command_name: str | None,
     component_name: str | None,

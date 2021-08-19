@@ -109,7 +109,7 @@ class FullConfig(Config):
     log_level: int | str | dict[str, typing.Any] | None = logging.INFO
     mention_prefix: bool = True
     owner_only: bool = False
-    prefixes: collections.Set[str] = frozenset("r.")
+    prefixes: collections.Set[str] = frozenset()
     ptf: PTFConfig | None = None
     set_global_commands: typing.Union[bool, hikari.Snowflake] = True
 
@@ -134,7 +134,7 @@ class FullConfig(Config):
             log_level=log_level,
             mention_prefix=bool(mapping.get("mention_prefix", False)),
             owner_only=bool(mapping.get("owner_only", False)),
-            prefixes=frozenset(map(str, mapping["prefixes"])) if "prefixes" in mapping else {"r."},
+            prefixes=frozenset(map(str, mapping["prefixes"])) if "prefixes" in mapping else frozenset(),
             ptf=_cast_or_default(mapping, "ptf", PTFConfig.from_mapping, None),
             tokens=Tokens.from_mapping(mapping["tokens"]),
             set_global_commands=set_global_commands,
