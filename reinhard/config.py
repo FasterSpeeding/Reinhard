@@ -91,12 +91,14 @@ class Tokens(Config):
         )
 
 
-DEFAULT_CACHE = (
+DEFAULT_CACHE: typing.Final[hikari.CacheComponents] = (
     hikari.CacheComponents.GUILDS
     | hikari.CacheComponents.GUILD_CHANNELS
     | hikari.CacheComponents.ROLES
     # | hikari.CacheComponents.ME
 )
+
+DEFAULT_INTENTS: typing.Final[hikari.Intents] = hikari.Intents.GUILDS | hikari.Intents.ALL_MESSAGES
 
 
 @dataclasses.dataclass(kw_only=True, repr=False, slots=True)
@@ -105,7 +107,7 @@ class FullConfig(Config):
     tokens: Tokens
     cache: hikari.CacheComponents = DEFAULT_CACHE
     emoji_guild: hikari.Snowflake | None = None
-    intents: hikari.Intents = hikari.Intents.ALL_UNPRIVILEGED
+    intents: hikari.Intents = DEFAULT_INTENTS
     log_level: int | str | dict[str, typing.Any] | None = logging.INFO
     mention_prefix: bool = True
     owner_only: bool = False
@@ -130,9 +132,9 @@ class FullConfig(Config):
             cache=_cast_or_default(mapping, "cache", hikari.CacheComponents, DEFAULT_CACHE),
             database=DatabaseConfig.from_mapping(mapping["database"]),
             emoji_guild=_cast_or_default(mapping, "emoji_guild", hikari.Snowflake, None),
-            intents=_cast_or_default(mapping, "intents", hikari.Intents, hikari.Intents.ALL_UNPRIVILEGED),
+            intents=_cast_or_default(mapping, "intents", hikari.Intents, DEFAULT_INTENTS),
             log_level=log_level,
-            mention_prefix=bool(mapping.get("mention_prefix", False)),
+            mention_prefix=bool(mapping.get("mention_prefix", True)),
             owner_only=bool(mapping.get("owner_only", False)),
             prefixes=frozenset(map(str, mapping["prefixes"])) if "prefixes" in mapping else frozenset(),
             ptf=_cast_or_default(mapping, "ptf", PTFConfig.from_mapping, None),

@@ -96,7 +96,7 @@ async def member_command(ctx: tanjun.abc.Context, member: hikari.Member | None) 
         return
 
     permissions = guild.roles[guild.id].permissions
-    roles = {}
+    roles: dict[int, hikari.Role] = {}
 
     for role_id in member.role_ids:
         role = guild.roles[role_id]
@@ -104,7 +104,7 @@ async def member_command(ctx: tanjun.abc.Context, member: hikari.Member | None) 
         roles[role.position] = role
 
     ordered_roles = dict(sorted(roles.items(), reverse=True))
-    roles = "\n".join(map("{0.name}: {0.id}".format, ordered_roles.values()))
+    roles_repr = "\n".join(map("{0.name}: {0.id}".format, ordered_roles.values()))
 
     for role in ordered_roles.values():
         if role.colour:
@@ -135,7 +135,7 @@ async def member_command(ctx: tanjun.abc.Context, member: hikari.Member | None) 
     # TODO: this embed will go over the character limit easily
     embed = (
         hikari.Embed(
-            description="\n".join(member_information) + f"\n\nRoles:\n{roles}\n\nPermissions:\n{permissions_grid}",
+            description="\n".join(member_information) + f"\n\nRoles:\n{roles_repr}\n\nPermissions:\n{permissions_grid}",
             colour=colour,
             title=f"{member.user.username}#{member.user.discriminator}",
             url=f"https://discordapp.com/users/{member.user.id}",
