@@ -16,11 +16,11 @@ _OUT_DIR = str(pathlib.Path("videos/%(title)s-%(id)s.%(ext)s").absolute())
 
 
 def _download(url: str, /) -> tuple[pathlib.Path, dict[str, typing.Any]]:
-    data = threading.local()
-    client = data.__dict__.get(_CLIENT_ATTRIBUTE)
+    thread_local = threading.local()
+    client = thread_local.__dict__.get(_CLIENT_ATTRIBUTE)
 
     if not client or not isinstance(client, youtube_dl.YoutubeDL):
-        client = youtube_dl.YoutubeDL(
+        client = youtube_dl.YoutubeDL(  # type: ignore
             # TODO: noplaylist isn't actually respected
             # not sure quiet is respected either
             {
@@ -30,9 +30,9 @@ def _download(url: str, /) -> tuple[pathlib.Path, dict[str, typing.Any]]:
                 "quiet": True,
             }
         )
-        data.__dict__[_CLIENT_ATTRIBUTE] = client
+        thread_local.__dict__[_CLIENT_ATTRIBUTE] = client
 
-    data = client.extract_info(url)
+    data: dict[str, typing.Any] = client.extract_info(url)
     return pathlib.Path(client.prepare_filename(data)), data
 
 

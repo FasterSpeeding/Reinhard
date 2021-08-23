@@ -90,7 +90,7 @@ class AIOHTTPStatusHandler(backoff.ErrorManager):
             return False
 
         if exception.status == 429:
-            raw_retry_after = exception.headers.get("Retry-After") if exception.headers else None
+            raw_retry_after: str | None = exception.headers.get("Retry-After") if exception.headers else None
             if raw_retry_after is not None:
                 retry_after = float(raw_retry_after)
 

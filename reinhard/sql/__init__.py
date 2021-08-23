@@ -74,7 +74,7 @@ class CachedScripts:
     schema = script_getter_factory("schema")
 
 
-async def initialise_schema(sql_scripts: CachedScripts, conn: asyncpg.Connection) -> None:
+async def initialise_schema(sql_scripts: CachedScripts, conn: asyncpg.Connection) -> None:  # type: ignore
     """
     Initialise the database schema if not already present.
 
@@ -86,5 +86,5 @@ async def initialise_schema(sql_scripts: CachedScripts, conn: asyncpg.Connection
     """
     try:
         await conn.execute(sql_scripts.schema)
-    except asyncpg.PostgresError as exc:
+    except asyncpg.PostgresError as exc:  # type: ignore
         raise RuntimeError("Failed to initialise database.") from exc

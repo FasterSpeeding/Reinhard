@@ -2,8 +2,11 @@ from __future__ import annotations
 
 __all__: list[str] = ["external_component"]
 
+import asyncio
 import collections.abc as collections
+import dataclasses
 import datetime
+import json
 import logging
 import time
 import typing
@@ -11,6 +14,7 @@ import urllib.parse
 
 import aiohttp
 import hikari
+import markdownify  # type: ignore
 import sphobjinv  # type: ignore[import]
 import tanjun
 import yuyo
@@ -34,7 +38,8 @@ RETRY_AFTER_HEADER = "Retry-After"
 USER_AGENT_HEADER = "User-Agent"
 _LOGGER = logging.getLogger("hikari.reinhard.external")
 SPOTIFY_RESOURCE_TYPES = ("track", "album", "artist", "playlist")
-HIKARI_IO = "https://hikari-py.github.io/hikari"
+HIKARI_PAGES = "https://hikari-py.github.io/hikari"
+TANJUN_PAGES = "https://fasterspeeding.github.io/Tanjun"
 
 
 class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType]]):
@@ -221,6 +226,7 @@ class CachedResource(typing.Generic[_ValueT]):
         "_data",
         "_expire_after",
         "_headers",
+        "_lock",
         "_parse_data",
         "_path",
         "_time",
@@ -239,6 +245,7 @@ class CachedResource(typing.Generic[_ValueT]):
         self._data: _ValueT | None = None
         self._expire_after = expire_after.total_seconds()
         self._headers = headers
+        self._lock: asyncio.Lock | None = None
         self._parse_data = parse_data
         self._path = path
         self._time = 0.0
@@ -247,19 +254,26 @@ class CachedResource(typing.Generic[_ValueT]):
     def _expired(self) -> bool:
         return time.perf_counter() - self._time >= self._expire_after
 
+    async def __call__(self, session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession)) -> _ValueT:
+        return await self.acquire_resource(session)
+
     async def acquire_resource(self, session: aiohttp.ClientSession) -> _ValueT:
         if self._data and not self._expired:
             return self._data
 
-        response = await session.get(self._path)
-        # TODO: better handling
-        response.raise_for_status()
-        self._data = self._parse_data(await response.read())
-        return self._data
+        if not self._lock:
+            self._lock = asyncio.Lock()
 
+        async with self._lock:
+            if self._data and not self._expire_after:
+                return self._data
 
-def make_doc_fetcher() -> CachedResource[sphobjinv.Inventory]:
-    return CachedResource(HIKARI_IO + "/objects.inv", datetime.timedelta(hours=12), sphobjinv.Inventory)
+            response = await session.get(self._path)
+            # TODO: better handling
+            response.raise_for_status()
+            self._data = self._parse_data(await response.read())
+            self._time = time.perf_counter()
+            return self._data
 
 
 external_component = tanjun.Component(strict=True)
@@ -275,7 +289,7 @@ async def lyrics_command(
     ctx: tanjun.abc.Context,
     query: str,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
-    reaction_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
+    component_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
 ) -> None:
     """Get a song's lyrics.
 
@@ -342,7 +356,7 @@ async def lyrics_command(
     assert first_response
     content, embed = first_response
     message = await ctx.respond(content=content, embed=embed, component=response_paginator, ensure_result=True)
-    reaction_client.add_executor(message, response_paginator)
+    component_client.add_executor(message, response_paginator)
 
 
 @external_component.with_slash_command
@@ -380,7 +394,7 @@ async def youtube_command(
     safe_search: bool | None,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
     tokens: config_.Tokens = tanjun.injected(type=config_.Tokens),
-    reaction_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
+    component_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
 ) -> None:
     """Search for a resource on youtube.
 
@@ -450,7 +464,7 @@ async def youtube_command(
     else:
         content, embed = first_response
         message = await ctx.respond(content, embed=embed, component=response_paginator, ensure_result=True)
-        reaction_client.add_executor(message, response_paginator)
+        component_client.add_executor(message, response_paginator)
 
 
 @youtube_command.with_check
@@ -555,7 +569,7 @@ async def spotify_command(
     query: str,
     resource_type: str,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
-    reaction_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
+    component_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
     spotify_auth: ClientCredentialsOauth2 = tanjun.injected(
         callback=tanjun.cache_callback(ClientCredentialsOauth2.spotify)
     ),
@@ -595,18 +609,22 @@ async def spotify_command(
     else:
         content, embed = first_response
         message = await ctx.respond(content, embed=embed, component=response_paginator, ensure_result=True)
-        reaction_client.add_executor(message, response_paginator)
+        component_client.add_executor(message, response_paginator)
 
 
-@external_component.with_slash_command
+docs_group = external_component.with_slash_command(
+    tanjun.slash_command_group("docs", "Search relevant document sites.")
+)
+
+
+@docs_group.with_command
 @tanjun.with_str_slash_option("path", "Optional path to query Hikari's documentation by.", default=None)
-@tanjun.as_slash_command("docs", "Search Hikari's documentation")
-async def docs_command(
+@tanjun.as_slash_command("hikari", "Search Hikari's documentation")
+async def docs_hikari_command(
     ctx: tanjun.abc.Context,
     path: str | None,
-    session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
-    doc_fetcher: CachedResource[sphobjinv.Inventory] = tanjun.injected(
-        callback=tanjun.cache_callback(make_doc_fetcher)
+    inventory: sphobjinv.Inventory = tanjun.injected(
+        callback=CachedResource(HIKARI_PAGES + "/objects.inv", datetime.timedelta(hours=12), sphobjinv.Inventory)
     ),
 ) -> None:
     """Search Hikari's documentation.
@@ -617,11 +635,10 @@ async def docs_command(
     error_manager = rest_manager.HikariErrorManager(break_on=(hikari.ForbiddenError, hikari.NotFoundError))
 
     if not path:
-        await error_manager.try_respond(ctx, content=HIKARI_IO + "/hikari/index.html")
+        await error_manager.try_respond(ctx, content=HIKARI_PAGES + "/hikari/index.html")
 
     else:
         path = path.replace(" ", "_")
-        inventory = await doc_fetcher.acquire_resource(session)
         description: list[str] = []
         # TODO: this line blocks for 2 seconds
         entries: collections.Iterator[tuple[str, int, int]] = iter(
@@ -630,13 +647,187 @@ async def docs_command(
 
         for result, _ in zip(entries, range(10)):
             sphinx_object: sphobjinv.DataObjStr = inventory.objects[result[2]]
-            description.append(f"[{sphinx_object.name}]({HIKARI_IO}/{sphinx_object.uri_expanded})")
+            description.append(f"[{sphinx_object.name}]({HIKARI_PAGES}/{sphinx_object.uri_expanded})")
 
         embed = hikari.Embed(
             description="\n".join(description) if description else "No results found.",
             color=constants.embed_colour(),
         )
         await error_manager.try_respond(ctx, embed=embed)
+
+
+SPECIAL_KEYS: frozenset[str] = frozenset(("df", "tf", "docs"))
+
+
+def _collect_pdoc_paths(data: dict[str, typing.Any], path_filter: str = "") -> collections.Iterator[str]:
+    if docs := data.get("docs"):
+        if path_filter:
+            yield from (key for key in docs.keys() if key.rsplit(".", 1)[0].endswith(path_filter))
+
+        else:
+            yield from docs.keys()
+
+    for key, value in data.items():
+        if key not in SPECIAL_KEYS:
+            yield from _collect_pdoc_paths(value, path_filter=path_filter)
+
+
+@dataclasses.dataclass(slots=True)
+class PdocEntryMetadata:
+    type: str
+    func_def: str | None
+    fullname: str
+    module_name: str
+    qualname: str
+    func_def: str | None
+    parameters: list[str] | None
+
+    @classmethod
+    def from_entry(cls, data: dict[str, typing.Any], /) -> PdocEntryMetadata:
+        return cls(
+            data["type"],
+            data.get("funcdef"),
+            data["fullname"],
+            data["modulename"],
+            data["qualname"],
+            data.get("parameters"),
+        )
+
+    def make_link(self, url: str) -> str:
+        fragment = ""
+        if in_module := self.fullname.removeprefix(self.module_name):
+            fragment = "#" + in_module.removeprefix(".")
+
+        return url + "/".join(self.module_name.split(".")) + fragment
+
+
+def _form_description(metadata: PdocEntryMetadata, doc: str | None) -> str:
+    summary = doc.split("\n", 1)[0] if doc else "NONE"
+    if metadata.func_def:
+        result = "Type: Async function" if metadata.func_def == "async def" else "Type: Sync function"
+        params = ", ".join(metadata.parameters or "")
+        return f"{result}\n\nSummary:\n```md\n{summary}\n```\nParameters:\n`{params}`"
+
+    return f"Type: {metadata.type}\n\nSummary\n```md\n{summary}\n```"
+
+
+EMPTY_ITER = iter(())
+
+
+class PdocIndex:
+    __slots__ = ("_doc_store", "_metadata", "_search_index")
+
+    def __init__(self, data: dict[str, typing.Any], /) -> None:
+        self._doc_store: dict[str, str | None] = {}
+        self._metadata: dict[str, PdocEntryMetadata] = {}
+
+        for name, entry in data["documentStore"]["docs"].items():
+            doc: str = markdownify.markdownify(entry["doc"]).strip("\n").strip()
+            self._doc_store[name] = doc or None
+            self._metadata[name] = PdocEntryMetadata.from_entry(entry)
+
+        # TODO: what is the difference between qualname and fullname here?
+        self._search_index: dict[str, typing.Any] = data["index"]["qualname"]
+
+    @classmethod
+    def from_json(cls, data: str | bytes, /) -> PdocIndex:
+        return cls(json.loads(data))
+
+    def get_doc(self, path: str, /) -> str | None:
+        return self._doc_store[path]
+
+    def get_metadata(self, path: str, /) -> PdocEntryMetadata:
+        return self._metadata[path]
+
+    def search(self, full_name: str, /) -> collections.Iterator[str]:
+        if not full_name:
+            return EMPTY_ITER
+
+        try:
+            path, name = full_name.rsplit(".", 1)
+        except ValueError:
+            path = ""
+            name = full_name
+
+        current_pos: dict[str, typing.Any] = self._search_index["root"]
+        for char in name:
+            if not (new_pos := current_pos.get(char)) or new_pos.get("tf"):
+                return EMPTY_ITER
+
+            current_pos = new_pos
+
+        return _collect_pdoc_paths(current_pos, path_filter=path)
+
+
+def _chunk(iterator: collections.Iterator[_ValueT], max: int) -> collections.Iterator[list[_ValueT]]:
+    chunk: list[_ValueT] = []
+    for entry in iterator:
+        chunk.append(entry)
+        if len(chunk) == max:
+            yield chunk
+            chunk = []
+
+    if chunk:
+        yield chunk
+
+
+@docs_group.with_command
+@tanjun.with_bool_slash_option("simple", "Whether this should only list links. Defaults to False.", default=False)
+@tanjun.with_str_slash_option("path", "Optional path to query Tanjun's documentation by.", default=None)
+@tanjun.as_slash_command("tanjun", "Search Tanjun's documentation")
+async def tanjun_docs_command(
+    ctx: tanjun.abc.Context,
+    path: str | None,
+    component_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
+    index: PdocIndex = tanjun.injected(
+        callback=CachedResource(TANJUN_PAGES + "/master/search.json", datetime.timedelta(hours=12), PdocIndex.from_json)
+    ),
+    simple: bool = False,
+) -> None:
+    if not path:
+        await ctx.respond(TANJUN_PAGES)
+        return
+
+    master = TANJUN_PAGES + "/master/"
+    if simple:
+        page = 0
+        results = map(lambda link: f"[{link}]({index.get_metadata(link).make_link(master)})", index.search(path))
+        iterator = (
+            (
+                hikari.UNDEFINED,
+                hikari.Embed(
+                    description="\n".join(entries),
+                    color=constants.embed_colour(),
+                    title="Tanjun Documentation page " + str(page := page + 1),
+                    url=TANJUN_PAGES + "/master/",
+                ),
+            )
+            for entries in _chunk(results, 10)
+        )
+
+    else:
+        results = map(lambda link: (index.get_metadata(link), index.get_doc(link)), index.search(path))
+        iterator = (
+            (
+                hikari.UNDEFINED,
+                hikari.Embed(
+                    description=_form_description(metadata, doc),
+                    color=constants.embed_colour(),
+                    title=metadata.fullname,
+                    url=metadata.make_link(master),
+                ),
+            )
+            for metadata, doc in results
+        )
+
+    paginator = yuyo.ComponentPaginator(iterator, authors=(ctx.author,))
+    if first_response := await paginator.get_next_entry():
+        content, embed = first_response
+        message = await ctx.respond(content=content, component=paginator, embed=embed, ensure_result=True)
+        component_client.add_executor(message, paginator)
+        return
+
+    await ctx.respond("Entry not found")
 
 
 @external_component.with_slash_command
