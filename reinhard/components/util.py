@@ -1,3 +1,34 @@
+# -*- coding: utf-8 -*-
+# cython: language_level=3
+# BSD 3-Clause License
+#
+# Copyright (c) 2020-2021, Faster Speeding
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
 __all__: list[str] = ["util_component", "load_component"]
@@ -226,7 +257,7 @@ async def avatar_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> N
 
     Arguments:
         * user: Optional argument of a mention or ID of the user to get the avatar for.
-            If this isn't provided then this command will return the avatar of the user who triggerred it.
+            If this isn't provided then this command will return the avatar of the user who triggered it.
     """
     if user is None:
         user = ctx.author
@@ -271,8 +302,16 @@ async def mentions_command(
             message = await ctx.rest.fetch_message(channel_id, message_id)
             break
 
+    else:
+        message = await ctx.rest.fetch_message(channel_id, message_id)
+
     error_manager.clear_rules(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
-    mentions = ", ".join(map(str, message.mentions.users.values())) if message.mentions.users else None
+
+    mentions: str | None = None
+    if message.mentions.users:
+        assert not isinstance(message.mentions.users, hikari.UndefinedType)
+        mentions = ", ".join(map(str, message.mentions.users.values()))
+
     await error_manager.try_respond(
         ctx, content=f"Pinging mentions: {mentions}" if mentions else "No pinging mentions."
     )
@@ -313,7 +352,7 @@ def _format_char_line(char: str, to_file: bool) -> str:
 
 @util_component.with_slash_command
 @tanjun.with_bool_slash_option(
-    "file", "Whether this should send a file repsonse regardless of response length", default=False
+    "file", "Whether this should send a file response regardless of response length", default=False
 )
 @tanjun.with_str_slash_option("characters", "The UTF-8 characters to get information about")
 @tanjun.as_slash_command("char", "Get information about the UTF-8 characters in the executing message.")

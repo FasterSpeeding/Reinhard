@@ -3,6 +3,10 @@ line-length     = 120
 target-version  = ["py39"]
 include         = ".*py$"
 
+[tool.isort]
+profile = "black"
+force_single_line = true
+
 [tool.pyright]
 include = ["reinhard"]
 
@@ -15,4 +19,5 @@ reportIncompatibleMethodOverride = "warning"  # This relies on ordering for key-
                                            # than it's worth
 reportUnknownMemberType = "warning"  # This messes with instance checking generic objects
 reportUnknownArgumentType = "warning"  # Pretty much the same as reportUnknownMemberType
+reportUnknownParameterType = "warning"  # Pretty much the same as reportUnknownMemberType
 reportUnusedFunction = "warning"  # This assumes decorator calls don't load a function into something for usage
