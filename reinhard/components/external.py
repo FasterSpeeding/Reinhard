@@ -817,7 +817,6 @@ async def tanjun_docs_command(
 
     master = TANJUN_PAGES + "/master/"
     if simple:
-        page = 0
         results = map(lambda metadata: f"[{metadata.fullname}]({metadata.make_link(master)})", index.search(path))
         iterator = (
             (
@@ -825,11 +824,11 @@ async def tanjun_docs_command(
                 hikari.Embed(
                     description="\n".join(entries),
                     color=constants.embed_colour(),
-                    title="Tanjun Documentation page " + str(page := page + 1),
+                    title="Tanjun Documentation",
                     url=TANJUN_PAGES + "/master/",
-                ),
+                ).set_footer(text=f"Page {index + 1}"),
             )
-            for entries in _chunk(results, 10)
+            for index, entries in enumerate(_chunk(results, 10))
         )
 
     else:
