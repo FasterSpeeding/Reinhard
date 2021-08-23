@@ -3,10 +3,15 @@ from __future__ import annotations
 import enum
 import typing
 
+import hikari
 from tanjun import errors
 
 if typing.TYPE_CHECKING:
     import datetime
+
+
+def to_media_avatar(url: hikari.URL | None, /) -> hikari.URL | None:
+    return hikari.URL(url.url.replace("cdn.discordapp.com", "media.discordapp.net")) if url else None
 
 
 def pretify_date(date: datetime.datetime) -> str:

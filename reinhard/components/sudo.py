@@ -154,6 +154,7 @@ async def eval_python_code_no_capture(ctx: tanjun.abc.Context, component: tanjun
 
 
 @sudo_component.with_message_command
+# @tanjun.with_option("ephemeral_response", "-e", "--ephemeral", converters=bool, default=False, empty_value=True)
 @tanjun.with_option("suppress_response", "-s", "--suppress", converters=bool, default=False, empty_value=True)
 @tanjun.with_option("file_output", "-f", "--file-out", "--file", converters=bool, default=False, empty_value=True)
 @tanjun.with_parser
@@ -161,6 +162,7 @@ async def eval_python_code_no_capture(ctx: tanjun.abc.Context, component: tanjun
 async def eval_command(
     ctx: tanjun.abc.MessageContext,
     file_output: bool = False,
+    # ephemeral_response: bool = False,
     suppress_response: bool = False,
     component: tanjun.abc.Component = tanjun.injected(type=tanjun.abc.Component),
     component_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),

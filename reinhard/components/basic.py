@@ -15,6 +15,7 @@ import tanjun
 import yuyo
 from hikari import snowflakes
 
+from ..util import basic as basic_util
 from ..util import constants
 from ..util import help as help_util
 from ..util import rest_manager
@@ -202,10 +203,11 @@ async def cache_command(
     )
 
     # TODO: try cache first + backoff
-    avatar = (await ctx.rest.fetch_my_user()).avatar_url
+    me = (ctx.cache.get_me() if ctx.cache else None) or await ctx.rest.fetch_my_user()
+    avatar_url = basic_util.to_media_avatar(me.avatar_url) or me.default_avatar_url
     embed = (
         hikari.Embed(description="An experimental pythonic Hikari bot.", color=0x55CDFC)
-        .set_author(name="Hikari: testing client", icon=avatar, url=hikari.__url__)
+        .set_author(name="Hikari: testing client", icon=avatar_url, url=hikari.__url__)
         .add_field(name="Uptime", value=str(uptime), inline=True)
         .add_field(
             name="Process",

@@ -409,7 +409,7 @@ async def youtube_command(
             This can be one of "date", "relevance", "title", "videoCount" or "viewCount" and defaults to "relevance".
         * language (-l, --language): The ISO 639-1 two letter identifier of the language to limit search to.
         * region (-r, --region): The ISO 3166-1 code of the region to search for results in.
-        * resource type (--type, -t):
+        * resource type (--type, -t): The type of resource to search for.
             This can be one of "channel", "playlist" or "video" and defaults to "video".
     """
     assert tokens.google is not None
@@ -656,24 +656,13 @@ async def docs_hikari_command(
         await error_manager.try_respond(ctx, embed=embed)
 
 
+EMPTY_ITER = iter(())
 SPECIAL_KEYS: frozenset[str] = frozenset(("df", "tf", "docs"))
 
 
-def _collect_pdoc_paths(data: dict[str, typing.Any], path_filter: str = "") -> collections.Iterator[str]:
-    if docs := data.get("docs"):
-        if path_filter:
-            yield from (key for key in docs.keys() if key.rsplit(".", 1)[0].endswith(path_filter))
-
-        else:
-            yield from docs.keys()
-
-    for key, value in data.items():
-        if key not in SPECIAL_KEYS:
-            yield from _collect_pdoc_paths(value, path_filter=path_filter)
-
-
 @dataclasses.dataclass(slots=True)
-class PdocEntryMetadata:
+class PdocEntry:
+    doc: str
     type: str
     func_def: str | None
     fullname: str
@@ -683,8 +672,9 @@ class PdocEntryMetadata:
     parameters: list[str] | None
 
     @classmethod
-    def from_entry(cls, data: dict[str, typing.Any], /) -> PdocEntryMetadata:
+    def from_entry(cls, data: dict[str, typing.Any], doc: str, /) -> PdocEntry:
         return cls(
+            doc,
             data["type"],
             data.get("funcdef"),
             data["fullname"],
@@ -701,30 +691,28 @@ class PdocEntryMetadata:
         return url + "/".join(self.module_name.split(".")) + fragment
 
 
-def _form_description(metadata: PdocEntryMetadata, doc: str | None) -> str:
-    summary = doc.split("\n", 1)[0] if doc else "NONE"
-    if metadata.func_def:
-        result = "Type: Async function" if metadata.func_def == "async def" else "Type: Sync function"
-        params = ", ".join(metadata.parameters or "")
-        return f"{result}\n\nSummary:\n```md\n{summary}\n```\nParameters:\n`{params}`"
+def _collect_pdoc_paths(data: dict[str, typing.Any], path_filter: str = "") -> collections.Iterator[str]:
+    if docs := data.get("docs"):
+        if path_filter:
+            yield from (key for key in docs.keys() if key.rsplit(".", 1)[0].endswith(path_filter))
 
-    return f"Type: {metadata.type}\n\nSummary\n```md\n{summary}\n```"
+        else:
+            yield from docs.keys()
 
-
-EMPTY_ITER = iter(())
+    for key, value in data.items():
+        if key not in SPECIAL_KEYS:
+            yield from _collect_pdoc_paths(value, path_filter=path_filter)
 
 
 class PdocIndex:
-    __slots__ = ("_doc_store", "_metadata", "_search_index")
+    __slots__ = ("_metadata", "_search_index")
 
     def __init__(self, data: dict[str, typing.Any], /) -> None:
-        self._doc_store: dict[str, str | None] = {}
-        self._metadata: dict[str, PdocEntryMetadata] = {}
+        self._metadata: dict[str, PdocEntry] = {}
 
         for name, entry in data["documentStore"]["docs"].items():
             doc: str = markdownify.markdownify(entry["doc"]).strip("\n").strip()
-            self._doc_store[name] = doc or None
-            self._metadata[name] = PdocEntryMetadata.from_entry(entry)
+            self._metadata[name] = PdocEntry.from_entry(entry, doc)
 
         # TODO: what is the difference between qualname and fullname here?
         self._search_index: dict[str, typing.Any] = data["index"]["qualname"]
@@ -733,13 +721,10 @@ class PdocIndex:
     def from_json(cls, data: str | bytes, /) -> PdocIndex:
         return cls(json.loads(data))
 
-    def get_doc(self, path: str, /) -> str | None:
-        return self._doc_store[path]
-
-    def get_metadata(self, path: str, /) -> PdocEntryMetadata:
+    def get_entry(self, path: str, /) -> PdocEntry:
         return self._metadata[path]
 
-    def search(self, full_name: str, /) -> collections.Iterator[str]:
+    def search(self, full_name: str, /) -> collections.Iterator[PdocEntry]:
         if not full_name:
             return EMPTY_ITER
 
@@ -756,7 +741,7 @@ class PdocIndex:
 
             current_pos = new_pos
 
-        return _collect_pdoc_paths(current_pos, path_filter=path)
+        return map(self._metadata.__getitem__, _collect_pdoc_paths(current_pos, path_filter=path))
 
 
 def _chunk(iterator: collections.Iterator[_ValueT], max: int) -> collections.Iterator[list[_ValueT]]:
@@ -769,6 +754,16 @@ def _chunk(iterator: collections.Iterator[_ValueT], max: int) -> collections.Ite
 
     if chunk:
         yield chunk
+
+
+def _form_description(metadata: PdocEntry) -> str:
+    summary = metadata.doc.split("\n", 1)[0] if metadata.doc else "NONE"
+    if metadata.func_def:
+        type_line = "Type: Async function" if metadata.func_def == "async def" else "Type: Sync function"
+        params = ", ".join(metadata.parameters or "")
+        return f"{type_line}\n\nSummary:\n```md\n{summary}\n```\nParameters:\n`{params}`"
+
+    return f"Type: {metadata.type.capitalize()}\n\nSummary\n```md\n{summary}\n```"
 
 
 @docs_group.with_command
@@ -791,7 +786,7 @@ async def tanjun_docs_command(
     master = TANJUN_PAGES + "/master/"
     if simple:
         page = 0
-        results = map(lambda link: f"[{link}]({index.get_metadata(link).make_link(master)})", index.search(path))
+        results = map(lambda metadata: f"[{metadata.fullname}]({metadata.make_link(master)})", index.search(path))
         iterator = (
             (
                 hikari.UNDEFINED,
@@ -806,18 +801,17 @@ async def tanjun_docs_command(
         )
 
     else:
-        results = map(lambda link: (index.get_metadata(link), index.get_doc(link)), index.search(path))
         iterator = (
             (
                 hikari.UNDEFINED,
                 hikari.Embed(
-                    description=_form_description(metadata, doc),
+                    description=_form_description(metadata),
                     color=constants.embed_colour(),
                     title=metadata.fullname,
                     url=metadata.make_link(master),
                 ),
             )
-            for metadata, doc in results
+            for metadata in index.search(path)
         )
 
     paginator = yuyo.ComponentPaginator(iterator, authors=(ctx.author,))

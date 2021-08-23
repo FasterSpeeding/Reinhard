@@ -140,7 +140,7 @@ async def member_command(ctx: tanjun.abc.Context, member: hikari.Member | None) 
             title=f"{member.user.username}#{member.user.discriminator}",
             url=f"https://discordapp.com/users/{member.user.id}",
         )
-        .set_thumbnail(member.user.avatar_url)
+        .set_thumbnail(basic_util.to_media_avatar(member.avatar_url) or member.default_avatar_url)
         .set_footer(text=str(member.user.id), icon=member.user.default_avatar_url)
     )
     error_manager.clear_rules()
@@ -209,7 +209,7 @@ async def user_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> Non
             title=f"{user.username}#{user.discriminator}",
             url=f"https://discordapp.com/users/{user.id}",
         )
-        .set_thumbnail(user.avatar_url)
+        .set_thumbnail(basic_util.to_media_avatar(user.avatar_url) or user.default_avatar_url)
         .set_footer(text=str(user.id), icon=user.default_avatar_url)
     )
     error_manager = rest_manager.HikariErrorManager(break_on=(hikari.ForbiddenError, hikari.NotFoundError))
@@ -232,7 +232,7 @@ async def avatar_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> N
         user = ctx.author
 
     error_manager = rest_manager.HikariErrorManager(break_on=(hikari.ForbiddenError, hikari.NotFoundError))
-    avatar = user.avatar_url or user.default_avatar_url
+    avatar = basic_util.to_media_avatar(user.avatar_url) or user.default_avatar_url
     embed = hikari.Embed(title=str(user), url=str(avatar), colour=constants.embed_colour()).set_image(avatar)
     await error_manager.try_respond(ctx, embed=embed)
 
