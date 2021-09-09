@@ -67,23 +67,11 @@ async def error_message_command(_: tanjun.abc.Context) -> None:
     raise Exception("This is an exception, get used to it.")
 
 
-@sudo_component.with_slash_command
-@tanjun.as_slash_command("error", "Command used for testing the current error handling.")
-async def error_slash_command(_: tanjun.abc.Context) -> None:
-    """Command used for testing the current error handling."""
-    raise Exception("This is an exception, get used to it.")
-
-
-@sudo_component.with_slash_command
-@tanjun.with_str_slash_option(
-    "raw_embed", "String JSON object of an embed for the bot to send.", converters=json.loads, default=hikari.UNDEFINED
-)
-@tanjun.with_str_slash_option(
-    "content",
-    "The greedy string content the bot should send back. This must be included if `embed` is not.",
-    default=hikari.UNDEFINED,
-)
-@tanjun.as_slash_command("echo", "Command used for getting the bot to mirror a response.")
+@sudo_component.with_message_command
+@tanjun.with_option("raw_embed", "--embed", "-e", converters=json.loads, default=hikari.UNDEFINED)
+@tanjun.with_greedy_argument("content", default=hikari.UNDEFINED)
+@tanjun.with_parser
+@tanjun.as_message_command("echo")
 async def echo_command(
     ctx: tanjun.abc.Context,
     content: hikari.UndefinedOr[str],
@@ -251,19 +239,6 @@ async def eval_command(
     content, embed = first_response
     message = await ctx.respond(content=content, embed=embed, component=response_paginator, ensure_result=True)
     component_client.add_executor(message, response_paginator)
-
-
-@sudo_component.with_slash_command
-@tanjun.as_slash_command("commands", "Get a list of the loaded commands")
-async def commands_command(ctx: tanjun.abc.Context) -> None:
-    lines: list[str] = []
-    for index, component in enumerate(ctx.client.components):
-        lines.append(f"Component {index}:")
-        lines.append("    Message commands: " + ", ".join(map(repr, component.message_commands)))
-        lines.append("    Slash commands: " + ", ".join(map(repr, component.slash_commands)))
-
-    error_manager = rest_manager.HikariErrorManager(break_on=(hikari.ForbiddenError, hikari.NotFoundError))
-    await error_manager.try_respond(ctx, content="Loaded Commands\n" + "\n".join(lines))
 
 
 @tanjun.as_loader
