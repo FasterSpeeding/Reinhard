@@ -768,7 +768,11 @@ class PdocIndex:
 
         current_pos: dict[str, typing.Any] = self._search_index["root"]
         for char in name:
-            if not (new_pos := current_pos.get(char)) or new_pos.get("tf"):
+            if not (new_pos := current_pos.get(char)):
+                # Sometimes the search path ends a bit pre-maturely.
+                if docs := current_pos.get("docs"):
+                    return (self._metadata[path] for path in docs.keys() if full_name in path.lower())
+
                 return EMPTY_ITER
 
             current_pos = new_pos
