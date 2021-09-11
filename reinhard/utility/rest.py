@@ -31,14 +31,17 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["AIOHTTPStatusHandler", "HikariErrorManager"]
+__all__: list[str] = ["AIOHTTPStatusHandler", "HikariErrorManager", "FetchedResource"]
 
+import typing
 from collections import abc as collections
 
 import aiohttp
 import hikari
 import tanjun
 from yuyo import backoff
+
+_ValueT = typing.TypeVar("_ValueT")
 
 
 class HikariErrorManager(backoff.ErrorManager):
@@ -146,3 +149,26 @@ class AIOHTTPStatusHandler(backoff.ErrorManager):
         self.with_rule((aiohttp.ClientResponseError,), self._on_client_response_error)
         self._break_on = set(break_on)
         self._on_404 = on_404
+
+
+class FetchedResource(typing.Generic[_ValueT]):
+    __slots__ = ("_authorization", "_headers", "_parse_data", "_path")
+
+    def __init__(
+        self,
+        path: str,
+        parse_data: collections.Callable[[bytes], _ValueT],
+        *,
+        authorization: aiohttp.BasicAuth | None = None,
+        headers: dict[str, typing.Any] | None = None,
+    ) -> None:
+        self._authorization = authorization
+        self._headers = headers
+        self._parse_data = parse_data
+        self._path = path
+
+    async def __call__(self, session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession)) -> _ValueT:
+        response = await session.get(self._path)
+        # TODO: better handling
+        response.raise_for_status()
+        return self._parse_data(await response.read())

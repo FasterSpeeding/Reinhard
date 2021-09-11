@@ -39,8 +39,7 @@ import yuyo
 from hikari import config as hikari_config
 
 from . import config as config_
-from .util import command_hooks
-from .util import dependencies
+from . import utility
 
 if typing.TYPE_CHECKING:
     from hikari import traits as hikari_traits
@@ -73,22 +72,25 @@ def build(bot: hikari_traits.GatewayBotAware, /, *, config: config_.FullConfig |
             bot, mention_prefix=config.mention_prefix, set_global_commands=config.set_global_commands
         )
         .set_hooks(
-            tanjun.AnyHooks().set_on_parser_error(command_hooks.on_parser_error).set_on_error(command_hooks.on_error)
+            tanjun.AnyHooks()
+            .set_on_parser_error(utility.command_hooks.on_parser_error)
+            .set_on_error(utility.command_hooks.on_error)
         )
         .add_prefix(config.prefixes)
         .add_type_dependency(
             aiohttp.ClientSession,
-            dependencies.SessionDependency(bot.http_settings, bot.proxy_settings, "Reinhard discord bot"),
+            utility.dependencies.SessionDependency(bot.http_settings, bot.proxy_settings, "Reinhard discord bot"),
         )
         .add_type_dependency(config_.FullConfig, lambda: typing.cast(config_.FullConfig, config))
         .add_type_dependency(config_.Tokens, lambda: typing.cast(config_.FullConfig, config).tokens)
-        .add_type_dependency(yuyo.ReactionClient, dependencies.ReactionClientDependency())
-        .add_type_dependency(yuyo.ComponentClient, dependencies.ComponentClientDependency())
+        .add_type_dependency(yuyo.ReactionClient, utility.dependencies.ReactionClientDependency())
+        .add_type_dependency(yuyo.ComponentClient, utility.dependencies.ComponentClientDependency())
         .load_modules("reinhard.components.basic")
+        .load_modules("reinhard.components.docs")
         .load_modules("reinhard.components.external")
         .load_modules("reinhard.components.moderation")
         .load_modules("reinhard.components.sudo")
-        .load_modules("reinhard.components.util")
+        .load_modules("reinhard.components.utility")
     )
 
     if config.ptf:

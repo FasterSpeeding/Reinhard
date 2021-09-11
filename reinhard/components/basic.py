@@ -46,10 +46,7 @@ import tanjun
 import yuyo
 from hikari import snowflakes
 
-from ..util import basic as basic_util
-from ..util import constants
-from ..util import help as help_util
-from ..util import rest_manager
+from .. import utility
 
 
 def gen_help_embeds(
@@ -60,14 +57,14 @@ def gen_help_embeds(
 
     help_embeds: dict[str, list[hikari.Embed]] = {}
     for component in ctx.client.components:
-        if value := help_util.generate_help_embeds(component, prefix=prefix):
+        if value := utility.help.generate_help_embeds(component, prefix=prefix):
             help_embeds[value[0].lower()] = [v for v in value[1]]
 
     return help_embeds
 
 
 basic_component = tanjun.Component(strict=True)
-help_util.with_docs(basic_component, "Basic commands", "Commands provided to give information about this bot.")
+utility.help.with_docs(basic_component, "Basic commands", "Commands provided to give information about this bot.")
 
 
 @basic_component.with_slash_command
@@ -95,7 +92,7 @@ async def about_command(
         "The source can be found on [Github](https://github.com/FasterSpeeding/Reinhard)."
     )
     embed = (
-        hikari.Embed(description=description, colour=constants.embed_colour())
+        hikari.Embed(description=description, colour=utility.constants.embed_colour())
         .set_author(name=name, url=hikari.__url__)
         .add_field(name="Uptime", value=str(uptime), inline=True)
         .add_field(
@@ -109,7 +106,7 @@ async def about_command(
         )
     )
 
-    error_manager = rest_manager.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
+    error_manager = utility.rest.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
     await error_manager.try_respond(ctx, embed=embed)
 
 
@@ -148,7 +145,7 @@ async def old_help_command(
 
         prefix = next(iter(ctx.client.prefixes)) if ctx.client.prefixes else ""
         for _, command in ctx.client.check_message_name(command_name):
-            if command_embed := help_util.generate_command_embed(command, prefix=prefix):
+            if command_embed := utility.help.generate_command_embed(command, prefix=prefix):
                 await ctx.respond(embed=command_embed)
                 break
 
@@ -235,7 +232,7 @@ async def cache_command(
 
     # TODO: try cache first + backoff
     me = (ctx.cache.get_me() if ctx.cache else None) or await ctx.rest.fetch_my_user()
-    avatar_url = basic_util.to_media_avatar(me.avatar_url) or me.default_avatar_url
+    avatar_url = utility.basic.to_media_avatar(me.avatar_url) or me.default_avatar_url
     embed = (
         hikari.Embed(description="An experimental pythonic Hikari bot.", color=0x55CDFC)
         .set_author(name="Hikari: testing client", icon=avatar_url, url=hikari.__url__)
@@ -252,7 +249,7 @@ async def cache_command(
         )
     )
 
-    error_manager = rest_manager.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
+    error_manager = utility.rest.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
     await error_manager.try_respond(ctx, content=f"{storage_time_taken * 1_000:.4g} ms", embed=embed)
 
 

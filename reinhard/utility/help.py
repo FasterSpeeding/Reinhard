@@ -46,7 +46,7 @@ from collections import abc as collections
 from hikari import embeds as embeds_
 from yuyo import pagination
 
-from ..util import constants
+from ..utility import constants
 
 if typing.TYPE_CHECKING:
     from tanjun import abc as tanjun_abc

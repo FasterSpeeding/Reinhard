@@ -40,14 +40,13 @@ import hikari
 import tanjun
 from yuyo import backoff
 
-from ..util import help as help_util
-from ..util import rest_manager
+from .. import utility
 
 MAX_MESSAGE_BULK_DELETE = datetime.timedelta(weeks=2)
 
 
 moderation_component = tanjun.Component(strict=True)
-help_util.with_docs(moderation_component, "Moderation commands", "Moderation oriented commands.")
+utility.help.with_docs(moderation_component, "Moderation commands", "Moderation oriented commands.")
 
 
 @moderation_component.with_slash_command
@@ -146,7 +145,7 @@ async def clear_command(
 
     iterator = iterator.map(lambda x: x.id).chunk(100)
     retry = backoff.Backoff(max_retries=5)
-    error_manager = rest_manager.HikariErrorManager(retry, break_on=(hikari.NotFoundError, hikari.ForbiddenError))
+    error_manager = utility.rest.HikariErrorManager(retry, break_on=(hikari.NotFoundError, hikari.ForbiddenError))
 
     with error_manager:
         async for messages in iterator:
