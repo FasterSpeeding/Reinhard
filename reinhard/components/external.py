@@ -183,61 +183,6 @@ class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
         return (self._buffer.pop(0)["external_urls"]["spotify"], hikari.UNDEFINED)
 
 
-class ClientCredentialsOauth2:
-    __slots__ = ("_authorization", "_expire_at", "_path", "_prefix", "_token")
-
-    def __init__(self, path: str, client_id: str, client_secret: str, *, prefix: str = "Bearer ") -> None:
-        self._authorization = aiohttp.BasicAuth(client_id, client_secret)
-        self._expire_at = 0
-        self._path = path
-        self._prefix = prefix
-        self._token: str | None = None
-
-    @property
-    def _expired(self) -> bool:
-        return time.time() >= self._expire_at
-
-    async def acquire_token(self, session: aiohttp.ClientSession) -> str:
-        if self._token and not self._expired:
-            return self._token
-
-        response = await session.post(self._path, data={"grant_type": "client_credentials"}, auth=self._authorization)
-
-        if 200 <= response.status < 300:
-            try:
-                data = await response.json()
-                expire = round(time.time()) + data["expires_in"] - 120
-                token = data["access_token"]
-
-            except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError, KeyError, TypeError) as exc:
-                _LOGGER.exception(
-                    "Couldn't decode or handle client credentials response received from %s: %r",
-                    self._path,
-                    await response.text(),
-                    exc_info=exc,
-                )
-
-            else:
-                self._expire_at = expire
-                self._token = f"{self._prefix} {token}"
-                return self._token
-
-        else:
-            _LOGGER.warning(
-                "Received %r from %s while trying to authenticate as client credentials",
-                response.status,
-                self._path,
-            )
-        raise tanjun.CommandError("Couldn't authenticate")
-
-    @classmethod
-    def spotify(cls, config: config_.Tokens = tanjun.injected(type=config_.Tokens)) -> ClientCredentialsOauth2:
-        if not config.spotify_id or not config.spotify_secret:
-            raise tanjun.MissingDependencyError("Missing spotify secret and/or client id")
-
-        return cls("https://accounts.spotify.com/api/token", config.spotify_id, config.spotify_secret)
-
-
 external_component = tanjun.Component(strict=True)
 utility.help.with_docs(
     external_component, "External API commands", "A utility component used for getting data from 3rd party APIs."
@@ -516,6 +461,17 @@ async def query_nekos_life(
     return result
 
 
+def _build_spotify_auth(
+    config: config_.Tokens = tanjun.injected(type=config_.Tokens),
+) -> utility.rest.ClientCredentialsOauth2:
+    if not config.spotify_id or not config.spotify_secret:
+        raise tanjun.MissingDependencyError("Missing spotify secret and/or client id")
+
+    return utility.rest.ClientCredentialsOauth2(
+        "https://accounts.spotify.com/api/token", config.spotify_id, config.spotify_secret
+    )
+
+
 # TODO: add valid options for Options maybe?
 @external_component.with_slash_command
 @tanjun.with_str_slash_option(
@@ -532,8 +488,8 @@ async def spotify_command(
     resource_type: str,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
     component_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
-    spotify_auth: ClientCredentialsOauth2 = tanjun.injected(
-        callback=tanjun.cache_callback(ClientCredentialsOauth2.spotify)
+    spotify_auth: utility.rest.ClientCredentialsOauth2 = tanjun.injected(
+        callback=tanjun.cache_callback(_build_spotify_auth)
     ),
 ) -> None:
     """Search for a resource on spotify.

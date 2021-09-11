@@ -33,7 +33,6 @@ from __future__ import annotations
 
 import typing
 
-import aiohttp
 import tanjun
 import yuyo
 from hikari import config as hikari_config
@@ -67,6 +66,8 @@ def build(bot: hikari_traits.GatewayBotAware, /, *, config: config_.FullConfig |
     if config is None:
         config = config_.load_config()
 
+    component_client = yuyo.ComponentClient(event_manager=bot.event_manager)
+    reaction_client = yuyo.ReactionClient(rest=bot.rest, event_manager=bot.event_manager)
     client = (
         tanjun.Client.from_gateway_bot(
             bot, mention_prefix=config.mention_prefix, set_global_commands=config.set_global_commands
@@ -76,21 +77,22 @@ def build(bot: hikari_traits.GatewayBotAware, /, *, config: config_.FullConfig |
             .set_on_parser_error(utility.command_hooks.on_parser_error)
             .set_on_error(utility.command_hooks.on_error)
         )
+        .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open)
+        .add_client_callback(tanjun.ClientCallbackNames.CLOSING, component_client.close)
         .add_prefix(config.prefixes)
-        .add_type_dependency(
-            aiohttp.ClientSession,
-            utility.dependencies.SessionDependency(bot.http_settings, bot.proxy_settings, "Reinhard discord bot"),
-        )
         .add_type_dependency(config_.FullConfig, lambda: typing.cast(config_.FullConfig, config))
         .add_type_dependency(config_.Tokens, lambda: typing.cast(config_.FullConfig, config).tokens)
-        .add_type_dependency(yuyo.ReactionClient, utility.dependencies.ReactionClientDependency())
-        .add_type_dependency(yuyo.ComponentClient, utility.dependencies.ComponentClientDependency())
+        .add_type_dependency(yuyo.ReactionClient, lambda: reaction_client)
+        .add_type_dependency(yuyo.ComponentClient, lambda: component_client)
         .load_modules("reinhard.components.basic")
         .load_modules("reinhard.components.docs")
         .load_modules("reinhard.components.external")
         .load_modules("reinhard.components.moderation")
         .load_modules("reinhard.components.sudo")
         .load_modules("reinhard.components.utility")
+    )
+    utility.dependencies.SessionManager(bot.http_settings, bot.proxy_settings, "Reinhard discord bot").load_into_client(
+        client
     )
 
     if config.ptf:

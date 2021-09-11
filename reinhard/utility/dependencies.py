@@ -31,24 +31,23 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["SessionDependency", "ReactionClientDependency", "ComponentClientDependency"]
+__all__: list[str] = ["SessionManager"]
 
 import asyncio
 import logging
 import typing
 
 import aiohttp
-import yuyo
-from hikari import traits
-from tanjun import injecting
+import tanjun
 
 if typing.TYPE_CHECKING:
     from hikari import config
 
+
 _LOGGER = logging.getLogger("hikari.reinhard")
 
 
-class SessionDependency:  # TODO: add on_closing, closed, opening and opened handlers to Tanjun
+class SessionManager:
     __slots__ = ("http_settings", "proxy_settings", "_session", "user_agent")
 
     def __init__(
@@ -60,57 +59,40 @@ class SessionDependency:  # TODO: add on_closing, closed, opening and opened han
         self.user_agent = user_agent
 
     def __call__(self) -> aiohttp.ClientSession:
-        # Assert that this is only called within a live event loop
-        asyncio.get_running_loop()
-        if self._session is None:
-            # Assert this is only called within an active event loop
-            self._session = aiohttp.ClientSession(
-                headers={"User-Agent": self.user_agent},
-                raise_for_status=False,
-                timeout=aiohttp.ClientTimeout(
-                    connect=self.http_settings.timeouts.acquire_and_connect,
-                    sock_connect=self.http_settings.timeouts.request_socket_connect,
-                    sock_read=self.http_settings.timeouts.request_socket_read,
-                    total=self.http_settings.timeouts.total,
-                ),
-                trust_env=self.proxy_settings.trust_env,
-            )
-            _LOGGER.debug("acquired new aiohttp client session")
+        if not self._session:
+            raise RuntimeError("Session isn't active")
 
         return self._session
 
+    def load_into_client(self, client: tanjun.Client) -> None:
+        client.add_client_callback(tanjun.ClientCallbackNames.STARTING, self.open).add_client_callback(
+            tanjun.ClientCallbackNames.CLOSING, self.close
+        ).add_type_dependency(aiohttp.ClientSession, self)
 
-class ReactionClientDependency:
-    __slots__ = ("_client",)
+    def open(self) -> None:
+        if self._session:
+            raise RuntimeError("Session already running")
 
-    def __init__(self) -> None:
-        self._client: yuyo.ReactionClient | None = None
+        # Assert that this is only called within a live event loop
+        asyncio.get_running_loop()
+        # Assert this is only called within an active event loop
+        self._session = aiohttp.ClientSession(
+            headers={"User-Agent": self.user_agent},
+            raise_for_status=False,
+            timeout=aiohttp.ClientTimeout(
+                connect=self.http_settings.timeouts.acquire_and_connect,
+                sock_connect=self.http_settings.timeouts.request_socket_connect,
+                sock_read=self.http_settings.timeouts.request_socket_read,
+                total=self.http_settings.timeouts.total,
+            ),
+            trust_env=self.proxy_settings.trust_env,
+        )
+        _LOGGER.debug("acquired new aiohttp client session")
 
-    def __call__(
-        self,
-        rest_client: traits.RESTAware = injecting.injected(type=traits.RESTAware),
-        event_client: traits.EventManagerAware = injecting.injected(type=traits.EventManagerAware),
-    ) -> yuyo.ReactionClient:
-        if not self._client or self._client.is_closed:
-            self._client = yuyo.ReactionClient(rest=rest_client.rest, event_manager=event_client.event_manager)
-            asyncio.create_task(self._client.open())
+    async def close(self) -> None:
+        if not self._session:
+            raise RuntimeError("Session not running")
 
-        return self._client
-
-
-class ComponentClientDependency:
-    __slots__ = ("_client",)
-
-    def __init__(self) -> None:
-        self._client: yuyo.ComponentClient | None = None
-
-    def __call__(
-        self,
-        event_client: traits.EventManagerAware = injecting.injected(type=traits.EventManagerAware),
-        # interaction_client: traits.InteractionServerAware  # TODO: needs defaults for this to work
-    ) -> yuyo.ComponentClient:
-        if not self._client:
-            self._client = yuyo.ComponentClient(event_manager=event_client.event_manager)
-            self._client.open()
-
-        return self._client
+        session = self._session
+        self._session = None
+        await session.close()

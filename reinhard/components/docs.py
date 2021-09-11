@@ -266,6 +266,7 @@ async def _docs_command(
     simple: bool,
     base_url: str,
     docs_url: str,
+    name: str,
 ) -> None:
     if not path:
         await ctx.respond(base_url)
@@ -281,7 +282,7 @@ async def _docs_command(
                 hikari.Embed(
                     description="\n".join(entries),
                     color=utility.constants.embed_colour(),
-                    title="Tanjun Documentation",
+                    title=f"{name} Documentation",
                     url=docs_url,
                 ).set_footer(text=f"Page {index + 1}"),
             )
@@ -333,7 +334,16 @@ async def docs_hikari_command(
     Arguments
         * path: Optional argument to query Hikari's documentation by.
     """
-    await _docs_command(ctx, path, component_client, index, simple, HIKARI_PAGES, HIKARI_PAGES + "/hikari/")
+    await _docs_command(
+        ctx,
+        path,
+        component_client,
+        index,
+        simple,
+        HIKARI_PAGES,
+        HIKARI_PAGES + "/hikari/",
+        "Hikari",
+    )
 
 
 @docs_group.with_command
@@ -352,4 +362,9 @@ async def tanjun_docs_command(
     ),
     simple: bool = False,
 ) -> None:
-    await _docs_command(ctx, path, component_client, index, simple, TANJUN_PAGES, TANJUN_PAGES + "/master/")
+    await _docs_command(ctx, path, component_client, index, simple, TANJUN_PAGES, TANJUN_PAGES + "/master/", "Tanjun")
+
+
+@tanjun.as_loader
+def load_component(cli: tanjun.abc.Client, /) -> None:
+    cli.add_component(docs_component.copy())
