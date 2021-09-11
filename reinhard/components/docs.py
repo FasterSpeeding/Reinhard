@@ -248,8 +248,13 @@ def _chunk(iterator: collections.Iterator[_ValueT], max: int) -> collections.Ite
         yield chunk
 
 
-def _form_description(metadata: DocEntry) -> str:
-    summary = metadata.doc.split("\n", 1)[0] if metadata.doc else "NONE"
+def _form_description(metadata: DocEntry, *, description_splitter: str = "\n") -> str:
+    if metadata.doc:
+        summary = metadata.doc.split(description_splitter, 1)[0]
+        if description_splitter != "\n":
+            summary += description_splitter
+    else:
+        summary = "NONE"
     if metadata.func_def:
         type_line = "Type: Async function" if metadata.func_def == "async def" else "Type: Sync function"
         params = ", ".join(metadata.parameters or "")
@@ -267,6 +272,7 @@ async def _docs_command(
     base_url: str,
     docs_url: str,
     name: str,
+    description_splitter: str = "\n",
 ) -> None:
     if not path:
         await ctx.respond(base_url)
@@ -294,7 +300,7 @@ async def _docs_command(
             (
                 hikari.UNDEFINED,
                 hikari.Embed(
-                    description=_form_description(metadata),
+                    description=_form_description(metadata, description_splitter=description_splitter),
                     color=utility.constants.embed_colour(),
                     title=metadata.fullname,
                     url=index.make_link(docs_url, metadata),
@@ -343,6 +349,7 @@ async def docs_hikari_command(
         HIKARI_PAGES,
         HIKARI_PAGES + "/hikari/",
         "Hikari",
+        description_splitter=".",
     )
 
 

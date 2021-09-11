@@ -239,7 +239,7 @@ async def cache_command(
         .add_field(name="Uptime", value=str(uptime), inline=True)
         .add_field(
             name="Process",
-            value=f"{memory_usage:.2f} MiB ({memory_percent:.0f}%)\n{cpu_usage:.2f}% CPU",
+            value=f"{memory_usage:.2f} MB ({memory_percent:.0f}%)\n{cpu_usage:.2f}% CPU",
             inline=True,
         )
         .add_field(name="Standard cache stats", value=f"```{cache_stats}```")
