@@ -31,7 +31,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["AIOHTTPStatusHandler", "HikariErrorManager", "FetchedResource", "ClientCredentialsOauth2"]
+__all__: list[str] = ["AIOHTTPStatusHandler", "ClientCredentialsOauth2", "FetchedResource", "HikariErrorManager"]
 
 import logging
 import time

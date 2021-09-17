@@ -79,7 +79,7 @@ class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
     async def __anext__(self) -> tuple[str, hikari.UndefinedType]:
         if not self._next_page_token and self._next_page_token is not None:
             retry = yuyo.Backoff(max_retries=5)
-            error_manager = utility.rest.AIOHTTPStatusHandler(retry, break_on=(404,))
+            error_manager = utility.AIOHTTPStatusHandler(retry, break_on=(404,))
 
             parameters = self._parameters.copy()
             parameters["pageToken"] = self._next_page_token
@@ -148,9 +148,7 @@ class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
             retry = yuyo.Backoff(max_retries=5)
             resource_type = self._parameters["type"]
             assert isinstance(resource_type, str)
-            error_manager = utility.rest.AIOHTTPStatusHandler(
-                retry, on_404=utility.basic.raise_error(None, StopAsyncIteration)
-            )
+            error_manager = utility.AIOHTTPStatusHandler(retry, on_404=utility.raise_error(None, StopAsyncIteration))
             parameters = self._parameters.copy()
             parameters["offset"] = self._offset
             self._offset += self._limit
@@ -184,9 +182,6 @@ class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
 
 
 external_component = tanjun.Component(strict=True)
-utility.help.with_docs(
-    external_component, "External API commands", "A utility component used for getting data from 3rd party APIs."
-)
 
 
 @external_component.with_slash_command
@@ -204,7 +199,7 @@ async def lyrics_command(
         * query: Greedy query string (e.g. name) to search a song by.
     """
     retry = yuyo.Backoff(max_retries=5)
-    error_manager = utility.rest.AIOHTTPStatusHandler(retry, on_404=f"Couldn't find the lyrics for `{query[:1960]}`")
+    error_manager = utility.AIOHTTPStatusHandler(retry, on_404=f"Couldn't find the lyrics for `{query[:1960]}`")
     async for _ in retry:
         with error_manager:
             response = await session.get("https://evan.lol/lyrics/search/top", params={"q": query})
@@ -217,9 +212,7 @@ async def lyrics_command(
     try:
         data = await response.json()
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError) as exc:
-        hikari_error_manager = utility.rest.HikariErrorManager(
-            retry, break_on=(hikari.NotFoundError, hikari.ForbiddenError)
-        )
+        hikari_error_manager = utility.HikariErrorManager(retry, break_on=(hikari.NotFoundError, hikari.ForbiddenError))
         await hikari_error_manager.try_respond(ctx, content="Invalid data returned by server.")
 
         _LOGGER.exception(
@@ -242,7 +235,7 @@ async def lyrics_command(
     pages = (
         (
             hikari.UNDEFINED,
-            hikari.Embed(description=page, colour=utility.constants.embed_colour())
+            hikari.Embed(description=page, colour=utility.embed_colour())
             .set_footer(text=f"Page {index + 1}")
             .set_author(icon=icon, name=title),
         )
@@ -364,7 +357,7 @@ async def youtube_command(
 
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError) as exc:
         _LOGGER.exception("Youtube returned invalid data", exc_info=exc)
-        error_manager = utility.rest.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
+        error_manager = utility.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
         await error_manager.try_respond(ctx, content="Youtube returned invalid data.")
         raise
 
@@ -381,8 +374,8 @@ def _youtube_token_check(_: tanjun.abc.Context, tokens: config_.Tokens = tanjun.
 
 # This API is currently dead (always returning 5xxs)
 # @external_component.with_message_command
-# @utility.help.with_parameter_doc("--source | -s", "The optional argument of a show's title.")
-# @utility.help.with_command_doc("Get a random cute anime image.")
+# @utility.with_parameter_doc("--source | -s", "The optional argument of a show's title.")
+# @utility.with_command_doc("Get a random cute anime image.")
 # @tanjun.with_option("source", "--source", "-s", default=None)
 # @tanjun.with_parser
 # @tanjun.as_message_command("moe")  # TODO: https://lewd.bowsette.pictures/api/request
@@ -396,7 +389,7 @@ async def moe_command(
         params["source"] = source
 
     retry = yuyo.Backoff(max_retries=5)
-    error_manager = utility.rest.AIOHTTPStatusHandler(
+    error_manager = utility.AIOHTTPStatusHandler(
         retry, on_404=f"Couldn't find source `{source[:1970]}`" if source is not None else "couldn't access api"
     )
     async for _ in retry:
@@ -408,9 +401,7 @@ async def moe_command(
     else:
         raise tanjun.CommandError("Couldn't get an image in time") from None
 
-    hikari_error_manager = utility.rest.HikariErrorManager(
-        retry, break_on=(hikari.NotFoundError, hikari.ForbiddenError)
-    )
+    hikari_error_manager = utility.HikariErrorManager(retry, break_on=(hikari.NotFoundError, hikari.ForbiddenError))
 
     try:
         data = (await response.json())["data"]
@@ -463,11 +454,11 @@ async def query_nekos_life(
 
 def _build_spotify_auth(
     config: config_.Tokens = tanjun.injected(type=config_.Tokens),
-) -> utility.rest.ClientCredentialsOauth2:
+) -> utility.ClientCredentialsOauth2:
     if not config.spotify_id or not config.spotify_secret:
         raise tanjun.MissingDependencyError("Missing spotify secret and/or client id")
 
-    return utility.rest.ClientCredentialsOauth2(
+    return utility.ClientCredentialsOauth2(
         "https://accounts.spotify.com/api/token", config.spotify_id, config.spotify_secret
     )
 
@@ -488,7 +479,7 @@ async def spotify_command(
     resource_type: str,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
     component_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
-    spotify_auth: utility.rest.ClientCredentialsOauth2 = tanjun.injected(
+    spotify_auth: utility.ClientCredentialsOauth2 = tanjun.injected(
         callback=tanjun.cache_callback(_build_spotify_auth)
     ),
 ) -> None:
@@ -520,7 +511,7 @@ async def spotify_command(
 
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError) as exc:
         _LOGGER.exception("Spotify returned invalid data", exc_info=exc)
-        error_manager = utility.rest.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
+        error_manager = utility.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
         await error_manager.try_respond(ctx, content="Spotify returned invalid data.")
         raise
 
@@ -530,17 +521,18 @@ async def spotify_command(
         component_client.add_executor(message, response_paginator)
 
 
-@external_component.with_slash_command
+@external_component.with_message_command
 @tanjun.with_owner_check
-@tanjun.with_str_slash_option("url", "The url to download from", converters=urllib.parse.ParseResult)
-@tanjun.as_slash_command("ytdl", "Owner only command to download a vid using youtube-dl")
+@tanjun.with_argument("url", converters=urllib.parse.ParseResult)
+@tanjun.with_parser
+@tanjun.as_message_command("ytdl")
 async def ytdl_command(
     ctx: tanjun.abc.Context,
     url: urllib.parse.ParseResult,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
     config: config_.PTFConfig = tanjun.injected(type=config_.PTFConfig),
-    ytdl_client: utility.ytdl.YoutubeDownloader = tanjun.injected(
-        callback=tanjun.cache_callback(utility.ytdl.YoutubeDownloader.spawn)
+    ytdl_client: utility.YoutubeDownloader = tanjun.injected(
+        callback=tanjun.cache_callback(utility.YoutubeDownloader.spawn)
     ),
 ) -> None:
     auth = aiohttp.BasicAuth(config.username, config.password)

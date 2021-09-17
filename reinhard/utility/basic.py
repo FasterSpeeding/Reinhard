@@ -31,22 +31,32 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
+__all__: list[str] = ["basic_name_grid", "pretify_date", "pretify_index", "raise_error"]
+
 import enum
 import typing
 
-import hikari
 from tanjun import errors
 
 if typing.TYPE_CHECKING:
     import datetime
 
 
-def to_media_avatar(url: hikari.URL | None, /) -> hikari.URL | None:
-    return hikari.URL(url.url.replace("cdn.discordapp.com", "media.discordapp.net")) if url else None
-
-
 def pretify_date(date: datetime.datetime) -> str:
     return date.strftime("%a %d %b %Y %H:%M:%S %Z")
+
+
+def pretify_index(index: int, max_digit_count: int) -> str:
+    remainder = index % 10
+    name = str(index).zfill(max_digit_count)
+    if remainder == 1 and index % 100 != 11:
+        return f"{name}st"
+    if remainder == 2 and index % 100 != 12:
+        return f"{name}nd"
+    if remainder == 3 and index % 100 != 13:
+        return f"{name}rd"
+
+    return f"{name}th"
 
 
 class _ErrorRaiserT(typing.Protocol):

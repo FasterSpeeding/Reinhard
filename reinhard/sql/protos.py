@@ -31,20 +31,42 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__ = ["AMARANTH_PINK", "embed_colour", "FAILED_COLOUR", "MAYA_BLUE", "PASS_COLOUR", "WHITE"]
+__all__: list[str] = []
 
-import random
+import datetime
 import typing
 
-from hikari import colours
 
-FAILED_COLOUR: typing.Final[colours.Colour] = colours.Colour(0xF04747)
-PASS_COLOUR: typing.Final[colours.Colour] = colours.Colour(0x43B581)
+class StarredMessage(typing.Protocol):
+    message_id: int
+    message_content: str
+    channel_id: int
+    author_id: int
+    author_avatar_hash: str | None
+    message_status: int
+    starboard_message_id: int
 
-MAYA_BLUE: typing.Final[colours.Colour] = colours.Colour(0x55CDFC)
-WHITE: typing.Final[colours.Colour] = colours.Colour(0xFFFFFE)  # 0xFFFFFF is treated as no colour in embeds by Discord.
-AMARANTH_PINK: typing.Final[colours.Colour] = colours.Colour(0xF7A8B8)
+
+class Star(typing.Protocol):
+    message_id: int
+    starrer_id: int
 
 
-def embed_colour() -> colours.Colour:
-    return random.choices((MAYA_BLUE, WHITE, AMARANTH_PINK), (2, 1, 2))[0]
+class Guild(typing.Protocol):
+    id: int
+    starboard_channel_id: int | None
+    log_members: bool
+    member_join_log: int | None
+    message_spam_system: bool
+
+
+class BotUserBan(typing.Protocol):
+    user_id: int
+    reason: str
+    expires_at: datetime.datetime | None
+
+
+class BotGuildBan(typing.Protocol):
+    guild_id: int
+    reason: str
+    expires_at: datetime.datetime | None

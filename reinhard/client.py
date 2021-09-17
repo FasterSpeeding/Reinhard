@@ -72,28 +72,23 @@ def build(bot: hikari_traits.GatewayBotAware, /, *, config: config_.FullConfig |
         tanjun.Client.from_gateway_bot(
             bot, mention_prefix=config.mention_prefix, set_global_commands=config.set_global_commands
         )
-        .set_hooks(
-            tanjun.AnyHooks()
-            .set_on_parser_error(utility.command_hooks.on_parser_error)
-            .set_on_error(utility.command_hooks.on_error)
-        )
+        .set_hooks(tanjun.AnyHooks().set_on_parser_error(utility.on_parser_error).set_on_error(utility.on_error))
         .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open)
         .add_client_callback(tanjun.ClientCallbackNames.CLOSING, component_client.close)
         .add_prefix(config.prefixes)
-        .add_type_dependency(config_.FullConfig, lambda: typing.cast(config_.FullConfig, config))
-        .add_type_dependency(config_.Tokens, lambda: typing.cast(config_.FullConfig, config).tokens)
-        .add_type_dependency(yuyo.ReactionClient, lambda: reaction_client)
-        .add_type_dependency(yuyo.ComponentClient, lambda: component_client)
+        .set_type_dependency(config_.FullConfig, lambda: typing.cast(config_.FullConfig, config))
+        .set_type_dependency(config_.Tokens, lambda: typing.cast(config_.FullConfig, config).tokens)
+        .set_type_dependency(yuyo.ReactionClient, lambda: reaction_client)
+        .set_type_dependency(yuyo.ComponentClient, lambda: component_client)
         .load_modules("reinhard.components.basic")
         .load_modules("reinhard.components.docs")
         .load_modules("reinhard.components.external")
         .load_modules("reinhard.components.moderation")
+        .load_modules("reinhard.components.roles")
         .load_modules("reinhard.components.sudo")
         .load_modules("reinhard.components.utility")
     )
-    utility.dependencies.SessionManager(bot.http_settings, bot.proxy_settings, "Reinhard discord bot").load_into_client(
-        client
-    )
+    utility.SessionManager(bot.http_settings, bot.proxy_settings, "Reinhard discord bot").load_into_client(client)
 
     if config.ptf:
         ptf = config.ptf

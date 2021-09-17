@@ -31,6 +31,8 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
+__all__ = ["on_error", "on_parser_error"]
+
 import hikari
 import tanjun
 from yuyo import backoff

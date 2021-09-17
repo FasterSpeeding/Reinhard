@@ -268,6 +268,7 @@ async def _docs_command(
     path: str | None,
     component_client: yuyo.ComponentClient,
     index: DocIndex,
+    public: bool,
     simple: bool,
     base_url: str,
     docs_url: str,
@@ -287,7 +288,7 @@ async def _docs_command(
                 hikari.UNDEFINED,
                 hikari.Embed(
                     description="\n".join(entries),
-                    color=utility.constants.embed_colour(),
+                    color=utility.embed_colour(),
                     title=f"{name} Documentation",
                     url=docs_url,
                 ).set_footer(text=f"Page {index + 1}"),
@@ -301,7 +302,7 @@ async def _docs_command(
                 hikari.UNDEFINED,
                 hikari.Embed(
                     description=_form_description(metadata, description_splitter=description_splitter),
-                    color=utility.constants.embed_colour(),
+                    color=utility.embed_colour(),
                     title=metadata.fullname,
                     url=index.make_link(docs_url, metadata),
                 ),
@@ -309,7 +310,7 @@ async def _docs_command(
             for metadata in index.search(path)
         )
 
-    paginator = yuyo.ComponentPaginator(iterator, authors=(ctx.author,))
+    paginator = yuyo.ComponentPaginator(iterator, authors=(ctx.author,) if public else ())
     if first_response := await paginator.get_next_entry():
         content, embed = first_response
         message = await ctx.respond(content=content, component=paginator, embed=embed, ensure_result=True)
@@ -322,14 +323,18 @@ async def _docs_command(
 @docs_group.with_command
 @tanjun.with_bool_slash_option("simple", "Whether this should only list links. Defaults to False.", default=False)
 @tanjun.with_str_slash_option("path", "Optional path to query Hikari's documentation by.", default=None)
+@tanjun.with_bool_slash_option(
+    "public", "Whether other people should be able to interact with the response. Defaults to False", default=False
+)
 @tanjun.as_slash_command("hikari", "Search Hikari's documentation")
 async def docs_hikari_command(
     ctx: tanjun.abc.Context,
     path: str | None,
+    public: bool,
     simple: bool,
     index: HikariIndex = tanjun.injected(
         callback=tanjun.cache_callback(
-            utility.rest.FetchedResource(HIKARI_PAGES + "/hikari/index.json", HikariIndex.from_json),
+            utility.FetchedResource(HIKARI_PAGES + "/hikari/index.json", HikariIndex.from_json),
             expire_after=datetime.timedelta(hours=12),
         )
     ),
@@ -345,6 +350,7 @@ async def docs_hikari_command(
         path,
         component_client,
         index,
+        public,
         simple,
         HIKARI_PAGES,
         HIKARI_PAGES + "/hikari/",
@@ -356,20 +362,26 @@ async def docs_hikari_command(
 @docs_group.with_command
 @tanjun.with_bool_slash_option("simple", "Whether this should only list links. Defaults to False.", default=False)
 @tanjun.with_str_slash_option("path", "Optional path to query Tanjun's documentation by.", default=None)
+@tanjun.with_bool_slash_option(
+    "public", "Whether other people should be able to interact with the response. Defaults to False", default=False
+)
 @tanjun.as_slash_command("tanjun", "Search Tanjun's documentation")
 async def tanjun_docs_command(
     ctx: tanjun.abc.Context,
     path: str | None,
+    public: bool,
+    simple: bool,
     component_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
     index: DocIndex = tanjun.injected(
         callback=tanjun.cache_callback(
-            utility.rest.FetchedResource(TANJUN_PAGES + "/master/search.json", PdocIndex.from_json),
+            utility.FetchedResource(TANJUN_PAGES + "/master/search.json", PdocIndex.from_json),
             expire_after=datetime.timedelta(hours=12),
         )
     ),
-    simple: bool = False,
 ) -> None:
-    await _docs_command(ctx, path, component_client, index, simple, TANJUN_PAGES, TANJUN_PAGES + "/master/", "Tanjun")
+    await _docs_command(
+        ctx, path, component_client, index, public, simple, TANJUN_PAGES, TANJUN_PAGES + "/master/", "Tanjun"
+    )
 
 
 @tanjun.as_loader

@@ -55,7 +55,6 @@ from .. import utility
 CallbackT = collections.Callable[..., collections.Coroutine[typing.Any, typing.Any, typing.Any]]
 
 sudo_component = tanjun.Component(strict=True)
-utility.help.with_docs(sudo_component, "Sudo commands", "Component used by this bot's owner.")
 
 
 @sudo_component.with_message_command
@@ -86,13 +85,13 @@ async def echo_command(
     """
     embed: hikari.UndefinedOr[hikari.Embed] = hikari.UNDEFINED
     retry = yuyo.Backoff(max_retries=5)
-    error_manager = utility.rest.HikariErrorManager(retry, break_on=(hikari.ForbiddenError, hikari.NotFoundError))
+    error_manager = utility.HikariErrorManager(retry, break_on=(hikari.ForbiddenError, hikari.NotFoundError))
     if raw_embed is not hikari.UNDEFINED:
         try:
             embed = entity_factory.entity_factory.deserialize_embed(raw_embed)
 
             if embed.colour is None:
-                embed.colour = utility.constants.embed_colour()
+                embed.colour = utility.embed_colour()
 
         except (TypeError, ValueError) as exc:
             await error_manager.try_respond(ctx, content=f"Invalid embed passed: {str(exc)[:1970]}")
@@ -210,7 +209,7 @@ async def eval_command(
         )
         return
 
-    colour = utility.constants.FAILED_COLOUR if failed else utility.constants.PASS_COLOUR
+    colour = utility.FAILED_COLOUR if failed else utility.PASS_COLOUR
     string_paginator = yuyo.string_paginator(iter(result), wrapper="```python\n{}\n```", char_limit=2034)
     embed_generator = (
         (

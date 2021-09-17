@@ -30,7 +30,45 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-__all__: list[str] = ["basic", "command_hooks", "constants", "dependencies", "help", "rest", "ytdl"]
+__all__: list[str] = [
+    # basic.py
+    "basic",
+    "basic_name_grid",
+    "pretify_date",
+    "pretify_index",
+    "raise_error",
+    # command_hooks.py
+    "command_hooks",
+    "on_error",
+    "on_parser_error",
+    # constants.py
+    "constants",
+    "AMARANTH_PINK",
+    "embed_colour",
+    "FAILED_COLOUR",
+    "MAYA_BLUE",
+    "PASS_COLOUR",
+    "WHITE",
+    # dependencies.py
+    "dependencies",
+    "SessionManager",
+    # help.py
+    "help",
+    "generate_command_embed",
+    "generate_help_embeds",
+    "get_command_doc",
+    "get_component_doc",
+    "with_docs",
+    # rest.py
+    "rest",
+    "AIOHTTPStatusHandler",
+    "ClientCredentialsOauth2",
+    "FetchedResource",
+    "HikariErrorManager",
+    # ytdl.py
+    "ytdl",
+    "YoutubeDownloader",
+]
 
 from . import basic
 from . import command_hooks
@@ -39,3 +77,10 @@ from . import dependencies
 from . import help
 from . import rest
 from . import ytdl
+from .basic import *
+from .command_hooks import *
+from .constants import *
+from .dependencies import *
+from .help import *
+from .rest import *
+from .ytdl import *

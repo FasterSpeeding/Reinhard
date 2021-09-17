@@ -35,6 +35,9 @@ __all__: list[str] = ["moderation_component", "load_component"]
 
 import asyncio
 import datetime
+import re
+import typing
+from collections import abc as collections
 
 import hikari
 import tanjun
@@ -45,8 +48,69 @@ from .. import utility
 MAX_MESSAGE_BULK_DELETE = datetime.timedelta(weeks=2)
 
 
-moderation_component = tanjun.Component(strict=True)
-utility.help.with_docs(moderation_component, "Moderation commands", "Moderation oriented commands.")
+moderation_component = tanjun.Component(name="moderation", strict=True)
+
+
+def iter_messages(
+    ctx: tanjun.abc.Context,
+    count: int | None,
+    after: hikari.Snowflake | None,
+    before: hikari.Snowflake | None,
+    bot_only: bool,
+    human_only: bool,
+    has_attachments: bool,
+    has_embeds: bool,
+    regex: re.Pattern[str] | None,
+    users: collections.Collection[hikari.Snowflake] | None,
+) -> hikari.LazyIterator[hikari.Message]:
+    if count is None and after is not None:
+        raise tanjun.CommandError("Must specify `count` when `after` is not specified")
+
+    elif count is not None and count <= 0:
+        raise tanjun.CommandError("Count must be greater than 0.")
+
+    if before is None and after is None:
+        before = hikari.Snowflake.from_datetime(ctx.created_at)
+
+    iterator = ctx.rest.fetch_messages(
+        ctx.channel_id,
+        before=hikari.UNDEFINED if before is None else before,
+        after=(hikari.UNDEFINED if after is None else after) if before is None else hikari.UNDEFINED,
+    )
+
+    if before and after:
+        iterator = iterator.filter(lambda message: message.id > typing.cast("hikari.Snowflake", after))
+
+    if human_only:
+        iterator = iterator.filter(lambda message: not message.author.is_bot)
+
+    elif bot_only:
+        iterator = iterator.filter(lambda message: message.author.is_bot)
+
+    if has_attachments:
+        iterator = iterator.filter(lambda message: bool(message.attachments))
+
+    if has_embeds:
+        iterator = iterator.filter(lambda message: bool(message.embeds))
+
+    if regex:
+        iterator = iterator.filter(
+            lambda message: bool(message.content and typing.cast("re.Pattern[str]", regex).match(message.content))
+        )
+
+    if users is not None:
+        if not users:
+            raise tanjun.CommandError("Must specify at least one user.")
+
+        iterator = iterator.filter(
+            lambda message: message.author.id in typing.cast("collections.Collection[hikari.Snowflake]", users)
+        )
+
+    # TODO: Should we limit count or at least default it to something other than no limit?
+    if count:
+        iterator = iterator.limit(count)
+
+    return iterator
 
 
 @moderation_component.with_slash_command
@@ -68,8 +132,21 @@ utility.help.with_docs(moderation_component, "Moderation commands", "Moderation 
 @tanjun.with_bool_slash_option(
     "human_only", "Whether this should only delete messages sent by actual users.", default=False
 )
-@tanjun.with_user_slash_option("user", "User to delete messages for", default=())
-# @tanjun.with_multi_option("users", "IDs of the users to delete messages from.", converters=hikari.Snowflake, default=())
+@tanjun.with_str_slash_option(
+    "has_attachments", "Whether this should only delete messages which have attachments.", default=False
+)
+@tanjun.with_str_slash_option(
+    "has_embeds", "Whether this should only delete messages which have embeds.", default=False
+)
+@tanjun.with_str_slash_option(
+    "regex", "A regular expression to match against the message content.", converters=re.compile, default=None
+)
+@tanjun.with_str_slash_option(
+    "users",
+    "Users to delete messages for",
+    converters=lambda value: map(tanjun.conversion.parse_user_id, value.split()),
+    default=None,
+)
 @tanjun.with_int_slash_option("count", "The amount of messages to delete.", default=None)
 @tanjun.as_slash_command("clear", "Clear new messages from chat as a moderator.")
 async def clear_command(
@@ -79,8 +156,10 @@ async def clear_command(
     before: hikari.Snowflake | None,
     bot_only: bool,
     human_only: bool,
-    user: hikari.Snowflake | None,
-    # users: collections.Sequence[hikari.Snowflake],
+    has_attachments: bool,
+    has_embeds: bool,
+    regex: re.Pattern[str] | None,
+    users: collections.Collection[hikari.Snowflake] | None,
 ) -> None:
     """Clear new messages from chat.
 
@@ -110,42 +189,15 @@ async def clear_command(
     if after_too_old or before_too_old:
         raise tanjun.CommandError("Cannot delete messages that are over 14 days old")
 
-    if count is None and after is not None:
-        raise tanjun.CommandError("Must specify `count` when `after` is not specified")
+    iterator = (
+        iter_messages(ctx, count, after, before, bot_only, human_only, has_attachments, has_embeds, regex, users)
+        .filter(lambda message: now - message.created_at < MAX_MESSAGE_BULK_DELETE)
+        .map(lambda x: x.id)
+        .chunk(100)
+    )
 
-    elif count is not None and count <= 0:
-        raise tanjun.CommandError("Count must be greater than 0.")
-
-    if before is None and after is None:
-        before = hikari.Snowflake.from_datetime(ctx.created_at)
-
-    iterator = ctx.rest.fetch_messages(
-        ctx.channel_id,
-        before=hikari.UNDEFINED if before is None else before,
-        after=(hikari.UNDEFINED if after is None else after) if before is None else hikari.UNDEFINED,
-    ).filter(lambda message: now - message.created_at < MAX_MESSAGE_BULK_DELETE)
-
-    if before and after:
-        iterator = iterator.filter(lambda message: message.id > after)  # type: ignore[operator]
-
-    if human_only:
-        iterator = iterator.filter(lambda message: not message.author.is_bot)
-
-    elif bot_only:
-        iterator = iterator.filter(lambda message: message.author.is_bot)
-
-    # if users:
-    #     iterator = iterator.filter(lambda message: message.author.id in users)
-    if user:
-        iterator = iterator.filter(lambda message: message.author == user)
-
-    # TODO: Should we limit count or at least default it to something other than no limit?
-    if count:
-        iterator = iterator.limit(count)
-
-    iterator = iterator.map(lambda x: x.id).chunk(100)
     retry = backoff.Backoff(max_retries=5)
-    error_manager = utility.rest.HikariErrorManager(retry, break_on=(hikari.NotFoundError, hikari.ForbiddenError))
+    error_manager = utility.HikariErrorManager(retry, break_on=(hikari.NotFoundError, hikari.ForbiddenError))
 
     with error_manager:
         async for messages in iterator:

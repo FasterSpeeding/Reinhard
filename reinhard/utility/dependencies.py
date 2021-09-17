@@ -67,7 +67,7 @@ class SessionManager:
     def load_into_client(self, client: tanjun.Client) -> None:
         client.add_client_callback(tanjun.ClientCallbackNames.STARTING, self.open).add_client_callback(
             tanjun.ClientCallbackNames.CLOSING, self.close
-        ).add_type_dependency(aiohttp.ClientSession, self)
+        ).set_type_dependency(aiohttp.ClientSession, self)
 
     def open(self) -> None:
         if self._session:
