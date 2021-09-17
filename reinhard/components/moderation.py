@@ -41,9 +41,6 @@ from collections import abc as collections
 
 import hikari
 import tanjun
-from yuyo import backoff
-
-from .. import utility
 
 MAX_MESSAGE_BULK_DELETE = datetime.timedelta(weeks=2)
 
@@ -196,15 +193,9 @@ async def clear_command(
         .chunk(100)
     )
 
-    retry = backoff.Backoff(max_retries=5)
-    error_manager = utility.HikariErrorManager(retry, break_on=(hikari.NotFoundError, hikari.ForbiddenError))
-
-    with error_manager:
-        async for messages in iterator:
-            retry.reset()
-            async for _ in retry:
-                await ctx.rest.delete_messages(ctx.channel_id, *messages)
-                break
+    async for messages in iterator:
+        await ctx.rest.delete_messages(ctx.channel_id, *messages)
+        break
 
     await ctx.respond(content="Cleared messages.")
     await asyncio.sleep(2)
