@@ -84,7 +84,7 @@ def build(bot: hikari_traits.GatewayBotAware, /, *, config: config_.FullConfig |
         .load_modules("reinhard.components.docs")
         .load_modules("reinhard.components.external")
         .load_modules("reinhard.components.moderation")
-        .load_modules("reinhard.components.roles")
+        # .load_modules("reinhard.components.roles")
         .load_modules("reinhard.components.sudo")
         .load_modules("reinhard.components.utility")
     )
