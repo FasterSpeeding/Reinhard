@@ -82,7 +82,7 @@ def basic_name_grid(flags: enum.IntFlag) -> str:  # TODO: actually deal with max
     if not names:
         return ""
 
-    name_grid = []
+    name_grid: list[str] = []
     line = ""
     for name in names:
         if line:

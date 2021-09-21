@@ -210,7 +210,7 @@ async def eval_command(
         return
 
     colour = utility.FAILED_COLOUR if failed else utility.PASS_COLOUR
-    string_paginator = yuyo.string_paginator(iter(result), wrapper="```python\n{}\n```", char_limit=2034)
+    string_paginator = yuyo.sync_paginate_string(iter(result), wrapper="```python\n{}\n```", char_limit=2034)
     embed_generator = (
         (
             hikari.UNDEFINED,

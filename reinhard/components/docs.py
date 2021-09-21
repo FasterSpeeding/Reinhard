@@ -322,10 +322,10 @@ async def _docs_command(
 
 @docs_group.with_command
 @tanjun.with_bool_slash_option("simple", "Whether this should only list links. Defaults to False.", default=False)
-@tanjun.with_str_slash_option("path", "Optional path to query Hikari's documentation by.", default=None)
 @tanjun.with_bool_slash_option(
     "public", "Whether other people should be able to interact with the response. Defaults to False", default=False
 )
+@tanjun.with_str_slash_option("path", "Optional path to query Hikari's documentation by.", default=None)
 @tanjun.as_slash_command("hikari", "Search Hikari's documentation")
 async def docs_hikari_command(
     ctx: tanjun.abc.Context,
@@ -361,10 +361,10 @@ async def docs_hikari_command(
 
 @docs_group.with_command
 @tanjun.with_bool_slash_option("simple", "Whether this should only list links. Defaults to False.", default=False)
-@tanjun.with_str_slash_option("path", "Optional path to query Tanjun's documentation by.", default=None)
 @tanjun.with_bool_slash_option(
     "public", "Whether other people should be able to interact with the response. Defaults to False", default=False
 )
+@tanjun.with_str_slash_option("path", "Optional path to query Tanjun's documentation by.", default=None)
 @tanjun.as_slash_command("tanjun", "Search Tanjun's documentation")
 async def tanjun_docs_command(
     ctx: tanjun.abc.Context,

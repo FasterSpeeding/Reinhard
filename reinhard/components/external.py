@@ -239,7 +239,7 @@ async def lyrics_command(
             .set_footer(text=f"Page {index + 1}")
             .set_author(icon=icon, name=title),
         )
-        for page, index in yuyo.string_paginator(iter(data["lyrics"].splitlines() or ["..."]))
+        for page, index in yuyo.sync_paginate_string(iter(data["lyrics"].splitlines() or ["..."]))
     )
     response_paginator = yuyo.ComponentPaginator(
         pages,

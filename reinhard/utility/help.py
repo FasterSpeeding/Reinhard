@@ -85,7 +85,7 @@ def generate_help_embeds(
 
         command_docs.append(f" - {prefix}{command_name}: {command_doc.splitlines()[0]}")
 
-    pages = pagination.string_paginator(iter(command_docs), wrapper=f"{component_doc}\n {'{}'}")
+    pages = pagination.sync_paginate_string(iter(command_docs), wrapper=f"{component_doc}\n {'{}'}")
     embeds = (
         embeds_.Embed(title=f"{component_name}", description=content, colour=constants.embed_colour()).set_footer(
             text=f"page {page + 1}"
