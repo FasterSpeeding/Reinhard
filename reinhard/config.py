@@ -1,3 +1,34 @@
+# -*- coding: utf-8 -*-
+# cython: language_level=3
+# BSD 3-Clause License
+#
+# Copyright (c) 2020-2021, Faster Speeding
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
 __all__: list[str] = ["DatabaseConfig", "Tokens", "FullConfig"]
@@ -91,12 +122,14 @@ class Tokens(Config):
         )
 
 
-DEFAULT_CACHE = (
+DEFAULT_CACHE: typing.Final[hikari.CacheComponents] = (
     hikari.CacheComponents.GUILDS
     | hikari.CacheComponents.GUILD_CHANNELS
     | hikari.CacheComponents.ROLES
     # | hikari.CacheComponents.ME
 )
+
+DEFAULT_INTENTS: typing.Final[hikari.Intents] = hikari.Intents.GUILDS | hikari.Intents.ALL_MESSAGES
 
 
 @dataclasses.dataclass(kw_only=True, repr=False, slots=True)
@@ -105,11 +138,11 @@ class FullConfig(Config):
     tokens: Tokens
     cache: hikari.CacheComponents = DEFAULT_CACHE
     emoji_guild: hikari.Snowflake | None = None
-    intents: hikari.Intents = hikari.Intents.ALL_UNPRIVILEGED
+    intents: hikari.Intents = DEFAULT_INTENTS
     log_level: int | str | dict[str, typing.Any] | None = logging.INFO
     mention_prefix: bool = True
     owner_only: bool = False
-    prefixes: collections.Set[str] = frozenset("r.")
+    prefixes: collections.Set[str] = frozenset()
     ptf: PTFConfig | None = None
     set_global_commands: typing.Union[bool, hikari.Snowflake] = True
 
@@ -130,11 +163,11 @@ class FullConfig(Config):
             cache=_cast_or_default(mapping, "cache", hikari.CacheComponents, DEFAULT_CACHE),
             database=DatabaseConfig.from_mapping(mapping["database"]),
             emoji_guild=_cast_or_default(mapping, "emoji_guild", hikari.Snowflake, None),
-            intents=_cast_or_default(mapping, "intents", hikari.Intents, hikari.Intents.ALL_UNPRIVILEGED),
+            intents=_cast_or_default(mapping, "intents", hikari.Intents, DEFAULT_INTENTS),
             log_level=log_level,
-            mention_prefix=bool(mapping.get("mention_prefix", False)),
+            mention_prefix=bool(mapping.get("mention_prefix", True)),
             owner_only=bool(mapping.get("owner_only", False)),
-            prefixes=frozenset(map(str, mapping["prefixes"])) if "prefixes" in mapping else {"r."},
+            prefixes=frozenset(map(str, mapping["prefixes"])) if "prefixes" in mapping else frozenset(),
             ptf=_cast_or_default(mapping, "ptf", PTFConfig.from_mapping, None),
             tokens=Tokens.from_mapping(mapping["tokens"]),
             set_global_commands=set_global_commands,

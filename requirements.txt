@@ -1,9 +1,8 @@
 asyncpg==0.24.0
-sphobjinv==2.1
-python-Levenshtein==0.12.2
+hikari~=2.0.0.dev102
+hikari-tanjun~=2.0.0a4
+hikari-yuyo~=1.0.1a1
+markdownify==0.9.2
 psutil==5.8.0
 pyyaml==5.4
-hikari==2.0.0.dev101
-hikari-tanjun~=2.0.0a1
-hikari-yuyo~=0.0.3a7
 youtube_dl~=2021.6.6

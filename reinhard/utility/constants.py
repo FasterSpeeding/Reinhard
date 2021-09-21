@@ -31,12 +31,20 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-from . import client as client_module
+__all__ = ["AMARANTH_PINK", "embed_colour", "FAILED_COLOUR", "MAYA_BLUE", "PASS_COLOUR", "WHITE"]
+
+import random
+import typing
+
+from hikari import colours
+
+FAILED_COLOUR: typing.Final[colours.Colour] = colours.Colour(0xF04747)
+PASS_COLOUR: typing.Final[colours.Colour] = colours.Colour(0x43B581)
+
+MAYA_BLUE: typing.Final[colours.Colour] = colours.Colour(0x55CDFC)
+WHITE: typing.Final[colours.Colour] = colours.Colour(0xFFFFFE)  # 0xFFFFFF is treated as no colour in embeds by Discord.
+AMARANTH_PINK: typing.Final[colours.Colour] = colours.Colour(0xF7A8B8)
 
 
-def main() -> None:
-    client_module.run_gateway_bot()
-
-
-if __name__ == "__main__":
-    main()
+def embed_colour() -> colours.Colour:
+    return random.choices((MAYA_BLUE, WHITE, AMARANTH_PINK), (2, 1, 2))[0]

@@ -31,12 +31,47 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-from . import client as client_module
+__all__ = ["on_error", "on_parser_error"]
+
+import hikari
+import tanjun
+from yuyo import backoff
+
+from . import constants
+from . import rest
 
 
-def main() -> None:
-    client_module.run_gateway_bot()
+async def on_error(ctx: tanjun.abc.Context, exception: BaseException) -> None:
+    retry = backoff.Backoff(max_retries=5)
+    # TODO: better permission checks
+    error_manager = rest.HikariErrorManager(retry, break_on=(hikari.ForbiddenError, hikari.NotFoundError))
+    embed = hikari.Embed(
+        title=f"An unexpected {type(exception).__name__} occurred",
+        colour=constants.FAILED_COLOUR,
+        description=f"```python\n{str(exception)[:1950]}```",
+    )
+
+    async for _ in retry:
+        with error_manager:
+            await ctx.respond(embed=embed)
+            break
 
 
-if __name__ == "__main__":
-    main()
+async def on_parser_error(ctx: tanjun.abc.Context, exception: tanjun.ParserError) -> None:
+    retry = backoff.Backoff(max_retries=5)
+    # TODO: better permission checks
+    error_manager = rest.HikariErrorManager(retry, break_on=(hikari.ForbiddenError, hikari.NotFoundError))
+
+    message = str(exception)
+
+    if isinstance(exception, tanjun.ConversionError) and exception.errors:
+        if len(exception.errors) > 1:
+            message += ":\n* " + "\n* ".join(map("`{}`".format, exception.errors))
+
+        else:
+            message = f"{message}: `{exception.errors[0]}`"
+
+    async for _ in retry:
+        with error_manager:
+            await ctx.respond(content=message)
+            break

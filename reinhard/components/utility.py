@@ -1,3 +1,34 @@
+# -*- coding: utf-8 -*-
+# cython: language_level=3
+# BSD 3-Clause License
+#
+# Copyright (c) 2020-2021, Faster Speeding
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
 __all__: list[str] = ["util_component", "load_component"]
@@ -8,13 +39,9 @@ import hikari
 import tanjun
 from yuyo import backoff
 
-from ..util import basic as basic_util
-from ..util import constants
-from ..util import help as help_util
-from ..util import rest_manager
+from .. import utility
 
 util_component = tanjun.Component(strict=True)
-help_util.with_docs(util_component, "Utility commands", "Component used for getting miscellaneous Discord information.")
 
 
 @util_component.with_slash_command
@@ -41,7 +68,7 @@ async def colour_command(ctx: tanjun.abc.Context, color: hikari.Colour | None, r
         .add_field(name="RGB", value=str(color.rgb))
         .add_field(name="HEX", value=str(color.hex_code))
     )
-    error_manager = rest_manager.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
+    error_manager = utility.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
     await error_manager.try_respond(ctx, embed=embed)
 
 
@@ -70,7 +97,7 @@ async def colour_command(ctx: tanjun.abc.Context, color: hikari.Colour | None, r
     default=None,
 )
 @tanjun.as_slash_command("member", "Get information about a member in the current guild.")
-async def member_command(ctx: tanjun.abc.Context, member: hikari.Member | None) -> None:
+async def member_command(ctx: tanjun.abc.SlashContext, member: hikari.InteractionMember | None) -> None:
     """Get information about a member in the current guild.
 
     Arguments:
@@ -83,7 +110,7 @@ async def member_command(ctx: tanjun.abc.Context, member: hikari.Member | None) 
         member = ctx.member
 
     retry = backoff.Backoff(max_retries=5)
-    error_manager = rest_manager.HikariErrorManager(retry, break_on=(hikari.ForbiddenError, hikari.NotFoundError))
+    error_manager = utility.HikariErrorManager(retry, break_on=(hikari.ForbiddenError, hikari.NotFoundError))
     async for _ in retry:
         with error_manager:
             guild = await ctx.rest.fetch_guild(guild=ctx.guild_id)
@@ -95,36 +122,31 @@ async def member_command(ctx: tanjun.abc.Context, member: hikari.Member | None) 
 
         return
 
-    permissions = guild.roles[guild.id].permissions
-    roles = {}
+    ordered_roles = sorted(
+        ((role.position, role) for role in map(guild.roles.get, member.role_ids) if role), reverse=True
+    )
 
-    for role_id in member.role_ids:
-        role = guild.roles[role_id]
-        permissions |= role.permissions
-        roles[role.position] = role
+    roles_repr = "\n".join(map("{0[1].name}: {0[1].id}".format, ordered_roles))
 
-    ordered_roles = dict(sorted(roles.items(), reverse=True))
-    roles = "\n".join(map("{0.name}: {0.id}".format, ordered_roles.values()))
-
-    for role in ordered_roles.values():
+    for _, role in ordered_roles:
         if role.colour:
             colour = role.colour
             break
     else:
         colour = hikari.Colour(0)
 
-    permissions_grid = basic_util.basic_name_grid(permissions) or "None"
+    permissions_grid = utility.basic_name_grid(member.permissions) or "None"
     member_information = [
         f"Color: {colour}",
-        f"Joined Discord: {basic_util.pretify_date(member.user.created_at)}",
-        f"Joined Server: {basic_util.pretify_date(member.joined_at)}",
+        f"Joined Discord: {utility.pretify_date(member.user.created_at)}",
+        f"Joined Server: {utility.pretify_date(member.joined_at)}",
     ]
 
     if member.nickname:
         member_information.append(f"Nickname: {member.nickname}")
 
     if member.premium_since:
-        member_information.append(f"Boosting since: {basic_util.pretify_date(member.premium_since)}")
+        member_information.append(f"Boosting since: {utility.pretify_date(member.premium_since)}")
 
     if member.user.is_bot:
         member_information.append("System bot" if member.user.is_system else "Bot")
@@ -135,12 +157,12 @@ async def member_command(ctx: tanjun.abc.Context, member: hikari.Member | None) 
     # TODO: this embed will go over the character limit easily
     embed = (
         hikari.Embed(
-            description="\n".join(member_information) + f"\n\nRoles:\n{roles}\n\nPermissions:\n{permissions_grid}",
+            description="\n".join(member_information) + f"\n\nRoles:\n{roles_repr}\n\nPermissions:\n{permissions_grid}",
             colour=colour,
             title=f"{member.user.username}#{member.user.discriminator}",
             url=f"https://discordapp.com/users/{member.user.id}",
         )
-        .set_thumbnail(member.user.avatar_url)
+        .set_thumbnail(member.avatar_url or member.default_avatar_url)
         .set_footer(text=str(member.user.id), icon=member.user.default_avatar_url)
     )
     error_manager.clear_rules()
@@ -159,8 +181,8 @@ async def role_command(ctx: tanjun.abc.Context, role: hikari.Role) -> None:
         * role: Mention or ID of the role to get information about.
     """
 
-    permissions = basic_util.basic_name_grid(role.permissions) or "None"
-    role_information = [f"Created: {basic_util.pretify_date(role.created_at)}", f"Position: {role.position}"]
+    permissions = utility.basic_name_grid(role.permissions) or "None"
+    role_information = [f"Created: {utility.pretify_date(role.created_at)}", f"Position: {role.position}"]
 
     if role.colour:
         role_information.append(f"Color: `{role.colour}`")
@@ -174,7 +196,7 @@ async def role_command(ctx: tanjun.abc.Context, role: hikari.Role) -> None:
     if role.is_mentionable:
         role_information.append("Can be mentioned")
 
-    error_manager = rest_manager.HikariErrorManager(break_on=(hikari.ForbiddenError, hikari.NotFoundError))
+    error_manager = utility.HikariErrorManager(break_on=(hikari.ForbiddenError, hikari.NotFoundError))
     embed = hikari.Embed(
         colour=role.colour,
         title=role.name,
@@ -198,21 +220,21 @@ async def user_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> Non
     if user is None:
         user = ctx.author
 
-    flags = basic_util.basic_name_grid(user.flags) or "NONE"
+    flags = utility.basic_name_grid(user.flags) or "NONE"
     embed = (
         hikari.Embed(
-            colour=constants.embed_colour(),
+            colour=utility.embed_colour(),
             description=(
                 f"Bot: {user.is_system}\nSystem bot: {user.is_system}\n"
-                f"Joined Discord: {basic_util.pretify_date(user.created_at)}\n\nFlags: {int(user.flags)}\n{flags}"
+                f"Joined Discord: {utility.pretify_date(user.created_at)}\n\nFlags: {int(user.flags)}\n{flags}"
             ),
             title=f"{user.username}#{user.discriminator}",
             url=f"https://discordapp.com/users/{user.id}",
         )
-        .set_thumbnail(user.avatar_url)
+        .set_thumbnail(user.avatar_url or user.default_avatar_url)
         .set_footer(text=str(user.id), icon=user.default_avatar_url)
     )
-    error_manager = rest_manager.HikariErrorManager(break_on=(hikari.ForbiddenError, hikari.NotFoundError))
+    error_manager = utility.HikariErrorManager(break_on=(hikari.ForbiddenError, hikari.NotFoundError))
     await error_manager.try_respond(ctx, embed=embed)
 
 
@@ -226,14 +248,14 @@ async def avatar_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> N
 
     Arguments:
         * user: Optional argument of a mention or ID of the user to get the avatar for.
-            If this isn't provided then this command will return the avatar of the user who triggerred it.
+            If this isn't provided then this command will return the avatar of the user who triggered it.
     """
     if user is None:
         user = ctx.author
 
-    error_manager = rest_manager.HikariErrorManager(break_on=(hikari.ForbiddenError, hikari.NotFoundError))
+    error_manager = utility.HikariErrorManager(break_on=(hikari.ForbiddenError, hikari.NotFoundError))
     avatar = user.avatar_url or user.default_avatar_url
-    embed = hikari.Embed(title=str(user), url=str(avatar), colour=constants.embed_colour()).set_image(avatar)
+    embed = hikari.Embed(title=str(user), url=str(avatar), colour=utility.embed_colour()).set_image(avatar)
     await error_manager.try_respond(ctx, embed=embed)
 
 
@@ -262,17 +284,25 @@ async def mentions_command(
 
     # TODO: set maximum?
     retry = backoff.Backoff()
-    error_manager = rest_manager.HikariErrorManager(retry).with_rule(
+    error_manager = utility.HikariErrorManager(retry).with_rule(
         (hikari.NotFoundError, hikari.ForbiddenError, hikari.BadRequestError),
-        basic_util.raise_error("Message not found."),
+        utility.raise_error("Message not found."),
     )
     async for _ in retry:
         with error_manager:
             message = await ctx.rest.fetch_message(channel_id, message_id)
             break
 
+    else:
+        message = await ctx.rest.fetch_message(channel_id, message_id)
+
     error_manager.clear_rules(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
-    mentions = ", ".join(map(str, message.mentions.users.values())) if message.mentions.users else None
+
+    mentions: str | None = None
+    if message.mentions.users:
+        assert not isinstance(message.mentions.users, hikari.UndefinedType)
+        mentions = ", ".join(map(str, message.mentions.users.values()))
+
     await error_manager.try_respond(
         ctx, content=f"Pinging mentions: {mentions}" if mentions else "No pinging mentions."
     )
@@ -299,7 +329,7 @@ async def members_command(ctx: tanjun.abc.Context, name: str) -> None:
     else:
         content = "No similar members found"
 
-    await rest_manager.HikariErrorManager().try_respond(ctx, content=content)
+    await utility.HikariErrorManager().try_respond(ctx, content=content)
 
 
 def _format_char_line(char: str, to_file: bool) -> str:
@@ -313,7 +343,7 @@ def _format_char_line(char: str, to_file: bool) -> str:
 
 @util_component.with_slash_command
 @tanjun.with_bool_slash_option(
-    "file", "Whether this should send a file repsonse regardless of response length", default=False
+    "file", "Whether this should send a file response regardless of response length", default=False
 )
 @tanjun.with_str_slash_option("characters", "The UTF-8 characters to get information about")
 @tanjun.as_slash_command("char", "Get information about the UTF-8 characters in the executing message.")

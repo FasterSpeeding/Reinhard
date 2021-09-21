@@ -1,9 +1,40 @@
+# -*- coding: utf-8 -*-
+# cython: language_level=3
+# BSD 3-Clause License
+#
+# Copyright (c) 2020-2021, Faster Speeding
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+"""Commands used to interact with external APIs."""
 from __future__ import annotations
 
 __all__: list[str] = ["external_component"]
 
 import collections.abc as collections
-import datetime
 import logging
 import time
 import typing
@@ -11,19 +42,11 @@ import urllib.parse
 
 import aiohttp
 import hikari
-import sphobjinv  # type: ignore[import]
 import tanjun
 import yuyo
-from hikari import traits
 
 from .. import config as config_
-from ..util import basic as basic_util
-from ..util import constants
-from ..util import help as help_util
-from ..util import rest_manager
-from ..util import ytdl
-
-_ValueT = typing.TypeVar("_ValueT")
+from .. import utility
 
 YOUTUBE_TYPES = {
     "youtube#video": ("videoId", "https://youtube.com/watch?v="),
@@ -35,7 +58,6 @@ RETRY_AFTER_HEADER = "Retry-After"
 USER_AGENT_HEADER = "User-Agent"
 _LOGGER = logging.getLogger("hikari.reinhard.external")
 SPOTIFY_RESOURCE_TYPES = ("track", "album", "artist", "playlist")
-HIKARI_IO = "https://hikari-py.github.io/hikari"
 
 
 class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType]]):
@@ -57,7 +79,7 @@ class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
     async def __anext__(self) -> tuple[str, hikari.UndefinedType]:
         if not self._next_page_token and self._next_page_token is not None:
             retry = yuyo.Backoff(max_retries=5)
-            error_manager = rest_manager.AIOHTTPStatusHandler(retry, break_on=(404,))
+            error_manager = utility.AIOHTTPStatusHandler(retry, break_on=(404,))
 
             parameters = self._parameters.copy()
             parameters["pageToken"] = self._next_page_token
@@ -92,7 +114,7 @@ class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
             if response_type := YOUTUBE_TYPES.get(page["id"]["kind"].lower()):
                 return f"{response_type[1]}{page['id'][response_type[0]]}", hikari.UNDEFINED
 
-        raise RuntimeError(f"Got unexpected 'kind' from youtube {page['id']['kind']}")
+        raise RuntimeError(f"Got unexpected 'kind' from youtube {page['id']['kind']}")  # type: ignore
 
 
 class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType]]):
@@ -126,9 +148,7 @@ class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
             retry = yuyo.Backoff(max_retries=5)
             resource_type = self._parameters["type"]
             assert isinstance(resource_type, str)
-            error_manager = rest_manager.AIOHTTPStatusHandler(
-                retry, on_404=basic_util.raise_error(None, StopAsyncIteration)
-            )
+            error_manager = utility.AIOHTTPStatusHandler(retry, on_404=utility.raise_error(None, StopAsyncIteration))
             parameters = self._parameters.copy()
             parameters["offset"] = self._offset
             self._offset += self._limit
@@ -161,124 +181,17 @@ class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
         return (self._buffer.pop(0)["external_urls"]["spotify"], hikari.UNDEFINED)
 
 
-class ClientCredentialsOauth2:
-    __slots__ = ("_authorization", "_expire_at", "_path", "_prefix", "_token")
-
-    def __init__(self, path: str, client_id: str, client_secret: str, *, prefix: str = "Bearer ") -> None:
-        self._authorization = aiohttp.BasicAuth(client_id, client_secret)
-        self._expire_at = 0
-        self._path = path
-        self._prefix = prefix
-        self._token: str | None = None
-
-    @property
-    def _expired(self) -> bool:
-        return time.time() >= self._expire_at
-
-    async def acquire_token(self, session: aiohttp.ClientSession) -> str:
-        if self._token and not self._expired:
-            return self._token
-
-        response = await session.post(self._path, data={"grant_type": "client_credentials"}, auth=self._authorization)
-
-        if 200 <= response.status < 300:
-            try:
-                data = await response.json()
-                expire = round(time.time()) + data["expires_in"] - 120
-                token = data["access_token"]
-
-            except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError, KeyError, TypeError) as exc:
-                _LOGGER.exception(
-                    "Couldn't decode or handle client credentials response received from %s: %r",
-                    self._path,
-                    await response.text(),
-                    exc_info=exc,
-                )
-
-            else:
-                self._expire_at = expire
-                self._token = f"{self._prefix} {token}"
-                return self._token
-
-        else:
-            _LOGGER.warning(
-                "Received %r from %s while trying to authenticate as client credentials",
-                response.status,
-                self._path,
-            )
-        raise tanjun.CommandError("Couldn't authenticate")
-
-    @classmethod
-    def spotify(cls, config: config_.Tokens = tanjun.injected(type=config_.Tokens)) -> ClientCredentialsOauth2:
-        if not config.spotify_id or not config.spotify_secret:
-            raise tanjun.MissingDependencyError("Missing spotify secret and/or client id")
-
-        return cls("https://accounts.spotify.com/api/token", config.spotify_id, config.spotify_secret)
-
-
-class CachedResource(typing.Generic[_ValueT]):
-    __slots__ = (
-        "_authorization",
-        "_data",
-        "_expire_after",
-        "_headers",
-        "_parse_data",
-        "_path",
-        "_time",
-    )
-
-    def __init__(
-        self,
-        path: str,
-        expire_after: datetime.timedelta,
-        parse_data: collections.Callable[[bytes], _ValueT],
-        *,
-        authorization: aiohttp.BasicAuth | None = None,
-        headers: dict[str, typing.Any] | None = None,
-    ) -> None:
-        self._authorization = authorization
-        self._data: _ValueT | None = None
-        self._expire_after = expire_after.total_seconds()
-        self._headers = headers
-        self._parse_data = parse_data
-        self._path = path
-        self._time = 0.0
-
-    @property
-    def _expired(self) -> bool:
-        return time.perf_counter() - self._time >= self._expire_after
-
-    async def acquire_resource(self, session: aiohttp.ClientSession) -> _ValueT:
-        if self._data and not self._expired:
-            return self._data
-
-        response = await session.get(self._path)
-        # TODO: better handling
-        response.raise_for_status()
-        self._data = self._parse_data(await response.read())
-        return self._data
-
-
-def make_doc_fetcher() -> CachedResource[sphobjinv.Inventory]:
-    return CachedResource(HIKARI_IO + "/objects.inv", datetime.timedelta(hours=12), sphobjinv.Inventory)
-
-
 external_component = tanjun.Component(strict=True)
-help_util.with_docs(
-    external_component, "External API commands", "A utility component used for getting data from 3rd party APIs."
-)
 
 
-@external_component.with_message_command
-@tanjun.with_greedy_argument("query")
-@tanjun.with_parser
-@tanjun.as_message_command("lyrics")
+@external_component.with_slash_command
+@tanjun.with_str_slash_option("query", "Query string (e.g. name) to search a song by.")
+@tanjun.as_slash_command("lyrics", "Get a song's lyrics.")
 async def lyrics_command(
     ctx: tanjun.abc.Context,
     query: str,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
-    paginator_pool: yuyo.PaginatorPool = tanjun.injected(type=yuyo.PaginatorPool),
-    rest_service: traits.RESTAware = tanjun.injected(type=traits.RESTAware),
+    component_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
 ) -> None:
     """Get a song's lyrics.
 
@@ -286,7 +199,7 @@ async def lyrics_command(
         * query: Greedy query string (e.g. name) to search a song by.
     """
     retry = yuyo.Backoff(max_retries=5)
-    error_manager = rest_manager.AIOHTTPStatusHandler(retry, on_404=f"Couldn't find the lyrics for `{query[:1960]}`")
+    error_manager = utility.AIOHTTPStatusHandler(retry, on_404=f"Couldn't find the lyrics for `{query[:1960]}`")
     async for _ in retry:
         with error_manager:
             response = await session.get("https://evan.lol/lyrics/search/top", params={"q": query})
@@ -299,9 +212,7 @@ async def lyrics_command(
     try:
         data = await response.json()
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError) as exc:
-        hikari_error_manager = rest_manager.HikariErrorManager(
-            retry, break_on=(hikari.NotFoundError, hikari.ForbiddenError)
-        )
+        hikari_error_manager = utility.HikariErrorManager(retry, break_on=(hikari.NotFoundError, hikari.ForbiddenError))
         await hikari_error_manager.try_respond(ctx, content="Invalid data returned by server.")
 
         _LOGGER.exception(
@@ -324,39 +235,55 @@ async def lyrics_command(
     pages = (
         (
             hikari.UNDEFINED,
-            hikari.Embed(description=page, colour=constants.embed_colour())
+            hikari.Embed(description=page, colour=utility.embed_colour())
             .set_footer(text=f"Page {index + 1}")
             .set_author(icon=icon, name=title),
         )
-        for page, index in yuyo.string_paginator(iter(data["lyrics"].splitlines() or ["..."]))
+        for page, index in yuyo.sync_paginate_string(iter(data["lyrics"].splitlines() or ["..."]))
     )
-    response_paginator = yuyo.Paginator(
-        rest_service,
-        ctx.channel_id,
+    response_paginator = yuyo.ComponentPaginator(
         pages,
         authors=(ctx.author.id,),
         triggers=(
-            yuyo.paginaton.LEFT_DOUBLE_TRIANGLE,
-            yuyo.paginaton.LEFT_TRIANGLE,
-            yuyo.paginaton.STOP_SQUARE,
-            yuyo.paginaton.RIGHT_TRIANGLE,
-            yuyo.paginaton.RIGHT_DOUBLE_TRIANGLE,
+            yuyo.pagination.LEFT_DOUBLE_TRIANGLE,
+            yuyo.pagination.LEFT_TRIANGLE,
+            yuyo.pagination.STOP_SQUARE,
+            yuyo.pagination.RIGHT_TRIANGLE,
+            yuyo.pagination.RIGHT_DOUBLE_TRIANGLE,
         ),
     )
-    message = await response_paginator.open()
-    paginator_pool.add_paginator(message, response_paginator)
+    first_response = await response_paginator.get_next_entry()
+    assert first_response
+    content, embed = first_response
+    message = await ctx.respond(content=content, embed=embed, component=response_paginator, ensure_result=True)
+    component_client.add_executor(message, response_paginator)
 
 
-@external_component.with_message_command
-@tanjun.with_option("safe_search", "--safe", "-s", "--safe-search", converters=bool, default=None)
-@tanjun.with_option("order", "-o", "--order", default="relevance")
-@tanjun.with_option("language", "-l", "--language", default=None)
-@tanjun.with_option("region", "-r", "--region", default=None)
+@external_component.with_slash_command
+@tanjun.with_bool_slash_option(
+    "safe_search",
+    "Whether safe search should be enabled or not. The default for this is based on the current channel.",
+    default=None,
+)
+@tanjun.with_str_slash_option(
+    "order",
+    "The order to return results in. Defaults to relevance.",
+    choices=("date", "relevance", "title", "videoCount", "viewCount"),
+    default="relevance",
+)
+@tanjun.with_str_slash_option(
+    "language", "The ISO 639-1 two letter identifier of the language to limit search to.", default=None
+)
+@tanjun.with_str_slash_option("region", "The ISO 3166-1 code of the region to search for results in.", default=None)
 # TODO: should different resource types be split between different sub commands?
-@tanjun.with_option("resource_type", "--type", "-t", default="video")
-@tanjun.with_greedy_argument("query")
-@tanjun.with_parser
-@tanjun.as_message_command("youtube", "yt")
+@tanjun.with_str_slash_option(
+    "resource_type",
+    "The type of resource to search for. Defaults to video.",
+    choices=("channel", "playlist", "video"),
+    default="video",
+)
+@tanjun.with_str_slash_option("query", "Query string to search for a resource by.")
+@tanjun.as_slash_command("youtube", "Search for a resource on youtube.")
 async def youtube_command(
     ctx: tanjun.abc.Context,
     query: str,
@@ -367,8 +294,7 @@ async def youtube_command(
     safe_search: bool | None,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
     tokens: config_.Tokens = tanjun.injected(type=config_.Tokens),
-    paginator_pool: yuyo.PaginatorPool = tanjun.injected(type=yuyo.PaginatorPool),
-    rest_service: traits.RESTAware = tanjun.injected(type=traits.RESTAware),
+    component_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
 ) -> None:
     """Search for a resource on youtube.
 
@@ -403,10 +329,6 @@ async def youtube_command(
         elif not safe_search and not channel_is_nsfw:
             raise tanjun.CommandError("Cannot disable safe search in a sfw channel")
 
-    resource_type = resource_type.lower()
-    if resource_type not in ("channel", "playlist", "video"):
-        raise tanjun.CommandError("Resource type must be one of 'channel', 'playist' or 'video'.")
-
     parameters: dict[str, str | int] = {
         "key": tokens.google,
         "maxResults": 50,
@@ -423,31 +345,26 @@ async def youtube_command(
     if language is not None:
         parameters["relevanceLanguage"] = language
 
-    response_paginator = yuyo.Paginator(
-        rest_service,
-        ctx.channel_id,
-        YoutubePaginator(session, parameters),
-        authors=[ctx.author.id],
-    )
+    response_paginator = yuyo.ComponentPaginator(YoutubePaginator(session, parameters), authors=[ctx.author.id])
     try:
-        message = await response_paginator.open()
+        if not (first_response := await response_paginator.get_next_entry()):
+            # data["pageInfo"]["totalResults"] will not reliably be `0` when no data is returned and they don't use 404
+            # for that so we'll just check to see if nothing is being returned.
+            raise tanjun.CommandError(f"Couldn't find `{query}`.")
 
     except RuntimeError as exc:
         raise tanjun.CommandError(str(exc)) from None
 
-    except ValueError:
-        raise tanjun.CommandError(f"Couldn't find `{query}`.") from None
-        # data["pageInfo"]["totalResults"] will not reliably be `0` when no data is returned and they don't use 404
-        # for that so we'll just check to see if nothing is being returned.
-
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError) as exc:
         _LOGGER.exception("Youtube returned invalid data", exc_info=exc)
-        error_manager = rest_manager.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
+        error_manager = utility.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
         await error_manager.try_respond(ctx, content="Youtube returned invalid data.")
         raise
 
     else:
-        paginator_pool.add_paginator(message, response_paginator)
+        content, embed = first_response
+        message = await ctx.respond(content, embed=embed, component=response_paginator, ensure_result=True)
+        component_client.add_executor(message, response_paginator)
 
 
 @youtube_command.with_check
@@ -457,8 +374,8 @@ def _youtube_token_check(_: tanjun.abc.Context, tokens: config_.Tokens = tanjun.
 
 # This API is currently dead (always returning 5xxs)
 # @external_component.with_message_command
-# @help_util.with_parameter_doc("--source | -s", "The optional argument of a show's title.")
-# @help_util.with_command_doc("Get a random cute anime image.")
+# @utility.with_parameter_doc("--source | -s", "The optional argument of a show's title.")
+# @utility.with_command_doc("Get a random cute anime image.")
 # @tanjun.with_option("source", "--source", "-s", default=None)
 # @tanjun.with_parser
 # @tanjun.as_message_command("moe")  # TODO: https://lewd.bowsette.pictures/api/request
@@ -472,7 +389,7 @@ async def moe_command(
         params["source"] = source
 
     retry = yuyo.Backoff(max_retries=5)
-    error_manager = rest_manager.AIOHTTPStatusHandler(
+    error_manager = utility.AIOHTTPStatusHandler(
         retry, on_404=f"Couldn't find source `{source[:1970]}`" if source is not None else "couldn't access api"
     )
     async for _ in retry:
@@ -484,9 +401,7 @@ async def moe_command(
     else:
         raise tanjun.CommandError("Couldn't get an image in time") from None
 
-    hikari_error_manager = rest_manager.HikariErrorManager(
-        retry, break_on=(hikari.NotFoundError, hikari.ForbiddenError)
-    )
+    hikari_error_manager = utility.HikariErrorManager(retry, break_on=(hikari.NotFoundError, hikari.ForbiddenError))
 
     try:
         data = (await response.json())["data"]
@@ -517,7 +432,7 @@ async def query_nekos_life(
     # We cannot consistently rely on this behaviour either as any internal server errors will likely return an
     # actual 5xx response.
     try:
-        status_code = int(data["msg"])
+        status_code = int(data["msg"])  # type: ignore
     except (LookupError, ValueError, TypeError):
         status_code = response.status
 
@@ -537,22 +452,36 @@ async def query_nekos_life(
     return result
 
 
+def _build_spotify_auth(
+    config: config_.Tokens = tanjun.injected(type=config_.Tokens),
+) -> utility.ClientCredentialsOauth2:
+    if not config.spotify_id or not config.spotify_secret:
+        raise tanjun.MissingDependencyError("Missing spotify secret and/or client id")
+
+    return utility.ClientCredentialsOauth2(
+        "https://accounts.spotify.com/api/token", config.spotify_id, config.spotify_secret
+    )
+
+
 # TODO: add valid options for Options maybe?
-@external_component.with_message_command
-@tanjun.with_option("resource_type", "--type", "-t", default="track")
-@tanjun.with_greedy_argument("query")
-@tanjun.with_parser
-@tanjun.as_message_command("spotify")
+@external_component.with_slash_command
+@tanjun.with_str_slash_option(
+    "resource_type",
+    "Type of resource to search for. Defaults to track.",
+    choices=("track", "album", "artist", "playlist"),
+    default="track",
+)
+@tanjun.with_str_slash_option("query", "The string query to search by.")
+@tanjun.as_slash_command("spotify", "Search for a resource on spotify.")
 async def spotify_command(
     ctx: tanjun.abc.Context,
     query: str,
     resource_type: str,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
-    paginator_pool: yuyo.PaginatorPool = tanjun.injected(type=yuyo.PaginatorPool),
-    spotify_auth: ClientCredentialsOauth2 = tanjun.injected(
-        callback=tanjun.cache_callback(ClientCredentialsOauth2.spotify)
+    component_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
+    spotify_auth: utility.ClientCredentialsOauth2 = tanjun.injected(
+        callback=tanjun.cache_callback(_build_spotify_auth)
     ),
-    rest_service: traits.RESTAware = tanjun.injected(type=traits.RESTAware),
 ) -> None:
     """Search for a resource on spotify.
 
@@ -568,82 +497,43 @@ async def spotify_command(
     if resource_type not in SPOTIFY_RESOURCE_TYPES:
         raise tanjun.CommandError(f"{resource_type!r} is not a valid resource type")
 
-    response_paginator = yuyo.Paginator(
-        rest_service,
-        ctx.channel_id,
+    response_paginator = yuyo.ComponentPaginator(
         SpotifyPaginator(spotify_auth.acquire_token, session, {"query": query, "type": resource_type}),
         authors=[ctx.author.id],
     )
+
     try:
-        message = await response_paginator.open()
+        if not (first_response := await response_paginator.get_next_entry()):
+            raise tanjun.CommandError(f"Couldn't find {resource_type}") from None
 
     except RuntimeError as exc:
         raise tanjun.CommandError(str(exc)) from None
 
-    except ValueError:
-        raise tanjun.CommandError(f"Couldn't find {resource_type}.") from None
-
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError) as exc:
         _LOGGER.exception("Spotify returned invalid data", exc_info=exc)
-        error_manager = rest_manager.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
+        error_manager = utility.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
         await error_manager.try_respond(ctx, content="Spotify returned invalid data.")
         raise
 
     else:
-        paginator_pool.add_paginator(message, response_paginator)
+        content, embed = first_response
+        message = await ctx.respond(content, embed=embed, component=response_paginator, ensure_result=True)
+        component_client.add_executor(message, response_paginator)
 
 
-@external_component.with_slash_command
-@tanjun.with_str_slash_option("path", "Optional path to query Hikari's documentation by.", default=None)
-@tanjun.as_slash_command("docs", "Search Hikari's documentation")
-async def docs_command(
-    ctx: tanjun.abc.Context,
-    path: str | None,
-    session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
-    doc_fetcher: CachedResource[sphobjinv.Inventory] = tanjun.injected(
-        callback=tanjun.cache_callback(make_doc_fetcher)
-    ),
-) -> None:
-    """Search Hikari's documentation.
-
-    Arguments
-        * path: Optional argument to query Hikari's documentation by.
-    """
-    error_manager = rest_manager.HikariErrorManager(break_on=(hikari.ForbiddenError, hikari.NotFoundError))
-
-    if not path:
-        await error_manager.try_respond(ctx, content=HIKARI_IO + "/hikari/index.html")
-
-    else:
-        path = path.replace(" ", "_")
-        inventory = await doc_fetcher.acquire_resource(session)
-        description: list[str] = []
-        # TODO: this line blocks for 2 seconds
-        entries: collections.Iterator[tuple[str, int, int]] = iter(
-            inventory.suggest(path, thresh=70, with_index=True, with_score=True)
-        )
-
-        for result, _ in zip(entries, range(10)):
-            sphinx_object: sphobjinv.DataObjStr = inventory.objects[result[2]]
-            description.append(f"[{sphinx_object.name}]({HIKARI_IO}/{sphinx_object.uri_expanded})")
-
-        embed = hikari.Embed(
-            description="\n".join(description) if description else "No results found.",
-            color=constants.embed_colour(),
-        )
-        await error_manager.try_respond(ctx, embed=embed)
-
-
-@external_component.with_slash_command
+@external_component.with_message_command
 @tanjun.with_owner_check
-@tanjun.with_str_slash_option("url", "The url to download from", converters=urllib.parse.ParseResult)
-@tanjun.as_slash_command("ytdl", "Owner only command to download a vid using youtube-dl")
+@tanjun.with_argument("url", converters=urllib.parse.ParseResult)
+@tanjun.with_parser
+@tanjun.as_message_command("ytdl")
 async def ytdl_command(
     ctx: tanjun.abc.Context,
     url: urllib.parse.ParseResult,
     session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession),
     config: config_.PTFConfig = tanjun.injected(type=config_.PTFConfig),
-    ytdl_client: ytdl.YoutubeDownloader = tanjun.injected(callback=tanjun.cache_callback(ytdl.YoutubeDownloader.spawn)),
+    ytdl_client: utility.YoutubeDownloader = tanjun.injected(
+        callback=tanjun.cache_callback(utility.YoutubeDownloader.spawn)
+    ),
 ) -> None:
     auth = aiohttp.BasicAuth(config.username, config.password)
 

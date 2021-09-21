@@ -31,12 +31,42 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-from . import client as client_module
+__all__: list[str] = []
+
+import datetime
+import typing
 
 
-def main() -> None:
-    client_module.run_gateway_bot()
+class StarredMessage(typing.Protocol):
+    message_id: int
+    message_content: str
+    channel_id: int
+    author_id: int
+    author_avatar_hash: str | None
+    message_status: int
+    starboard_message_id: int
 
 
-if __name__ == "__main__":
-    main()
+class Star(typing.Protocol):
+    message_id: int
+    starrer_id: int
+
+
+class Guild(typing.Protocol):
+    id: int
+    starboard_channel_id: int | None
+    log_members: bool
+    member_join_log: int | None
+    message_spam_system: bool
+
+
+class BotUserBan(typing.Protocol):
+    user_id: int
+    reason: str
+    expires_at: datetime.datetime | None
+
+
+class BotGuildBan(typing.Protocol):
+    guild_id: int
+    reason: str
+    expires_at: datetime.datetime | None

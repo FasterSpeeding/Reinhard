@@ -1,3 +1,34 @@
+# -*- coding: utf-8 -*-
+# cython: language_level=3
+# BSD 3-Clause License
+#
+# Copyright (c) 2020-2021, Faster Speeding
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+#
+# * Redistributions in binary form must reproduce the above copyright notice,
+#   this list of conditions and the following disclaimer in the documentation
+#   and/or other materials provided with the distribution.
+#
+# * Neither the name of the copyright holder nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
 __all__: list[str] = ["basic_component"]
@@ -10,15 +41,12 @@ import platform
 import time
 
 import hikari
-import psutil  # type: ignore[import]
+import psutil
 import tanjun
 import yuyo
 from hikari import snowflakes
-from hikari import traits
 
-from ..util import constants
-from ..util import help as help_util
-from ..util import rest_manager
+from .. import utility
 
 
 def gen_help_embeds(
@@ -29,14 +57,13 @@ def gen_help_embeds(
 
     help_embeds: dict[str, list[hikari.Embed]] = {}
     for component in ctx.client.components:
-        if value := help_util.generate_help_embeds(component, prefix=prefix):
+        if value := utility.generate_help_embeds(component, prefix=prefix):
             help_embeds[value[0].lower()] = [v for v in value[1]]
 
     return help_embeds
 
 
 basic_component = tanjun.Component(strict=True)
-help_util.with_docs(basic_component, "Basic commands", "Commands provided to give information about this bot.")
 
 
 @basic_component.with_slash_command
@@ -48,9 +75,9 @@ async def about_command(
     """Get basic information about the current bot instance."""
     start_date = datetime.datetime.fromtimestamp(process.create_time())
     uptime = datetime.datetime.now() - start_date
-    memory_usage = process.memory_full_info().uss / 1024 ** 2
-    cpu_usage = process.cpu_percent() / psutil.cpu_count()
-    memory_percent = process.memory_percent()
+    memory_usage: float = process.memory_full_info().uss / 1024 ** 2
+    cpu_usage: float = process.cpu_percent() / psutil.cpu_count()
+    memory_percent: float = process.memory_percent()
 
     if ctx.shards:
         shard_id = snowflakes.calculate_shard_id(ctx.shards.shard_count, ctx.guild_id) if ctx.guild_id else 0
@@ -64,7 +91,7 @@ async def about_command(
         "The source can be found on [Github](https://github.com/FasterSpeeding/Reinhard)."
     )
     embed = (
-        hikari.Embed(description=description, colour=constants.embed_colour())
+        hikari.Embed(description=description, colour=utility.embed_colour())
         .set_author(name=name, url=hikari.__url__)
         .add_field(name="Uptime", value=str(uptime), inline=True)
         .add_field(
@@ -78,23 +105,28 @@ async def about_command(
         )
     )
 
-    error_manager = rest_manager.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
+    error_manager = utility.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
     await error_manager.try_respond(ctx, embed=embed)
 
 
 @basic_component.with_message_command
-@tanjun.with_greedy_argument("command_name", default=None)
-@tanjun.with_option("component_name", "--component", default=None)
-@tanjun.with_parser
-# TODO: specify a group or command
 @tanjun.as_message_command("help")
-async def help_command(
+async def help_command(ctx: tanjun.abc.Context) -> None:
+    await ctx.respond("See the slash command menu")
+
+
+# @basic_component.with_message_command
+# @tanjun.with_greedy_argument("command_name", default=None)
+# @tanjun.with_option("component_name", "--component", default=None)
+# @tanjun.with_parser
+# # TODO: specify a group or command
+# @tanjun.as_message_command("help")
+async def old_help_command(
     ctx: tanjun.abc.Context,
     command_name: str | None,
     component_name: str | None,
-    paginator_pool: yuyo.PaginatorPool = tanjun.injected(type=yuyo.PaginatorPool),
+    component_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
     help_embeds: dict[str, list[hikari.Embed]] = tanjun.injected(callback=tanjun.cache_callback(gen_help_embeds)),
-    rest_service: traits.RESTAware = tanjun.injected(type=traits.RESTAware),
 ) -> None:
     """Get information about the commands in this bot.
 
@@ -112,7 +144,7 @@ async def help_command(
 
         prefix = next(iter(ctx.client.prefixes)) if ctx.client.prefixes else ""
         for _, command in ctx.client.check_message_name(command_name):
-            if command_embed := help_util.generate_command_embed(command, prefix=prefix):
+            if command_embed := utility.generate_command_embed(command, prefix=prefix):
                 await ctx.respond(embed=command_embed)
                 break
 
@@ -132,9 +164,12 @@ async def help_command(
             (hikari.UNDEFINED, embed) for embed in itertools.chain.from_iterable(list(help_embeds.values()))
         )
 
-    paginator = yuyo.Paginator(rest_service, ctx.channel_id, embed_generator, authors=(ctx.author,))
-    message = await paginator.open()
-    paginator_pool.add_paginator(message, paginator)
+    paginator = yuyo.ComponentPaginator(embed_generator, authors=(ctx.author,))
+
+    if first_entry := await paginator.get_next_entry():
+        content, embed = first_entry
+        message = await ctx.respond(content=content, embed=embed, component=paginator, ensure_result=True)
+        component_client.add_executor(message, paginator)
 
 
 @basic_component.with_slash_command
@@ -173,11 +208,11 @@ async def cache_command(
     """Get general information about this bot."""
     start_date = datetime.datetime.fromtimestamp(process.create_time())
     uptime = datetime.datetime.now() - start_date
-    memory_usage = process.memory_full_info().uss / 1024 ** 2
-    cpu_usage = process.cpu_percent() / psutil.cpu_count()
-    memory_percent = process.memory_percent()
+    memory_usage: float = process.memory_full_info().uss / 1024 ** 2
+    cpu_usage: float = process.cpu_percent() / psutil.cpu_count()
+    memory_percent: float = process.memory_percent()
 
-    cache_stats_lines = []
+    cache_stats_lines: list[tuple[str, float]] = []
 
     storage_start_time = time.perf_counter()
     for line_template, callback in _about_lines:
@@ -195,14 +230,14 @@ async def cache_command(
     )
 
     # TODO: try cache first + backoff
-    avatar = (await ctx.rest.fetch_my_user()).avatar_url
+    me = (ctx.cache.get_me() if ctx.cache else None) or await ctx.rest.fetch_my_user()
     embed = (
         hikari.Embed(description="An experimental pythonic Hikari bot.", color=0x55CDFC)
-        .set_author(name="Hikari: testing client", icon=avatar, url=hikari.__url__)
+        .set_author(name="Hikari: testing client", icon=me.avatar_url or me.default_avatar_url, url=hikari.__url__)
         .add_field(name="Uptime", value=str(uptime), inline=True)
         .add_field(
             name="Process",
-            value=f"{memory_usage:.2f} MiB ({memory_percent:.0f}%)\n{cpu_usage:.2f}% CPU",
+            value=f"{memory_usage:.2f} MB ({memory_percent:.0f}%)\n{cpu_usage:.2f}% CPU",
             inline=True,
         )
         .add_field(name="Standard cache stats", value=f"```{cache_stats}```")
@@ -212,7 +247,7 @@ async def cache_command(
         )
     )
 
-    error_manager = rest_manager.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
+    error_manager = utility.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
     await error_manager.try_respond(ctx, content=f"{storage_time_taken * 1_000:.4g} ms", embed=embed)
 
 
@@ -222,6 +257,20 @@ def _cache_command_check(ctx: tanjun.abc.Context) -> bool:
         return True
 
     raise tanjun.CommandError("Client is cache-less")
+
+
+@basic_component.with_slash_command
+@tanjun.as_slash_command("invite", "Invite the bot to your server")
+async def invite_command(ctx: tanjun.abc.Context) -> None:
+    if ctx.cache:
+        me = ctx.cache.get_me() or await ctx.rest.fetch_my_user()
+
+    else:
+        me = await ctx.rest.fetch_my_user()
+
+    await ctx.respond(
+        f"https://discord.com/oauth2/authorize?client_id={me.id}&scope=bot%20applications.commands&permissions=8"
+    )
 
 
 @tanjun.as_loader
