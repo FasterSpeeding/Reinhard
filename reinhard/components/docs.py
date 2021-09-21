@@ -310,7 +310,7 @@ async def _docs_command(
             for metadata in index.search(path)
         )
 
-    paginator = yuyo.ComponentPaginator(iterator, authors=(ctx.author,) if public else ())
+    paginator = yuyo.ComponentPaginator(iterator, authors=(ctx.author,) if not public else ())
     if first_response := await paginator.get_next_entry():
         content, embed = first_response
         message = await ctx.respond(content=content, component=paginator, embed=embed, ensure_result=True)
