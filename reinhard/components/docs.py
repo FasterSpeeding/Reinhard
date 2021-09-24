@@ -87,7 +87,7 @@ class DocEntry:
 def _collect_pdoc_paths(data: dict[str, typing.Any], path_filter: str = "") -> collections.Iterator[str]:
     if docs := data.get("docs"):
         if path_filter:
-            yield from (key for key in docs.keys() if key.rsplit(".", 1)[0].endswith(path_filter))
+            yield from (key for key in docs.keys() if key.rsplit(".", 1)[0].lower().endswith(path_filter))
 
         else:
             yield from docs.keys()
