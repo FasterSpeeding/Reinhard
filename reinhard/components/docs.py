@@ -56,7 +56,8 @@ EMPTY_ITER = iter(())
 _DocIndexT = typing.TypeVar("_DocIndexT", bound="DocIndex")
 _ValueT = typing.TypeVar("_ValueT")
 HIKARI_PAGES = "https://hikari-py.github.io/hikari"
-TANJUN_PAGES = "https://fasterspeeding.github.io/Tanjun"
+TANJUN_PAGES = "https://tanjun.cursed.solutions"
+YUYO_PAGES = "https://yuyo.cursed.solutions"
 SPECIAL_KEYS: frozenset[str] = frozenset(("df", "tf", "docs"))
 
 
@@ -381,6 +382,31 @@ async def tanjun_docs_command(
 ) -> None:
     await _docs_command(
         ctx, path, component_client, index, public, simple, TANJUN_PAGES, TANJUN_PAGES + "/master/", "Tanjun"
+    )
+
+
+@docs_group.with_command
+@tanjun.with_bool_slash_option("simple", "Whether this should only list links. Defaults to False.", default=False)
+@tanjun.with_bool_slash_option(
+    "public", "Whether other people should be able to interact with the response. Defaults to False", default=False
+)
+@tanjun.with_str_slash_option("path", "Optional path to query Tanjun's documentation by.", default=None)
+@tanjun.as_slash_command("yuyo", "Search Yuyo's documentation")
+async def yuyo_docs_command(
+    ctx: tanjun.abc.Context,
+    path: str | None,
+    public: bool,
+    simple: bool,
+    component_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
+    index: DocIndex = tanjun.injected(
+        callback=tanjun.cache_callback(
+            utility.FetchedResource(YUYO_PAGES + "/master/search.json", PdocIndex.from_json),
+            expire_after=datetime.timedelta(hours=12),
+        )
+    ),
+) -> None:
+    await _docs_command(
+        ctx, path, component_client, index, public, simple, YUYO_PAGES, YUYO_PAGES + "/master/", "Tanjun"
     )
 
 
