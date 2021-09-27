@@ -1,6 +1,6 @@
 asyncpg==0.24.0
 hikari~=2.0.0.dev102
-hikari-tanjun~=2.0.0a4
+hikari-tanjun~=2.0.1a1
 hikari-yuyo~=1.0.1a1
 markdownify==0.9.4
 psutil==5.8.0
