@@ -14,7 +14,8 @@ The standard instance of this bot can be invited to your guild using this
 
 ### Self-hosted.
 
-This can be self hosted through only a few easy steps.
-1: Ensure you have docker-compose installed.
-2: Rename .env.example to .env and fill in the required entries.
-2: Run docker-compose up
+This can be self hosted through only a few easy steps:
+
+1. Ensure you have docker-compose installed.
+2. Rename .env.example to .env and fill in the required entries.
+3. Run `docker-compose up`.

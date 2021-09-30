@@ -2,3 +2,4 @@ version: "3"
 services:
   bot:
     build: .
+    env_file: .env
