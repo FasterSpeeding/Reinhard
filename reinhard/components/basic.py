@@ -31,7 +31,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["basic_component"]
+__all__: list[str] = ["basic_component", "load_basic"]
 
 import collections.abc as collections
 import datetime
@@ -260,7 +260,7 @@ def _cache_command_check(ctx: tanjun.abc.Context) -> bool:
 
 
 @basic_component.with_slash_command
-@tanjun.as_slash_command("invite", "Invite the bot to your server")
+@tanjun.as_slash_command("invite", "Invite the bot to your server(s)")
 async def invite_command(ctx: tanjun.abc.Context) -> None:
     if ctx.cache:
         me = ctx.cache.get_me() or await ctx.rest.fetch_my_user()
@@ -274,5 +274,5 @@ async def invite_command(ctx: tanjun.abc.Context) -> None:
 
 
 @tanjun.as_loader
-def load_component(cli: tanjun.abc.Client, /) -> None:
+def load_basic(cli: tanjun.abc.Client, /) -> None:
     cli.add_component(basic_component.copy())

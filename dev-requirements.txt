@@ -3,4 +3,5 @@ codespell==2.1.0
 flake8==3.9.2
 isort==5.9.3
 mypy==0.910
+pytest==6.2.5
 types-PyYAML==5.4.10

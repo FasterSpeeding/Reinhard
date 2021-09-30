@@ -47,7 +47,7 @@ if typing.TYPE_CHECKING:
 
 def build_gateway_bot(*, config: config_.FullConfig | None = None) -> tuple[hikari.impl.GatewayBot, tanjun.Client]:
     if config is None:
-        config = config_.load_config()
+        config = config_.FullConfig.from_env()
 
     bot = hikari.GatewayBot(
         config.tokens.bot,
@@ -62,7 +62,7 @@ def build_gateway_bot(*, config: config_.FullConfig | None = None) -> tuple[hika
 
 def build_rest_bot(*, config: config_.FullConfig | None = None) -> tuple[hikari.impl.RESTBot, tanjun.Client]:
     if config is None:
-        config = config_.load_config()
+        config = config_.FullConfig.from_env()
 
     bot = hikari.impl.RESTBot(config.tokens.bot, hikari.TokenType.BOT)
     return bot, build_from_rest_bot(bot, config=config)
@@ -74,13 +74,7 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> None:
         .add_prefix(config.prefixes)
         .set_type_dependency(config_.FullConfig, lambda: config)
         .set_type_dependency(config_.Tokens, lambda: config.tokens)
-        .load_modules("reinhard.components.basic")
-        .load_modules("reinhard.components.docs")
-        .load_modules("reinhard.components.external")
-        .load_modules("reinhard.components.moderation")
-        # .load_modules("reinhard.components.roles")
-        .load_modules("reinhard.components.sudo")
-        .load_modules("reinhard.components.utility")
+        .load_modules("reinhard.components")
     )
     utility.SessionManager(
         client.rest.http_settings, client.rest.proxy_settings, "Reinhard discord bot"
@@ -98,7 +92,7 @@ def build_from_gateway_bot(
     bot: hikari_traits.GatewayBotAware, /, *, config: config_.FullConfig | None = None
 ) -> tanjun.Client:
     if config is None:
-        config = config_.load_config()
+        config = config_.FullConfig.from_env()
 
     component_client = yuyo.ComponentClient(event_manager=bot.event_manager)
     reaction_client = yuyo.ReactionClient(rest=bot.rest, event_manager=bot.event_manager)
@@ -120,7 +114,7 @@ def build_from_rest_bot(
     bot: hikari_traits.RESTBotAware, /, *, config: config_.FullConfig | None = None
 ) -> tanjun.Client:
     if config is None:
-        config = config_.load_config()
+        config = config_.FullConfig.from_env()
 
     component_client = yuyo.ComponentClient(server=bot.interaction_server)
     client = (

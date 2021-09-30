@@ -32,7 +32,7 @@
 """Commands used to search Hikari and Tanjun's docs."""
 from __future__ import annotations
 
-__all__: list[str] = ["docs_component"]
+__all__: list[str] = ["docs_component", "load_docs"]
 
 import abc
 import collections.abc as collections
@@ -375,13 +375,13 @@ async def tanjun_docs_command(
     component_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
     index: DocIndex = tanjun.injected(
         callback=tanjun.cache_callback(
-            utility.FetchedResource(TANJUN_PAGES + "/master/search.json", PdocIndex.from_json),
+            utility.FetchedResource(TANJUN_PAGES + "/release/search.json", PdocIndex.from_json),
             expire_after=datetime.timedelta(hours=12),
         )
     ),
 ) -> None:
     await _docs_command(
-        ctx, path, component_client, index, public, simple, TANJUN_PAGES, TANJUN_PAGES + "/master/", "Tanjun"
+        ctx, path, component_client, index, public, simple, TANJUN_PAGES, TANJUN_PAGES + "/release/", "Tanjun"
     )
 
 
@@ -400,16 +400,16 @@ async def yuyo_docs_command(
     component_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
     index: DocIndex = tanjun.injected(
         callback=tanjun.cache_callback(
-            utility.FetchedResource(YUYO_PAGES + "/master/search.json", PdocIndex.from_json),
+            utility.FetchedResource(YUYO_PAGES + "/release/search.json", PdocIndex.from_json),
             expire_after=datetime.timedelta(hours=12),
         )
     ),
 ) -> None:
     await _docs_command(
-        ctx, path, component_client, index, public, simple, YUYO_PAGES, YUYO_PAGES + "/master/", "Tanjun"
+        ctx, path, component_client, index, public, simple, YUYO_PAGES, YUYO_PAGES + "/release/", "Tanjun"
     )
 
 
 @tanjun.as_loader
-def load_component(cli: tanjun.abc.Client, /) -> None:
+def load_docs(cli: tanjun.abc.Client, /) -> None:
     cli.add_component(docs_component.copy())

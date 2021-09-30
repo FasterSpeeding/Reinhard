@@ -29,41 +29,34 @@
 # CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+from __future__ import annotations
+
 import pathlib
-import shutil
 
 import nox
 
 nox.options.sessions = ["reformat", "lint", "spell-check", "type-check", "test"]  # type: ignore
-GENERAL_TARGETS = ["./noxfile.py", "./reinhard"]
+GENERAL_TARGETS = ["./noxfile.py", "./reinhard", "./tests"]
 PYTHON_VERSIONS = ["3.9", "3.10"]  # TODO: @nox.session(python=["3.6", "3.7", "3.8"])?
-REQUIREMENTS = [
-    # Temporarily assume #master for hikari, yuyo and tanjun
-    "git+https://github.com/FasterSpeeding/hikari.git@task/components",
-    "git+https://github.com/FasterSpeeding/Yuyo.git@task/message-components",
-    "git+https://github.com/FasterSpeeding/tanjun.git@task/components",
-]
 
 
-def install_requirements(
-    session: nox.Session, *other_requirements: str, include_standard_requirements: bool = True
-) -> None:
+def install_requirements(session: nox.Session, *other_requirements: str, include_standard: bool = False) -> None:
     session.install("--upgrade", "wheel")
-    requirements = [*REQUIREMENTS, *other_requirements]
 
-    if include_standard_requirements:
-        requirements.append("-r")
-        requirements.append("requirements.txt")
+    if include_standard:
+        other_requirements = ("-r", "requirements.txt", *other_requirements)
 
-    session.install("--upgrade", *requirements)
+    session.install("--upgrade", "-r", "dev-requirements.txt", *other_requirements)
 
 
 @nox.session(venv_backend="none")
 def cleanup(session: nox.Session) -> None:
+    import shutil
+
     # Remove directories
     from nox.logger import logger
 
-    for raw_path in ["./dist", "./docs", "./.nox", "./.pytest_cache", "./reinhard.egg-info"]:
+    for raw_path in ["./.nox", "./.pytest_cache", "./coverage_html"]:
         path = pathlib.Path(raw_path)
         try:
             shutil.rmtree(str(path.absolute()))
@@ -75,7 +68,7 @@ def cleanup(session: nox.Session) -> None:
             logger.info(f"[  OK  ] Removed '{raw_path}'")  # type: ignore
 
     # Remove individual files
-    for raw_path in ["./.coverage"]:
+    for raw_path in ["./.coverage", "./coverage_html.xml"]:
         path = pathlib.Path(raw_path)
         try:
             path.unlink()
@@ -89,38 +82,47 @@ def cleanup(session: nox.Session) -> None:
 
 @nox.session(reuse_venv=True)
 def lint(session: nox.Session) -> None:
-    install_requirements(session, "-r", "dev-requirements.txt")
+    install_requirements(session, include_standard=True)
     session.run("flake8", *GENERAL_TARGETS)
 
 
 @nox.session(reuse_venv=True, name="spell-check")
 def spell_check(session: nox.Session) -> None:
-    install_requirements(session, "-r", "dev-requirements.txt", include_standard_requirements=False)
-    session.run("codespell", *GENERAL_TARGETS, ".flake8", ".gitignore", "LICENSE", "pyproject.toml", "README.md")
+    install_requirements(session)  # include_standard_requirements=False
+    session.run(
+        "codespell",
+        *GENERAL_TARGETS,
+        ".flake8",
+        ".gitignore",
+        "LICENSE",
+        "pyproject.toml",
+        "README.md",
+        "./github",
+        "-I",
+        "./codespell_ignore.txt",
+    )
 
 
 @nox.session(reuse_venv=True)
 def reformat(session: nox.Session) -> None:
-    install_requirements(session, "-r", "dev-requirements.txt", include_standard_requirements=False)
+    install_requirements(session)  # include_standard_requirements=False
     session.run("black", *GENERAL_TARGETS)
     session.run("isort", *GENERAL_TARGETS)
 
 
 @nox.session(reuse_venv=True)
 def test(session: nox.Session) -> None:
-    install_requirements(session, "-r", "dev-requirements.txt")
-    # TODO: can import-mode be specified in the config.
-    session.run("pytest", "--import-mode", "importlib")
+    install_requirements(session, include_standard=True)
+    session.run("pytest")
 
 
 @nox.session(name="test-coverage", reuse_venv=True)
 def test_coverage(session: nox.Session) -> None:
-    install_requirements(session, "-r", "dev-requirements.txt")
-    # TODO: can import-mode be specified in the config.
-    session.run("pytest", "--cov=reinhard", "--import-mode", "importlib")
+    install_requirements(session, include_standard=True)
+    session.run("pytest", "--cov=reinhard", "--cov-report", "html:coverage_html", "--cov-report", "xml:coverage.xml")
 
 
 @nox.session(name="type-check", reuse_venv=True)
 def type_check(session: nox.Session) -> None:
-    install_requirements(session, "-r", "dev-requirements.txt")
+    install_requirements(session, "-r", "nox-requirements.txt", include_standard=True)
     session.run("pyright", external=True)

@@ -31,7 +31,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["sudo_component", "load_component"]
+__all__: list[str] = ["sudo_component", "load_sudo"]
 
 import ast
 import asyncio
@@ -239,5 +239,5 @@ async def eval_command(
 
 
 @tanjun.as_loader
-def load_component(cli: tanjun.abc.Client, /) -> None:
+def load_sudo(cli: tanjun.abc.Client, /) -> None:
     cli.add_component(sudo_component.copy().add_check(tanjun.checks.ApplicationOwnerCheck()))

@@ -30,3 +30,24 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
+
+__all__ = [
+    "load_basic",
+    "load_docs",
+    "load_external",
+    "load_moderation",
+    "load_sudo",
+    # "load_tags",
+    # "load_roles",
+    "load_utility",
+]
+
+from .basic import load_basic
+from .docs import load_docs
+from .external import load_external
+from .moderation import load_moderation
+from .sudo import load_sudo
+
+# from .tags import load_tags
+# from .roles import load_roles
+from .utility import load_utility

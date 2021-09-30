@@ -32,7 +32,7 @@
 """Commands used to interact with external APIs."""
 from __future__ import annotations
 
-__all__: list[str] = ["external_component"]
+__all__: list[str] = ["external_component", "load_external"]
 
 import collections.abc as collections
 import logging
@@ -571,5 +571,5 @@ async def ytdl_command(
 
 
 @tanjun.as_loader
-def load_component(cli: tanjun.abc.Client, /) -> None:
+def load_external(cli: tanjun.abc.Client, /) -> None:
     cli.add_component(external_component.copy())
