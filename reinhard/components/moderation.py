@@ -36,7 +36,6 @@ __all__: list[str] = ["moderation_component", "load_moderation"]
 import asyncio
 import datetime
 import re
-import typing
 from collections import abc as collections
 
 import hikari
@@ -76,7 +75,7 @@ def iter_messages(
     )
 
     if before and after:
-        iterator = iterator.filter(lambda message: message.id > typing.cast("hikari.Snowflake", after))
+        iterator = iterator.filter(lambda message: message.id > after)
 
     if human_only:
         iterator = iterator.filter(lambda message: not message.author.is_bot)
@@ -91,17 +90,13 @@ def iter_messages(
         iterator = iterator.filter(lambda message: bool(message.embeds))
 
     if regex:
-        iterator = iterator.filter(
-            lambda message: bool(message.content and typing.cast("re.Pattern[str]", regex).match(message.content))
-        )
+        iterator = iterator.filter(lambda message: bool(message.content and regex.match(message.content)))
 
     if users is not None:
         if not users:
             raise tanjun.CommandError("Must specify at least one user.")
 
-        iterator = iterator.filter(
-            lambda message: message.author.id in typing.cast("collections.Collection[hikari.Snowflake]", users)
-        )
+        iterator = iterator.filter(lambda message: message.author.id in users)
 
     # TODO: Should we limit count or at least default it to something other than no limit?
     if count:

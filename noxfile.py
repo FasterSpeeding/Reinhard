@@ -40,6 +40,15 @@ GENERAL_TARGETS = ["./noxfile.py", "./reinhard", "./tests"]
 PYTHON_VERSIONS = ["3.9", "3.10"]  # TODO: @nox.session(python=["3.6", "3.7", "3.8"])?
 
 
+def _try_find_option(session: nox.Session, name: str, *other_names: str, when_empty: str | None = None) -> str | None:
+    args_iter = iter(session.posargs)
+    names = {name, *other_names}
+
+    for arg in args_iter:
+        if arg in names:
+            return next(args_iter, when_empty)
+
+
 def install_requirements(session: nox.Session, *other_requirements: str, include_standard: bool = False) -> None:
     session.install("--upgrade", "wheel")
 
@@ -53,19 +62,16 @@ def install_requirements(session: nox.Session, *other_requirements: str, include
 def cleanup(session: nox.Session) -> None:
     import shutil
 
-    # Remove directories
-    from nox.logger import logger
-
     for raw_path in ["./.nox", "./.pytest_cache", "./coverage_html"]:
         path = pathlib.Path(raw_path)
         try:
             shutil.rmtree(str(path.absolute()))
 
         except Exception as exc:
-            logger.error(f"[ FAIL ] Failed to remove '{raw_path}': {exc!s}")  # type: ignore
+            session.warn(f"[ FAIL ] Failed to remove '{raw_path}': {exc!s}")
 
         else:
-            logger.info(f"[  OK  ] Removed '{raw_path}'")  # type: ignore
+            session.log(f"[  OK  ] Removed '{raw_path}'")
 
     # Remove individual files
     for raw_path in ["./.coverage", "./coverage_html.xml"]:
@@ -74,10 +80,10 @@ def cleanup(session: nox.Session) -> None:
             path.unlink()
 
         except Exception as exc:
-            logger.error(f"[ FAIL ] Failed to remove '{raw_path}': {exc!s}")  # type: ignore
+            session.warn(f"[ FAIL ] Failed to remove '{raw_path}': {exc!s}")
 
         else:
-            logger.info(f"[  OK  ] Removed '{raw_path}'")  # type: ignore
+            session.log(f"[  OK  ] Removed '{raw_path}'")
 
 
 @nox.session(reuse_venv=True)
@@ -124,5 +130,10 @@ def test_coverage(session: nox.Session) -> None:
 
 @nox.session(name="type-check", reuse_venv=True)
 def type_check(session: nox.Session) -> None:
-    install_requirements(session, "-r", "nox-requirements.txt", include_standard=True)
-    session.run("pyright", external=True)
+    install_requirements(session, ".[tests, type_checking]", "-r", "nox-requirements.txt")
+
+    if _try_find_option(session, "--force-env", when_empty="True"):
+        session.env["PYRIGHT_PYTHON_GLOBAL_NODE"] = "off"
+
+    session.run("python", "-m", "pyright", "--version")
+    session.run("python", "-m", "pyright")
