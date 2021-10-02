@@ -94,8 +94,8 @@ def build_from_gateway_bot(
     if config is None:
         config = config_.FullConfig.from_env()
 
-    component_client = yuyo.ComponentClient(event_manager=bot.event_manager)
-    reaction_client = yuyo.ReactionClient(rest=bot.rest, event_manager=bot.event_manager)
+    component_client = yuyo.ComponentClient.from_gateway_bot(bot, event_managed=False)
+    reaction_client = yuyo.ReactionClient.from_gateway_bot(bot, event_managed=False)
     client = (
         tanjun.Client.from_gateway_bot(
             bot, mention_prefix=config.mention_prefix, set_global_commands=config.set_global_commands
@@ -116,7 +116,7 @@ def build_from_rest_bot(
     if config is None:
         config = config_.FullConfig.from_env()
 
-    component_client = yuyo.ComponentClient(server=bot.interaction_server)
+    component_client = yuyo.ComponentClient.from_rest_bot(bot)
     client = (
         tanjun.Client.from_rest_bot(bot, set_global_commands=config.set_global_commands)
         .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open)
