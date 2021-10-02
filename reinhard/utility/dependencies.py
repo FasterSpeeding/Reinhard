@@ -66,16 +66,16 @@ class SessionManager:
 
     def load_into_client(self, client: tanjun.Client) -> None:
         client.add_client_callback(tanjun.ClientCallbackNames.STARTING, self.open).add_client_callback(
-            tanjun.ClientCallbackNames.CLOSING, self.close
-        ).set_type_dependency(aiohttp.ClientSession, self)
+            tanjun.ClientCallbackNames.CLOSED, self.close
+        )
 
-    def open(self) -> None:
+    # TODO: switch over to tanjun.InjectorClient
+    def open(self, client: tanjun.Client = tanjun.injected(type=tanjun.Client)) -> None:
         if self._session:
             raise RuntimeError("Session already running")
 
         # Assert that this is only called within a live event loop
         asyncio.get_running_loop()
-        # Assert this is only called within an active event loop
         self._session = aiohttp.ClientSession(
             headers={"User-Agent": self.user_agent},
             raise_for_status=False,
@@ -87,12 +87,14 @@ class SessionManager:
             ),
             trust_env=self.proxy_settings.trust_env,
         )
+        client.set_type_dependency(aiohttp.ClientSession, self._session)
         _LOGGER.debug("acquired new aiohttp client session")
 
-    async def close(self) -> None:
+    async def close(self, client: tanjun.Client = tanjun.injected(type=tanjun.Client)) -> None:
         if not self._session:
             raise RuntimeError("Session not running")
 
         session = self._session
         self._session = None
         await session.close()
+        client.remove_type_dependency(aiohttp.ClientSession)

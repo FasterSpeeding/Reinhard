@@ -72,8 +72,8 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> None:
     (
         client.set_hooks(tanjun.AnyHooks().set_on_parser_error(utility.on_parser_error).set_on_error(utility.on_error))
         .add_prefix(config.prefixes)
-        .set_type_dependency(config_.FullConfig, lambda: config)
-        .set_type_dependency(config_.Tokens, lambda: config.tokens)
+        .set_type_dependency(config_.FullConfig, config)
+        .set_type_dependency(config_.Tokens, config.tokens)
         .load_modules("reinhard.components")
     )
     utility.SessionManager(
@@ -82,7 +82,7 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> None:
 
     if config.ptf:
         ptf = config.ptf
-        client.set_type_dependency(config_.PTFConfig, lambda: ptf)
+        client.set_type_dependency(config_.PTFConfig, ptf)
 
     if config.owner_only:
         client.add_check(tanjun.checks.ApplicationOwnerCheck())
@@ -102,8 +102,8 @@ def build_from_gateway_bot(
         )
         .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open)
         .add_client_callback(tanjun.ClientCallbackNames.CLOSING, component_client.close)
-        .set_type_dependency(yuyo.ReactionClient, lambda: reaction_client)
-        .set_type_dependency(yuyo.ComponentClient, lambda: component_client)
+        .set_type_dependency(yuyo.ReactionClient, reaction_client)
+        .set_type_dependency(yuyo.ComponentClient, component_client)
     )
     _build(client, config)
 
@@ -121,7 +121,7 @@ def build_from_rest_bot(
         tanjun.Client.from_rest_bot(bot, set_global_commands=config.set_global_commands)
         .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open)
         .add_client_callback(tanjun.ClientCallbackNames.CLOSING, component_client.close)
-        .set_type_dependency(yuyo.ComponentClient, lambda: component_client)
+        .set_type_dependency(yuyo.ComponentClient, component_client)
     )
     _build(client, config)
     return client
