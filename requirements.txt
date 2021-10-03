@@ -5,5 +5,5 @@ hikari-tanjun~=2.1.0a1
 hikari-yuyo~=1.0.2a1.post1
 markdownify==0.9.4
 psutil==5.8.0
-uvloop==0.16.0; sys_platform == "linux"
+uvloop==0.16.0; platform_system != "Windows"
 youtube_dl~=2021.6.6
