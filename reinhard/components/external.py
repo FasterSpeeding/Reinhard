@@ -368,7 +368,7 @@ async def youtube_command(
 
 
 @youtube_command.with_check
-def _youtube_token_check(_: tanjun.abc.Context, tokens: config_.Tokens = tanjun.injected(type=config_.Tokens)) -> bool:
+def _(_: tanjun.abc.Context, tokens: config_.Tokens = tanjun.injected(type=config_.Tokens)) -> bool:
     return tokens.google is not None
 
 

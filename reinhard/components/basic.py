@@ -252,7 +252,7 @@ async def cache_command(
 
 
 @cache_command.with_check
-def _cache_command_check(ctx: tanjun.abc.Context) -> bool:
+def _(ctx: tanjun.abc.Context) -> bool:
     if ctx.cache:
         return True
 

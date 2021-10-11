@@ -113,10 +113,10 @@ def iter_messages(
     hikari.Permissions.MANAGE_MESSAGES | hikari.Permissions.VIEW_CHANNEL | hikari.Permissions.READ_MESSAGE_HISTORY
 )
 @tanjun.with_str_slash_option(
-    "after", "ID of a message to delete messages which were sent after.", converters=hikari.Snowflake, default=None
+    "after", "ID of a message to delete messages which were sent after.", converters=tanjun.to_snowflake, default=None
 )
 @tanjun.with_str_slash_option(
-    "before", "ID of a message to delete messages which were sent before.", converters=hikari.Snowflake, default=None
+    "before", "ID of a message to delete messages which were sent before.", converters=tanjun.to_snowflake, default=None
 )
 @tanjun.with_bool_slash_option(
     "bot_only", "Whether this should only delete messages sent by bots and webhooks.", default=False
@@ -124,10 +124,10 @@ def iter_messages(
 @tanjun.with_bool_slash_option(
     "human_only", "Whether this should only delete messages sent by actual users.", default=False
 )
-@tanjun.with_str_slash_option(
+@tanjun.with_bool_slash_option(
     "has_attachments", "Whether this should only delete messages which have attachments.", default=False
 )
-@tanjun.with_str_slash_option(
+@tanjun.with_bool_slash_option(
     "has_embeds", "Whether this should only delete messages which have embeds.", default=False
 )
 @tanjun.with_str_slash_option(
