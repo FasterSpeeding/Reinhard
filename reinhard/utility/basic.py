@@ -31,7 +31,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["basic_name_grid", "pretify_date", "pretify_index", "raise_error"]
+__all__: list[str] = ["basic_name_grid", "prettify_date", "prettify_index", "raise_error"]
 
 import enum
 import typing
@@ -42,11 +42,11 @@ if typing.TYPE_CHECKING:
     import datetime
 
 
-def pretify_date(date: datetime.datetime) -> str:
+def prettify_date(date: datetime.datetime) -> str:
     return date.strftime("%a %d %b %Y %H:%M:%S %Z")
 
 
-def pretify_index(index: int, max_digit_count: int) -> str:
+def prettify_index(index: int, max_digit_count: int) -> str:
     remainder = index % 10
     name = str(index).zfill(max_digit_count)
     if remainder == 1 and index % 100 != 11:

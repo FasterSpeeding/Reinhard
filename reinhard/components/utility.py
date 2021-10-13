@@ -138,15 +138,15 @@ async def member_command(ctx: tanjun.abc.SlashContext, member: hikari.Interactio
     permissions_grid = utility.basic_name_grid(member.permissions) or "None"
     member_information = [
         f"Color: {colour}",
-        f"Joined Discord: {utility.pretify_date(member.user.created_at)}",
-        f"Joined Server: {utility.pretify_date(member.joined_at)}",
+        f"Joined Discord: {tanjun.from_datetime(member.user.created_at)}",
+        f"Joined Server: {tanjun.from_datetime(member.joined_at)}",
     ]
 
     if member.nickname:
         member_information.append(f"Nickname: {member.nickname}")
 
     if member.premium_since:
-        member_information.append(f"Boosting since: {utility.pretify_date(member.premium_since)}")
+        member_information.append(f"Boosting since: {tanjun.from_datetime(member.premium_since)}")
 
     if member.user.is_bot:
         member_information.append("System bot" if member.user.is_system else "Bot")
@@ -182,7 +182,7 @@ async def role_command(ctx: tanjun.abc.Context, role: hikari.Role) -> None:
     """
 
     permissions = utility.basic_name_grid(role.permissions) or "None"
-    role_information = [f"Created: {utility.pretify_date(role.created_at)}", f"Position: {role.position}"]
+    role_information = [f"Created: {tanjun.from_datetime(role.created_at)}", f"Position: {role.position}"]
 
     if role.colour:
         role_information.append(f"Color: `{role.colour}`")
@@ -226,7 +226,7 @@ async def user_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> Non
             colour=utility.embed_colour(),
             description=(
                 f"Bot: {user.is_system}\nSystem bot: {user.is_system}\n"
-                f"Joined Discord: {utility.pretify_date(user.created_at)}\n\nFlags: {int(user.flags)}\n{flags}"
+                f"Joined Discord: {tanjun.from_datetime(user.created_at)}\n\nFlags: {int(user.flags)}\n{flags}"
             ),
             title=f"{user.username}#{user.discriminator}",
             url=f"https://discordapp.com/users/{user.id}",
@@ -322,8 +322,8 @@ async def members_command(ctx: tanjun.abc.Context, name: str) -> None:
     members = await ctx.rest.search_members(ctx.guild_id, name)
 
     if members:
-        content = "Similar members:\n" + "\n".join(
-            f"* {member.username} ({member.nickname})" if member.nickname else member.username for member in members
+        content = "Similar members:\n* " + "\n* ".join(
+            f"{member.username} ({member.nickname})" if member.nickname else member.username for member in members
         )
 
     else:

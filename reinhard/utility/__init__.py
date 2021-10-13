@@ -34,8 +34,8 @@ __all__: list[str] = [
     # basic.py
     "basic",
     "basic_name_grid",
-    "pretify_date",
-    "pretify_index",
+    "prettify_date",
+    "prettify_index",
     "raise_error",
     # command_hooks.py
     "command_hooks",
