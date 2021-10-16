@@ -204,6 +204,7 @@ async def cache_command(
     ctx: tanjun.abc.Context,
     process: psutil.Process = tanjun.injected(callback=tanjun.cache_callback(psutil.Process)),
     cache: hikari.api.Cache = tanjun.injected(type=hikari.api.Cache),
+    me: hikari.OwnUser = tanjun.injected(callback=tanjun.make_lc_resolver(hikari.OwnUser)),
 ) -> None:
     """Get general information about this bot."""
     start_date = datetime.datetime.fromtimestamp(process.create_time())
@@ -229,8 +230,6 @@ async def cache_command(
         for line, time_taken in cache_stats_lines
     )
 
-    # TODO: try cache first + backoff
-    me = (ctx.cache.get_me() if ctx.cache else None) or await ctx.rest.fetch_my_user()
     embed = (
         hikari.Embed(description="An experimental pythonic Hikari bot.", color=0x55CDFC)
         .set_author(name="Hikari: testing client", icon=me.avatar_url or me.default_avatar_url, url=hikari.__url__)
@@ -261,13 +260,9 @@ def _(ctx: tanjun.abc.Context) -> bool:
 
 @basic_component.with_slash_command
 @tanjun.as_slash_command("invite", "Invite the bot to your server(s)")
-async def invite_command(ctx: tanjun.abc.Context) -> None:
-    if ctx.cache:
-        me = ctx.cache.get_me() or await ctx.rest.fetch_my_user()
-
-    else:
-        me = await ctx.rest.fetch_my_user()
-
+async def invite_command(
+    ctx: tanjun.abc.Context, me: hikari.OwnUser = tanjun.injected(callback=tanjun.make_lc_resolver(hikari.OwnUser))
+) -> None:
     await ctx.respond(
         f"https://discord.com/oauth2/authorize?client_id={me.id}&scope=bot%20applications.commands&permissions=8"
     )
