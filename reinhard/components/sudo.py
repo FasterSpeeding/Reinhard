@@ -73,7 +73,7 @@ async def echo_command(
     ctx: tanjun.abc.Context,
     content: hikari.UndefinedOr[str],
     raw_embed: hikari.UndefinedOr[dict[str, typing.Any]],
-    entity_factory: traits.EntityFactoryAware = tanjun.injected(type=traits.EntityFactoryAware),
+    entity_factory: traits.EntityFactoryAware = tanjun.inject(type=traits.EntityFactoryAware),
 ) -> None:
     """Command used for getting the bot to mirror a response.
 
@@ -180,8 +180,8 @@ async def eval_command(
     file_output: bool = False,
     # ephemeral_response: bool = False,
     suppress_response: bool = False,
-    component: tanjun.abc.Component = tanjun.injected(type=tanjun.abc.Component),
-    component_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
+    component: tanjun.abc.Component = tanjun.inject(type=tanjun.abc.Component),
+    component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
 ) -> None:
     """Dynamically evaluate a script in the bot's environment.
 

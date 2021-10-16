@@ -1,7 +1,8 @@
 asyncpg==0.24.0
 python-dotenv~=0.19.1
 hikari[speedups]~=2.0.0.dev103
-hikari-tanjun~=2.1.2a1
+# hikari-tanjun~=2.1.2a1
+git+https://github.com/FasterSpeeding/Tanjun@df7785d0bf4dcdec465c16c26b00bcfcd69d9d74
 hikari-yuyo~=1.0.2a1.post1
 markdownify==0.9.4
 psutil==5.8.0

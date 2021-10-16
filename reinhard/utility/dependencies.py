@@ -70,7 +70,7 @@ class SessionManager:
         )
 
     # TODO: switch over to tanjun.InjectorClient
-    def open(self, client: tanjun.Client = tanjun.injected(type=tanjun.Client)) -> None:
+    def open(self, client: tanjun.Client = tanjun.inject(type=tanjun.Client)) -> None:
         if self._session:
             raise RuntimeError("Session already running")
 
@@ -90,7 +90,7 @@ class SessionManager:
         client.set_type_dependency(aiohttp.ClientSession, self._session)
         _LOGGER.debug("acquired new aiohttp client session")
 
-    async def close(self, client: tanjun.Client = tanjun.injected(type=tanjun.Client)) -> None:
+    async def close(self, client: tanjun.Client = tanjun.inject(type=tanjun.Client)) -> None:
         if not self._session:
             raise RuntimeError("Session not running")
 

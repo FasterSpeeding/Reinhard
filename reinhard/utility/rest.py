@@ -170,7 +170,7 @@ class FetchedResource(typing.Generic[_ValueT]):
         self._parse_data = parse_data
         self._path = path
 
-    async def __call__(self, session: aiohttp.ClientSession = tanjun.injected(type=aiohttp.ClientSession)) -> _ValueT:
+    async def __call__(self, session: aiohttp.ClientSession = tanjun.inject(type=aiohttp.ClientSession)) -> _ValueT:
         response = await session.get(self._path)
         # TODO: better handling
         response.raise_for_status()

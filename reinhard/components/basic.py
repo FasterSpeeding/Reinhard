@@ -50,8 +50,8 @@ from .. import utility
 
 
 def gen_help_embeds(
-    ctx: tanjun.abc.Context = tanjun.injected(type=tanjun.abc.Context),
-    client: tanjun.abc.Client = tanjun.injected(type=tanjun.abc.Client),
+    ctx: tanjun.abc.Context = tanjun.inject(type=tanjun.abc.Context),
+    client: tanjun.abc.Client = tanjun.inject(type=tanjun.abc.Client),
 ) -> dict[str, list[hikari.Embed]]:
     prefix = next(iter(client.prefixes)) if client and client.prefixes else ""
 
@@ -70,7 +70,7 @@ basic_component = tanjun.Component(name="basic", strict=True)
 @tanjun.as_slash_command("about", "Get basic information about the current bot instance.")
 async def about_command(
     ctx: tanjun.abc.Context,
-    process: psutil.Process = tanjun.injected(callback=tanjun.cache_callback(psutil.Process)),
+    process: psutil.Process = tanjun.cached_inject(psutil.Process),
 ) -> None:
     """Get basic information about the current bot instance."""
     start_date = datetime.datetime.fromtimestamp(process.create_time())
@@ -125,8 +125,8 @@ async def old_help_command(
     ctx: tanjun.abc.Context,
     command_name: str | None,
     component_name: str | None,
-    component_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
-    help_embeds: dict[str, list[hikari.Embed]] = tanjun.injected(callback=tanjun.cache_callback(gen_help_embeds)),
+    component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
+    help_embeds: dict[str, list[hikari.Embed]] = tanjun.cached_inject(gen_help_embeds),
 ) -> None:
     """Get information about the commands in this bot.
 
@@ -202,9 +202,9 @@ _about_lines: list[tuple[str, collections.Callable[[hikari.api.Cache], int]]] = 
 @tanjun.as_slash_command("cache", "Get general information about this bot's cache.")
 async def cache_command(
     ctx: tanjun.abc.Context,
-    process: psutil.Process = tanjun.injected(callback=tanjun.cache_callback(psutil.Process)),
-    cache: hikari.api.Cache = tanjun.injected(type=hikari.api.Cache),
-    me: hikari.OwnUser = tanjun.injected(callback=tanjun.make_lc_resolver(hikari.OwnUser)),
+    process: psutil.Process = tanjun.cached_inject(psutil.Process),
+    cache: hikari.api.Cache = tanjun.inject(type=hikari.api.Cache),
+    me: hikari.OwnUser = tanjun.inject_lc(hikari.OwnUser),
 ) -> None:
     """Get general information about this bot."""
     start_date = datetime.datetime.fromtimestamp(process.create_time())
@@ -260,9 +260,7 @@ def _(ctx: tanjun.abc.Context) -> bool:
 
 @basic_component.with_slash_command
 @tanjun.as_slash_command("invite", "Invite the bot to your server(s)")
-async def invite_command(
-    ctx: tanjun.abc.Context, me: hikari.OwnUser = tanjun.injected(callback=tanjun.make_lc_resolver(hikari.OwnUser))
-) -> None:
+async def invite_command(ctx: tanjun.abc.Context, me: hikari.OwnUser = tanjun.inject_lc(hikari.OwnUser)) -> None:
     await ctx.respond(
         f"https://discord.com/oauth2/authorize?client_id={me.id}&scope=bot%20applications.commands&permissions=8"
     )

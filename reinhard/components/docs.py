@@ -333,13 +333,11 @@ def docs_hikari_command(
     path: str | None,
     public: bool,
     simple: bool,
-    index: HikariIndex = tanjun.injected(
-        callback=tanjun.cache_callback(
-            utility.FetchedResource(HIKARI_PAGES + "/hikari/index.json", HikariIndex.from_json),
-            expire_after=datetime.timedelta(hours=12),
-        )
+    index: HikariIndex = tanjun.cached_inject(
+        utility.FetchedResource(HIKARI_PAGES + "/hikari/index.json", HikariIndex.from_json),
+        expire_after=datetime.timedelta(hours=12),
     ),
-    component_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
+    component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
 ) -> collections.Awaitable[None]:
     """Search Hikari's documentation.
 
@@ -372,12 +370,10 @@ def tanjun_docs_command(
     path: str | None,
     public: bool,
     simple: bool,
-    component_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
-    index: DocIndex = tanjun.injected(
-        callback=tanjun.cache_callback(
-            utility.FetchedResource(TANJUN_PAGES + "/release/search.json", PdocIndex.from_json),
-            expire_after=datetime.timedelta(hours=12),
-        )
+    component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
+    index: DocIndex = tanjun.cached_inject(
+        utility.FetchedResource(TANJUN_PAGES + "/release/search.json", PdocIndex.from_json),
+        expire_after=datetime.timedelta(hours=12),
     ),
 ) -> collections.Awaitable[None]:
     return _docs_command(
@@ -397,12 +393,10 @@ def yuyo_docs_command(
     path: str | None,
     public: bool,
     simple: bool,
-    component_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
-    index: DocIndex = tanjun.injected(
-        callback=tanjun.cache_callback(
-            utility.FetchedResource(YUYO_PAGES + "/release/search.json", PdocIndex.from_json),
-            expire_after=datetime.timedelta(hours=12),
-        )
+    component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
+    index: DocIndex = tanjun.cached_inject(
+        utility.FetchedResource(YUYO_PAGES + "/release/search.json", PdocIndex.from_json),
+        expire_after=datetime.timedelta(hours=12),
     ),
 ) -> collections.Awaitable[None]:
     return _docs_command(
