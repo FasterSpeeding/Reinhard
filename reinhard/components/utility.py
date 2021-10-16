@@ -31,7 +31,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["util_component", "load_utility"]
+__all__: list[str] = ["util_component", "load_utility", "unload_utility"]
 
 import unicodedata
 
@@ -41,7 +41,7 @@ from yuyo import backoff
 
 from .. import utility
 
-util_component = tanjun.Component(strict=True)
+util_component = tanjun.Component(name="utility", strict=True)
 
 
 @util_component.with_slash_command
@@ -374,5 +374,10 @@ async def char_command(ctx: tanjun.abc.Context, characters: str, file: bool = Fa
 
 
 @tanjun.as_loader
-def load_utility(cli: tanjun.abc.Client, /) -> None:
+def load_utility(cli: tanjun.Client, /) -> None:
     cli.add_component(util_component.copy())
+
+
+@tanjun.as_unloader
+def unload_utility(cli: tanjun.Client, /) -> None:
+    cli.remove_component_by_name(util_component.name)

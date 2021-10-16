@@ -1,0 +1,1 @@
+types-PyYAML==5.4.12

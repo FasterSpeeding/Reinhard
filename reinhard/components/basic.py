@@ -31,7 +31,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["basic_component", "load_basic"]
+__all__: list[str] = ["basic_component", "load_basic", "unload_basic"]
 
 import collections.abc as collections
 import datetime
@@ -63,7 +63,7 @@ def gen_help_embeds(
     return help_embeds
 
 
-basic_component = tanjun.Component(strict=True)
+basic_component = tanjun.Component(name="basic", strict=True)
 
 
 @basic_component.with_slash_command
@@ -274,5 +274,10 @@ async def invite_command(ctx: tanjun.abc.Context) -> None:
 
 
 @tanjun.as_loader
-def load_basic(cli: tanjun.abc.Client, /) -> None:
+def load_basic(cli: tanjun.Client, /) -> None:
     cli.add_component(basic_component.copy())
+
+
+@tanjun.as_unloader
+def unload_basic(cli: tanjun.Client, /) -> None:
+    cli.remove_component_by_name(basic_component.name)

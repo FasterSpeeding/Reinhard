@@ -32,7 +32,7 @@
 """Commands used to interact with external APIs."""
 from __future__ import annotations
 
-__all__: list[str] = ["external_component", "load_external"]
+__all__: list[str] = ["external_component", "load_external", "unload_external"]
 
 import collections.abc as collections
 import logging
@@ -181,7 +181,7 @@ class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
         return (self._buffer.pop(0)["external_urls"]["spotify"], hikari.UNDEFINED)
 
 
-external_component = tanjun.Component(strict=True)
+external_component = tanjun.Component(name="external", strict=True)
 
 
 @external_component.with_slash_command
@@ -571,5 +571,10 @@ async def ytdl_command(
 
 
 @tanjun.as_loader
-def load_external(cli: tanjun.abc.Client, /) -> None:
+def load_external(cli: tanjun.Client, /) -> None:
     cli.add_component(external_component.copy())
+
+
+@tanjun.as_unloader
+def unload_external(cli: tanjun.Client, /) -> None:
+    cli.remove_component_by_name(external_component.name)

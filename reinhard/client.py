@@ -85,7 +85,7 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> None:
         client.set_type_dependency(config_.PTFConfig, ptf)
 
     if config.owner_only:
-        client.add_check(tanjun.checks.ApplicationOwnerCheck())
+        client.add_check(tanjun.checks.OwnerCheck())
 
 
 def build_from_gateway_bot(
@@ -98,7 +98,7 @@ def build_from_gateway_bot(
     reaction_client = yuyo.ReactionClient.from_gateway_bot(bot, event_managed=False)
     client = (
         tanjun.Client.from_gateway_bot(
-            bot, mention_prefix=config.mention_prefix, set_global_commands=config.set_global_commands
+            bot, mention_prefix=config.mention_prefix, declare_global_commands=config.declare_global_commands
         )
         .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open)
         .add_client_callback(tanjun.ClientCallbackNames.CLOSING, component_client.close)
@@ -118,7 +118,7 @@ def build_from_rest_bot(
 
     component_client = yuyo.ComponentClient.from_rest_bot(bot)
     client = (
-        tanjun.Client.from_rest_bot(bot, set_global_commands=config.set_global_commands)
+        tanjun.Client.from_rest_bot(bot, declare_global_commands=config.declare_global_commands)
         .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open)
         .add_client_callback(tanjun.ClientCallbackNames.CLOSING, component_client.close)
         .set_type_dependency(yuyo.ComponentClient, component_client)

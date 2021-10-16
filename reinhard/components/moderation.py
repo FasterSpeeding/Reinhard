@@ -31,7 +31,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["moderation_component", "load_moderation"]
+__all__: list[str] = ["moderation_component", "load_moderation", "unload_moderation"]
 
 import asyncio
 import datetime
@@ -201,5 +201,10 @@ async def clear_command(
 
 
 @tanjun.as_loader
-def load_moderation(cli: tanjun.abc.Client, /) -> None:
+def load_moderation(cli: tanjun.Client, /) -> None:
     cli.add_component(moderation_component.copy())
+
+
+@tanjun.as_unloader
+def unload_moderation(cli: tanjun.Client, /) -> None:
+    cli.remove_component_by_name(moderation_component.name)

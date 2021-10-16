@@ -186,7 +186,7 @@ class FullConfig(Config):
     owner_only: bool = False
     prefixes: collections.Set[str] = frozenset()
     ptf: PTFConfig | None = None
-    set_global_commands: typing.Union[bool, hikari.Snowflake] = True
+    declare_global_commands: typing.Union[bool, hikari.Snowflake] = True
 
     @classmethod
     def from_env(cls) -> FullConfig:
@@ -203,8 +203,8 @@ class FullConfig(Config):
             prefixes=_cast_or_else(os.environ, "prefixes", lambda v: frozenset(map(str, v)), frozenset[str]()),
             ptf=PTFConfig.from_env() if os.getenv("ptf_username") else None,
             tokens=Tokens.from_env(),
-            set_global_commands=_cast_or_else(
-                os.environ, "set_global_commands", lambda v: v if isinstance(v, bool) else hikari.Snowflake(v), True
+            declare_global_commands=_cast_or_else(
+                os.environ, "declare_global_commands", lambda v: v if isinstance(v, bool) else hikari.Snowflake(v), True
             ),
         )
 
@@ -217,9 +217,9 @@ class FullConfig(Config):
         elif isinstance(log_level, str):
             log_level = log_level.upper()
 
-        set_global_commands = mapping.get("set_global_commands", True)
-        if not isinstance(set_global_commands, bool):
-            set_global_commands = hikari.Snowflake(set_global_commands)
+        declare_global_commands = mapping.get("declare_global_commands", True)
+        if not isinstance(declare_global_commands, bool):
+            declare_global_commands = hikari.Snowflake(declare_global_commands)
 
         return cls(
             cache=_cast_or_else(mapping, "cache", hikari.CacheComponents, DEFAULT_CACHE),
@@ -228,11 +228,11 @@ class FullConfig(Config):
             intents=_cast_or_else(mapping, "intents", hikari.Intents, DEFAULT_INTENTS),
             log_level=log_level,
             mention_prefix=bool(mapping.get("mention_prefix", True)),
-            owner_only=bool(mapping.get("owner_only", False)),
+            owner_only=bool(mapping.get("ownerA_only", False)),
             prefixes=frozenset(map(str, mapping["prefixes"])) if "prefixes" in mapping else frozenset(),
             ptf=_cast_or_else(mapping, "ptf", PTFConfig.from_mapping, None),
             tokens=Tokens.from_mapping(mapping["tokens"]),
-            set_global_commands=set_global_commands,
+            declare_global_commands=declare_global_commands,
         )
 
 

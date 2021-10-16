@@ -31,7 +31,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["sudo_component", "load_sudo"]
+__all__: list[str] = ["sudo_component", "load_sudo", "unload_sudo"]
 
 import ast
 import asyncio
@@ -54,7 +54,7 @@ from .. import utility
 
 CallbackT = collections.Callable[..., collections.Coroutine[typing.Any, typing.Any, typing.Any]]
 
-sudo_component = tanjun.Component(strict=True)
+sudo_component = tanjun.Component(name="sudo", strict=True)
 
 
 @sudo_component.with_message_command
@@ -239,5 +239,10 @@ async def eval_command(
 
 
 @tanjun.as_loader
-def load_sudo(cli: tanjun.abc.Client, /) -> None:
-    cli.add_component(sudo_component.copy().add_check(tanjun.checks.ApplicationOwnerCheck()))
+def load_sudo(cli: tanjun.Client, /) -> None:
+    cli.add_component(sudo_component.copy().add_check(tanjun.checks.OwnerCheck()))
+
+
+@tanjun.as_unloader
+def unload_sudo(cli: tanjun.Client, /) -> None:
+    cli.remove_component_by_name(sudo_component.name)

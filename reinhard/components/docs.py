@@ -32,7 +32,7 @@
 """Commands used to search Hikari and Tanjun's docs."""
 from __future__ import annotations
 
-__all__: list[str] = ["docs_component", "load_docs"]
+__all__: list[str] = ["docs_component", "load_docs", "unload_docs"]
 
 import abc
 import collections.abc as collections
@@ -328,7 +328,7 @@ async def _docs_command(
 )
 @tanjun.with_str_slash_option("path", "Optional path to query Hikari's documentation by.", default=None)
 @tanjun.as_slash_command("hikari", "Search Hikari's documentation")
-async def docs_hikari_command(
+def docs_hikari_command(
     ctx: tanjun.abc.Context,
     path: str | None,
     public: bool,
@@ -340,13 +340,13 @@ async def docs_hikari_command(
         )
     ),
     component_client: yuyo.ComponentClient = tanjun.injected(type=yuyo.ComponentClient),
-) -> None:
+) -> collections.Awaitable[None]:
     """Search Hikari's documentation.
 
     Arguments
         * path: Optional argument to query Hikari's documentation by.
     """
-    await _docs_command(
+    return _docs_command(
         ctx,
         path,
         component_client,
@@ -367,7 +367,7 @@ async def docs_hikari_command(
 )
 @tanjun.with_str_slash_option("path", "Optional path to query Tanjun's documentation by.", default=None)
 @tanjun.as_slash_command("tanjun", "Search Tanjun's documentation")
-async def tanjun_docs_command(
+def tanjun_docs_command(
     ctx: tanjun.abc.Context,
     path: str | None,
     public: bool,
@@ -379,8 +379,8 @@ async def tanjun_docs_command(
             expire_after=datetime.timedelta(hours=12),
         )
     ),
-) -> None:
-    await _docs_command(
+) -> collections.Awaitable[None]:
+    return _docs_command(
         ctx, path, component_client, index, public, simple, TANJUN_PAGES, TANJUN_PAGES + "/release/", "Tanjun"
     )
 
@@ -392,7 +392,7 @@ async def tanjun_docs_command(
 )
 @tanjun.with_str_slash_option("path", "Optional path to query Tanjun's documentation by.", default=None)
 @tanjun.as_slash_command("yuyo", "Search Yuyo's documentation")
-async def yuyo_docs_command(
+def yuyo_docs_command(
     ctx: tanjun.abc.Context,
     path: str | None,
     public: bool,
@@ -404,12 +404,17 @@ async def yuyo_docs_command(
             expire_after=datetime.timedelta(hours=12),
         )
     ),
-) -> None:
-    await _docs_command(
+) -> collections.Awaitable[None]:
+    return _docs_command(
         ctx, path, component_client, index, public, simple, YUYO_PAGES, YUYO_PAGES + "/release/", "Tanjun"
     )
 
 
 @tanjun.as_loader
-def load_docs(cli: tanjun.abc.Client, /) -> None:
+def load_docs(cli: tanjun.Client, /) -> None:
     cli.add_component(docs_component.copy())
+
+
+@tanjun.as_unloader
+def unload_docs(cli: tanjun.Client, /) -> None:
+    cli.remove_component_by_name(docs_component.name)
