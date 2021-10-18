@@ -37,6 +37,7 @@ import typing
 import hikari
 import tanjun
 import yuyo
+import yuyo.asgi
 
 from . import config as config_
 from . import utility
@@ -68,7 +69,7 @@ def build_rest_bot(*, config: config_.FullConfig | None = None) -> tuple[hikari.
     return bot, build_from_rest_bot(bot, config=config)
 
 
-def _build(client: tanjun.Client, config: config_.FullConfig) -> None:
+def _build(client: tanjun.Client, config: config_.FullConfig) -> tanjun.Client:
     (
         client.set_hooks(tanjun.AnyHooks().set_on_parser_error(utility.on_parser_error).set_on_error(utility.on_error))
         .add_prefix(config.prefixes)
@@ -87,6 +88,8 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> None:
     if config.owner_only:
         client.add_check(tanjun.checks.OwnerCheck())
 
+    return client
+
 
 def build_from_gateway_bot(
     bot: hikari_traits.GatewayBotAware, /, *, config: config_.FullConfig | None = None
@@ -96,16 +99,16 @@ def build_from_gateway_bot(
 
     component_client = yuyo.ComponentClient.from_gateway_bot(bot, event_managed=False)
     reaction_client = yuyo.ReactionClient.from_gateway_bot(bot, event_managed=False)
-    client = (
+    client = _build(
         tanjun.Client.from_gateway_bot(
             bot, mention_prefix=config.mention_prefix, declare_global_commands=config.declare_global_commands
         )
         .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open)
         .add_client_callback(tanjun.ClientCallbackNames.CLOSING, component_client.close)
         .set_type_dependency(yuyo.ReactionClient, reaction_client)
-        .set_type_dependency(yuyo.ComponentClient, component_client)
+        .set_type_dependency(yuyo.ComponentClient, component_client),
+        config,
     )
-    _build(client, config)
 
     return client
 
@@ -117,13 +120,13 @@ def build_from_rest_bot(
         config = config_.FullConfig.from_env()
 
     component_client = yuyo.ComponentClient.from_rest_bot(bot)
-    client = (
+    client = _build(
         tanjun.Client.from_rest_bot(bot, declare_global_commands=config.declare_global_commands)
         .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open)
         .add_client_callback(tanjun.ClientCallbackNames.CLOSING, component_client.close)
-        .set_type_dependency(yuyo.ComponentClient, component_client)
+        .set_type_dependency(yuyo.ComponentClient, component_client),
+        config,
     )
-    _build(client, config)
     return client
 
 
@@ -142,3 +145,31 @@ async def _run_rest(*, config: config_.FullConfig | None = None) -> None:
 
 def run_rest_bot(*, config: config_.FullConfig | None = None) -> None:
     asyncio.run(_run_rest(config=config))
+
+
+def make_asgi_app(*, config: config_.FullConfig | None = None) -> yuyo.asgi.AsgiAdapter:
+    if config is None:
+        config = config_.FullConfig.from_env()
+
+    rest = hikari.impl.RESTApp().acquire(config.tokens.bot, "Bot")
+
+    async def start_rest() -> None:
+        rest.start()
+
+    interaction_server = hikari.impl.InteractionServer(entity_factory=rest.entity_factory, rest_client=rest)
+    component_client = yuyo.ComponentClient(server=interaction_server)
+    client = _build(
+        tanjun.Client(rest, server=interaction_server, declare_global_commands=config.declare_global_commands)
+        .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open)
+        .add_client_callback(tanjun.ClientCallbackNames.CLOSING, component_client.close)
+        .set_type_dependency(yuyo.ComponentClient, component_client),
+        config,
+    )
+
+    return (
+        yuyo.asgi.AsgiAdapter(interaction_server)
+        .add_startup_callback(start_rest)
+        .add_shutdown_callback(rest.close)
+        .add_startup_callback(client.open)
+        .add_shutdown_callback(client.close)
+    )

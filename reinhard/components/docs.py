@@ -231,8 +231,8 @@ class PdocIndex(DocIndex):
 
     def make_link(self, base_url: str, entry: DocEntry, /) -> str:
         fragment = ""
-        if in_module := entry.fullname.removeprefix(entry.module_name):
-            fragment = "#" + in_module.removeprefix(".")
+        if in_module := entry.fullname.removeprefix(entry.module_name + "."):
+            fragment = "#" + in_module
 
         return base_url + "/".join(entry.module_name.split(".")) + fragment
 
