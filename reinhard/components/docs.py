@@ -55,7 +55,7 @@ docs_group = docs_component.with_slash_command(tanjun.slash_command_group("docs"
 EMPTY_ITER = iter(())
 _DocIndexT = typing.TypeVar("_DocIndexT", bound="DocIndex")
 _ValueT = typing.TypeVar("_ValueT")
-HIKARI_PAGES = "https://www.hikari-py.dev/"
+HIKARI_PAGES = "https://www.hikari-py.dev"
 TANJUN_PAGES = "https://tanjun.cursed.solutions"
 YUYO_PAGES = "https://yuyo.cursed.solutions"
 SPECIAL_KEYS: frozenset[str] = frozenset(("df", "tf", "docs"))
