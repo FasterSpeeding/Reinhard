@@ -97,7 +97,8 @@ class Config(abc.ABC):
         raise NotImplementedError
 
 
-@dataclasses.dataclass(kw_only=True, repr=False, slots=True)
+# @dataclasses.dataclass(kw_only=True, repr=False, slots=True)
+@dataclasses.dataclass(repr=False)
 class DatabaseConfig(Config):
     password: str
     database: str = "postgres"
@@ -120,7 +121,8 @@ class DatabaseConfig(Config):
         )
 
 
-@dataclasses.dataclass(kw_only=True, repr=False, slots=True)
+# @dataclasses.dataclass(kw_only=True, repr=False, slots=True)
+@dataclasses.dataclass(repr=False)
 class PTFConfig(Config):
     auth_service: str
     file_service: str
@@ -143,7 +145,8 @@ class PTFConfig(Config):
         )
 
 
-@dataclasses.dataclass(kw_only=True, repr=False, slots=True)
+# @dataclasses.dataclass(kw_only=True, repr=False, slots=True)
+@dataclasses.dataclass(repr=False)
 class Tokens(Config):
     bot: str
     google: str | None = None
@@ -174,7 +177,8 @@ DEFAULT_CACHE: typing.Final[hikari.CacheComponents] = (
 DEFAULT_INTENTS: typing.Final[hikari.Intents] = hikari.Intents.GUILDS | hikari.Intents.ALL_MESSAGES
 
 
-@dataclasses.dataclass(kw_only=True, repr=False, slots=True)
+# @dataclasses.dataclass(kw_only=True, repr=False, slots=True)
+@dataclasses.dataclass(repr=False)
 class FullConfig(Config):
     database: DatabaseConfig
     tokens: Tokens

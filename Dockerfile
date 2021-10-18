@@ -1,5 +1,5 @@
-FROM python:3.10.0rc2
-# FROM colesbury/python-nogil
+# FROM python:3.10.0rc2
+FROM colesbury/python-nogil
 WORKDIR /reinhard
 
 COPY ./reinhard ./reinhard

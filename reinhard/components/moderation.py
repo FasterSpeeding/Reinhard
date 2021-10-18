@@ -221,7 +221,8 @@ def get_top_role(
         return None
 
 
-@dataclasses.dataclass(slots=True)
+#@dataclasses.dataclass(slots=True)
+@dataclasses.dataclass()
 class _MultiBanner:
     ctx: tanjun.abc.Context
     reason: str

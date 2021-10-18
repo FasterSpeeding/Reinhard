@@ -58,7 +58,8 @@ YUYO_PAGES = "https://yuyo.cursed.solutions"
 SPECIAL_KEYS: frozenset[str] = frozenset(("df", "tf", "docs"))
 
 
-@dataclasses.dataclass(slots=True)
+# @dataclasses.dataclass(slots=True)
+@dataclasses.dataclass()
 class DocEntry:
     doc: str
     type: str
@@ -175,7 +176,7 @@ def process_hikari_index(data: dict[str, typing.Any]) -> dict[str, typing.Any]:
 
     for entry in data["index"]:
         fullpath: str = entry["r"]
-        path = fullpath.removeprefix("hikari.")
+        path = fullpath[7:] if fullpath.startswith("hikari.") else fullpath
         doc: str = entry["d"]
 
         position = base_urls
@@ -190,12 +191,13 @@ def process_hikari_index(data: dict[str, typing.Any]) -> dict[str, typing.Any]:
             except KeyError:
                 break
 
+        last_dot_prefix = path[:last_dot] + "."
         docs_store[fullpath] = {
             "doc": doc,
             "type": PLACEHOLDER,
             "fullname": fullpath,
             "modulename": path[:last_dot],
-            "qualname": fullpath.removeprefix(path[:last_dot] + "."),
+            "qualname": fullpath[len(last_dot_prefix) :] if fullpath.startswith(last_dot_prefix) else fullpath,
             "parameters": [PLACEHOLDER],
         }
         for node in map(str.lower, path.split(".")):
@@ -224,7 +226,7 @@ class HikariIndex(DocIndex):
 
     def make_link(self, base_url: str, entry: DocEntry, /) -> str:
         fragment = ""
-        if entry.fullname.removeprefix(entry.module_name):
+        if entry.fullname[len(entry.module_name) :] if entry.fullname.startswith(entry.module_name) else entry.fullname:
             fragment = "#" + entry.fullname
 
         return base_url + "/".join(entry.module_name.split(".")) + fragment
@@ -235,7 +237,8 @@ class PdocIndex(DocIndex):
 
     def make_link(self, base_url: str, entry: DocEntry, /) -> str:
         fragment = ""
-        if in_module := entry.fullname.removeprefix(entry.module_name + "."):
+        to_remove = entry.module_name + "."
+        if in_module := entry.fullname[len(to_remove) :] if entry.fullname.startswith(to_remove) else entry.fullname:
             fragment = "#" + in_module
 
         return base_url + "/".join(entry.module_name.split(".")) + fragment
