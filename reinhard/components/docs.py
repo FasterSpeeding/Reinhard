@@ -141,13 +141,19 @@ class DocIndex(abc.ABC):
             if not (new_position := position.get(char)):
                 # Sometimes the search path ends a bit pre-maturely.
                 if docs := position.get("docs"):
+                    # Since this isn't recursive, no de-duplication is necessary.
                     return (self._metadata[path] for path in docs.keys() if full_name in path.lower())
 
                 return EMPTY_ITER
 
             position = new_position
 
-        return map(self._metadata.__getitem__, _collect_pdoc_paths(position, path_filter=path))
+        # Since this is recursive we need to check for duplicated entries.
+        already_yielded = set[str]()
+        for path in _collect_pdoc_paths(position, path_filter=path):
+            if path not in already_yielded:
+                already_yielded.add(path)
+                yield self._metadata[path]
 
 
 PLACEHOLDER = "???"
