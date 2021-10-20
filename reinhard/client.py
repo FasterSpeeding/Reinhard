@@ -152,10 +152,6 @@ def make_asgi_app(*, config: config_.FullConfig | None = None) -> yuyo.asgi.Asgi
         config = config_.FullConfig.from_env()
 
     rest = hikari.impl.RESTApp().acquire(config.tokens.bot, "Bot")
-
-    async def start_rest() -> None:
-        rest.start()
-
     interaction_server = hikari.impl.InteractionServer(entity_factory=rest.entity_factory, rest_client=rest)
     component_client = yuyo.ComponentClient(server=interaction_server)
     client = _build(
@@ -168,7 +164,7 @@ def make_asgi_app(*, config: config_.FullConfig | None = None) -> yuyo.asgi.Asgi
 
     return (
         yuyo.asgi.AsgiAdapter(interaction_server)
-        .add_startup_callback(start_rest)
+        .add_startup_callback(rest.start)
         .add_shutdown_callback(rest.close)
         .add_startup_callback(client.open)
         .add_shutdown_callback(client.close)
