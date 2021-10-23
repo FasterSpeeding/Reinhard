@@ -52,7 +52,6 @@ docs_component = tanjun.Component(name="docs", strict=True)
 docs_group = docs_component.with_slash_command(tanjun.slash_command_group("docs", "Search relevant document sites."))
 
 
-EMPTY_ITER = iter(())
 _DocIndexT = typing.TypeVar("_DocIndexT", bound="DocIndex")
 _ValueT = typing.TypeVar("_ValueT")
 HIKARI_PAGES = "https://www.hikari-py.dev"
@@ -128,7 +127,7 @@ class DocIndex(abc.ABC):
     def search(self, full_name: str, /) -> collections.Iterator[DocEntry]:
         full_name = full_name.lower()
         if not full_name:
-            return EMPTY_ITER
+            return
 
         try:
             path, name = full_name.rsplit(".", 1)
@@ -142,9 +141,10 @@ class DocIndex(abc.ABC):
                 # Sometimes the search path ends a bit pre-maturely.
                 if docs := position.get("docs"):
                     # Since this isn't recursive, no de-duplication is necessary.
-                    return (self._metadata[path] for path in docs.keys() if full_name in path.lower())
+                    yield from (self._metadata[path] for path in docs.keys() if full_name in path.lower())
+                    return
 
-                return EMPTY_ITER
+                return
 
             position = new_position
 
