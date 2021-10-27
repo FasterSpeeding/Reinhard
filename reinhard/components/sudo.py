@@ -235,7 +235,7 @@ async def eval_command(
     assert first_response is not None
     content, embed = first_response
     message = await ctx.respond(content=content, embed=embed, component=response_paginator, ensure_result=True)
-    component_client.add_executor(message, response_paginator)
+    component_client.set_executor(message, response_paginator)
 
 
 @tanjun.as_loader

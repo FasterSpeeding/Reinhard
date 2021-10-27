@@ -4,8 +4,7 @@ python-dotenv~=0.19
 git+https://github.com/hikari-py/hikari#egg=hikari[speedups]
 # hikari-tanjun~=2.1.2a1
 git+https://github.com/FasterSpeeding/Tanjun@df7785d0bf4dcdec465c16c26b00bcfcd69d9d74
-# hikari-yuyo~=1.0.2a1.post1
-git+https://github.com/FasterSpeeding/Yuyo@feature/asgi
+hikari-yuyo~=1.0.3a1
 markdownify~=0.9.4
 psutil~=5.8
 uvloop~=0.16; platform_system != "Windows"

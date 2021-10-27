@@ -256,7 +256,7 @@ async def lyrics_command(
     assert first_response
     content, embed = first_response
     message = await ctx.respond(content=content, embed=embed, component=response_paginator, ensure_result=True)
-    component_client.add_executor(message, response_paginator)
+    component_client.set_executor(message, response_paginator)
 
 
 @external_component.with_slash_command
@@ -364,7 +364,7 @@ async def youtube_command(
     else:
         content, embed = first_response
         message = await ctx.respond(content, embed=embed, component=response_paginator, ensure_result=True)
-        component_client.add_executor(message, response_paginator)
+        component_client.set_executor(message, response_paginator)
 
 
 @youtube_command.with_check
@@ -516,7 +516,7 @@ async def spotify_command(
     else:
         content, embed = first_response
         message = await ctx.respond(content, embed=embed, component=response_paginator, ensure_result=True)
-        component_client.add_executor(message, response_paginator)
+        component_client.set_executor(message, response_paginator)
 
 
 @external_component.with_message_command

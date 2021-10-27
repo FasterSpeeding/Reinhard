@@ -169,7 +169,7 @@ async def old_help_command(
     if first_entry := await paginator.get_next_entry():
         content, embed = first_entry
         message = await ctx.respond(content=content, embed=embed, component=paginator, ensure_result=True)
-        component_client.add_executor(message, paginator)
+        component_client.set_executor(message, paginator)
 
 
 @basic_component.with_slash_command

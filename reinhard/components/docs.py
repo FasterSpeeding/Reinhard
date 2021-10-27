@@ -321,7 +321,7 @@ async def _docs_command(
     if first_response := await paginator.get_next_entry():
         content, embed = first_response
         message = await ctx.respond(content=content, component=paginator, embed=embed, ensure_result=True)
-        component_client.add_executor(message, paginator)
+        component_client.set_executor(message, paginator)
         return
 
     await ctx.respond("Entry not found")
