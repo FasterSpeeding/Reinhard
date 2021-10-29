@@ -114,9 +114,10 @@ async def delete_message_button(ctx: yuyo.ComponentContext) -> None:
         await ctx.defer(hikari.ResponseType.DEFERRED_MESSAGE_UPDATE)
         await ctx.delete_initial_response()
 
-    await ctx.create_initial_response(
-        hikari.ResponseType.MESSAGE_CREATE, "You do not own this message", flags=hikari.MessageFlag.EPHEMERAL
-    )
+    else:
+        await ctx.create_initial_response(
+            hikari.ResponseType.MESSAGE_CREATE, "You do not own this message", flags=hikari.MessageFlag.EPHEMERAL
+        )
 
 
 DELETE_CUSTOM_ID = "AUTHOR_DELETE_BUTTON"
