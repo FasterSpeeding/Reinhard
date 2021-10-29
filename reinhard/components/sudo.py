@@ -141,7 +141,7 @@ async def eval_python_code(
                     eval(compiled_code, globals_)
 
                 failed = False
-            except BaseException:
+            except Exception:
                 traceback.print_exc()
                 failed = True
             finally:
