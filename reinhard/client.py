@@ -97,7 +97,9 @@ def build_from_gateway_bot(
     if config is None:
         config = config_.FullConfig.from_env()
 
-    component_client = yuyo.ComponentClient.from_gateway_bot(bot, event_managed=False)
+    component_client = yuyo.ComponentClient.from_gateway_bot(bot, event_managed=False).set_constant_id(
+        utility.DELETE_CUSTOM_ID, utility.delete_message_button
+    )
     reaction_client = yuyo.ReactionClient.from_gateway_bot(bot, event_managed=False)
     client = _build(
         tanjun.Client.from_gateway_bot(
@@ -119,7 +121,9 @@ def build_from_rest_bot(
     if config is None:
         config = config_.FullConfig.from_env()
 
-    component_client = yuyo.ComponentClient.from_rest_bot(bot)
+    component_client = yuyo.ComponentClient.from_rest_bot(bot).set_constant_id(
+        utility.DELETE_CUSTOM_ID, utility.delete_message_button
+    )
     client = _build(
         tanjun.Client.from_rest_bot(bot, declare_global_commands=config.declare_global_commands)
         .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open)
@@ -153,7 +157,9 @@ def make_asgi_app(*, config: config_.FullConfig | None = None) -> yuyo.asgi.Asgi
 
     rest = hikari.impl.RESTApp().acquire(config.tokens.bot, "Bot")
     interaction_server = hikari.impl.InteractionServer(entity_factory=rest.entity_factory, rest_client=rest)
-    component_client = yuyo.ComponentClient(server=interaction_server)
+    component_client = yuyo.ComponentClient(server=interaction_server).set_constant_id(
+        utility.DELETE_CUSTOM_ID, utility.delete_message_button
+    )
     client = _build(
         tanjun.Client(rest, server=interaction_server, declare_global_commands=config.declare_global_commands)
         .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open)

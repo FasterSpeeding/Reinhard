@@ -105,8 +105,7 @@ async def about_command(
         )
     )
 
-    error_manager = utility.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
-    await error_manager.try_respond(ctx, embed=embed)
+    await ctx.respond(embed=embed, component=utility.DELETE_ROW)
 
 
 @basic_component.with_message_command
@@ -180,7 +179,9 @@ async def ping_command(ctx: tanjun.abc.Context, /) -> None:
     await ctx.rest.fetch_my_user()
     time_taken = (time.perf_counter() - start_time) * 1_000
     heartbeat_latency = ctx.shards.heartbeat_latency * 1_000 if ctx.shards else float("NAN")
-    await ctx.respond(f"PONG\n - REST: {time_taken:.0f}ms\n - Gateway: {heartbeat_latency:.0f}ms")
+    await ctx.respond(
+        f"PONG\n - REST: {time_taken:.0f}ms\n - Gateway: {heartbeat_latency:.0f}ms", component=utility.DELETE_ROW
+    )
 
 
 _about_lines: list[tuple[str, collections.Callable[[hikari.api.Cache], int]]] = [
@@ -246,8 +247,7 @@ async def cache_command(
         )
     )
 
-    error_manager = utility.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
-    await error_manager.try_respond(ctx, content=f"{storage_time_taken * 1_000:.4g} ms", embed=embed)
+    await ctx.respond(content=f"{storage_time_taken * 1_000:.4g} ms", embed=embed, component=utility.DELETE_ROW)
 
 
 @cache_command.with_check
@@ -262,7 +262,8 @@ def _(ctx: tanjun.abc.Context) -> bool:
 @tanjun.as_slash_command("invite", "Invite the bot to your server(s)")
 async def invite_command(ctx: tanjun.abc.Context, me: hikari.OwnUser = tanjun.inject_lc(hikari.OwnUser)) -> None:
     await ctx.respond(
-        f"https://discord.com/oauth2/authorize?client_id={me.id}&scope=bot%20applications.commands&permissions=8"
+        f"https://discord.com/oauth2/authorize?client_id={me.id}&scope=bot%20applications.commands&permissions=8",
+        component=utility.DELETE_ROW,
     )
 
 

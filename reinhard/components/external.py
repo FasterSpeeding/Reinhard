@@ -212,8 +212,7 @@ async def lyrics_command(
     try:
         data = await response.json()
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError) as exc:
-        hikari_error_manager = utility.HikariErrorManager(retry, break_on=(hikari.NotFoundError, hikari.ForbiddenError))
-        await hikari_error_manager.try_respond(ctx, content="Invalid data returned by server.")
+        await ctx.respond(content="Invalid data returned by server.", component=utility.DELETE_ROW)
 
         _LOGGER.exception(
             "Received unexpected data from lyrics.tsu.sh of type %s\n %s",
@@ -357,8 +356,7 @@ async def youtube_command(
 
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError) as exc:
         _LOGGER.exception("Youtube returned invalid data", exc_info=exc)
-        error_manager = utility.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
-        await error_manager.try_respond(ctx, content="Youtube returned invalid data.")
+        await ctx.respond(content="Youtube returned invalid data.", component=utility.DELETE_ROW)
         raise
 
     else:
@@ -401,15 +399,15 @@ async def moe_command(
     else:
         raise tanjun.CommandError("Couldn't get an image in time") from None
 
-    hikari_error_manager = utility.HikariErrorManager(retry, break_on=(hikari.NotFoundError, hikari.ForbiddenError))
-
     try:
         data = (await response.json())["data"]
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, LookupError, ValueError) as exc:
-        await hikari_error_manager.try_respond(ctx, content="Image API returned invalid data.")
+        await ctx.respond(content="Image API returned invalid data.", component=utility.DELETE_ROW)
         raise exc
 
-    await hikari_error_manager.try_respond(ctx, content=f"{data['image']} (source {data.get('source') or 'unknown'})")
+    await ctx.respond(
+        content=f"{data['image']} (source {data.get('source') or 'unknown'})", component=utility.DELETE_ROW
+    )
 
 
 async def query_nekos_life(
@@ -509,8 +507,7 @@ async def spotify_command(
 
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError) as exc:
         _LOGGER.exception("Spotify returned invalid data", exc_info=exc)
-        error_manager = utility.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
-        await error_manager.try_respond(ctx, content="Spotify returned invalid data.")
+        await ctx.respond(content="Spotify returned invalid data.", component=utility.DELETE_ROW)
         raise
 
     else:

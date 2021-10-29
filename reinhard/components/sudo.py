@@ -84,8 +84,6 @@ async def echo_command(
         * embed (--embed, -e): String JSON object of an embed for the bot to send.
     """
     embed: hikari.UndefinedOr[hikari.Embed] = hikari.UNDEFINED
-    retry = yuyo.Backoff(max_retries=5)
-    error_manager = utility.HikariErrorManager(retry, break_on=(hikari.ForbiddenError, hikari.NotFoundError))
     if raw_embed is not hikari.UNDEFINED:
         try:
             embed = entity_factory.entity_factory.deserialize_embed(raw_embed)
@@ -94,14 +92,14 @@ async def echo_command(
                 embed.colour = utility.embed_colour()
 
         except (TypeError, ValueError) as exc:
-            await error_manager.try_respond(ctx, content=f"Invalid embed passed: {str(exc)[:1970]}")
+            await ctx.respond(content=f"Invalid embed passed: {str(exc)[:1970]}")
             return
 
     if content or embed:
-        await error_manager.try_respond(ctx, content=content, embed=embed)
+        await ctx.respond(content=content, embed=embed)
 
     else:
-        await error_manager.try_respond(ctx, content="No content provided")
+        await ctx.respond(content="No content provided")
 
 
 def _yields_results(*args: io.StringIO) -> collections.Iterator[str]:

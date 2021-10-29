@@ -31,7 +31,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["AIOHTTPStatusHandler", "ClientCredentialsOauth2", "FetchedResource", "HikariErrorManager"]
+__all__: list[str] = ["AIOHTTPStatusHandler", "ClientCredentialsOauth2", "FetchedResource"]
 
 import logging
 import time
@@ -39,66 +39,11 @@ import typing
 from collections import abc as collections
 
 import aiohttp
-import hikari
 import tanjun
 from yuyo import backoff
 
 _ValueT = typing.TypeVar("_ValueT")
 _LOGGER = logging.getLogger("hikari.reinhard.rest_utility")
-
-
-class HikariErrorManager(backoff.ErrorManager):
-    __slots__ = ("_backoff_handler",)
-
-    def __init__(
-        self,
-        backoff_handler: backoff.Backoff | None = None,
-        /,
-        *,
-        break_on: collections.Iterable[type[BaseException]] = (),
-    ) -> None:
-        if backoff_handler is None:
-            backoff_handler = backoff.Backoff(max_retries=5)
-        self._backoff_handler = backoff_handler
-        super().__init__()
-        self.clear_rules(break_on=break_on)
-
-    def _on_break_on(self, _: BaseException) -> bool:
-        self._backoff_handler.finish()
-        return False
-
-    @staticmethod
-    def _on_internal_server_error(_: hikari.InternalServerError) -> bool:
-        return False
-
-    def _on_rate_limited_error(self, exception: hikari.RateLimitedError) -> bool:
-        if exception.retry_after > 10:
-            return True
-
-        self._backoff_handler.set_next_backoff(exception.retry_after)
-        return False
-
-    def clear_rules(self, *, break_on: collections.Iterable[type[BaseException]] = ()) -> None:
-        super().clear_rules()
-        self.with_rule((hikari.InternalServerError,), self._on_internal_server_error)
-        self.with_rule((hikari.RateLimitedError,), self._on_rate_limited_error)
-
-        if break_on := tuple(break_on):
-            self.with_rule(break_on, self._on_break_on)
-
-    async def try_respond(
-        self,
-        ctx: tanjun.abc.Context,
-        *,
-        content: hikari.UndefinedOr[str] = hikari.UNDEFINED,
-        embed: hikari.UndefinedOr[hikari.Embed] = hikari.UNDEFINED,
-    ) -> None:
-        self._backoff_handler.reset()
-
-        async for _ in self._backoff_handler:
-            with self:
-                await ctx.respond(content=content, embed=embed)
-                break
 
 
 class AIOHTTPStatusHandler(backoff.ErrorManager):

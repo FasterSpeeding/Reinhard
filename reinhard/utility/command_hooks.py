@@ -35,33 +35,27 @@ __all__ = ["on_error", "on_parser_error"]
 
 import hikari
 import tanjun
-from yuyo import backoff
 
+from . import basic
 from . import constants
-from . import rest
 
 
 async def on_error(ctx: tanjun.abc.Context, exception: BaseException) -> None:
-    retry = backoff.Backoff(max_retries=5)
     # TODO: better permission checks
-    error_manager = rest.HikariErrorManager(retry, break_on=(hikari.ForbiddenError, hikari.NotFoundError))
     embed = hikari.Embed(
         title=f"An unexpected {type(exception).__name__} occurred",
         colour=constants.FAILED_COLOUR,
         description=f"```python\n{str(exception)[:1950]}```",
     )
-
-    async for _ in retry:
-        with error_manager:
-            await ctx.respond(embed=embed)
-            break
+    if isinstance(ctx, tanjun.SlashContext):
+        # The delete row only works for slash command responses.
+        await ctx.respond(embed=embed, component=basic.DELETE_ROW)
+    else:
+        await ctx.respond(embed=embed)
 
 
 async def on_parser_error(ctx: tanjun.abc.Context, exception: tanjun.ParserError) -> None:
-    retry = backoff.Backoff(max_retries=5)
     # TODO: better permission checks
-    error_manager = rest.HikariErrorManager(retry, break_on=(hikari.ForbiddenError, hikari.NotFoundError))
-
     message = str(exception)
 
     if isinstance(exception, tanjun.ConversionError) and exception.errors:
@@ -71,7 +65,8 @@ async def on_parser_error(ctx: tanjun.abc.Context, exception: tanjun.ParserError
         else:
             message = f"{message}: `{exception.errors[0]}`"
 
-    async for _ in retry:
-        with error_manager:
-            await ctx.respond(content=message)
-            break
+    if isinstance(ctx, tanjun.SlashContext):
+        # The delete row only works for slash command responses.
+        await ctx.respond(content=message, component=basic.DELETE_ROW)
+    else:
+        await ctx.respond(content=message)

@@ -34,6 +34,9 @@ __all__: list[str] = [
     # basic.py
     "basic",
     "basic_name_grid",
+    "DELETE_CUSTOM_ID",
+    "DELETE_ROW",
+    "delete_message_button",
     "prettify_date",
     "prettify_index",
     "raise_error",
@@ -64,7 +67,6 @@ __all__: list[str] = [
     "AIOHTTPStatusHandler",
     "ClientCredentialsOauth2",
     "FetchedResource",
-    "HikariErrorManager",
     # ytdl.py
     "ytdl",
     "YoutubeDownloader",

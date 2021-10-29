@@ -37,7 +37,6 @@ import unicodedata
 
 import hikari
 import tanjun
-from yuyo import backoff
 
 from .. import utility
 
@@ -68,8 +67,7 @@ async def colour_command(ctx: tanjun.abc.Context, color: hikari.Colour | None, r
         .add_field(name="RGB", value=str(color.rgb))
         .add_field(name="HEX", value=str(color.hex_code))
     )
-    error_manager = utility.HikariErrorManager(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
-    await error_manager.try_respond(ctx, embed=embed)
+    await ctx.respond(embed=embed, component=utility.DELETE_ROW)
 
 
 # # @decorators.as_message_command
@@ -109,19 +107,8 @@ async def member_command(ctx: tanjun.abc.SlashContext, member: hikari.Interactio
     if member is None:
         member = ctx.member
 
-    retry = backoff.Backoff(max_retries=5)
-    error_manager = utility.HikariErrorManager(retry, break_on=(hikari.ForbiddenError, hikari.NotFoundError))
-    async for _ in retry:
-        with error_manager:
-            guild = await ctx.rest.fetch_guild(guild=ctx.guild_id)
-            break
-
-    else:
-        if retry.is_depleted:
-            raise tanjun.CommandError("Couldn't get guild in time")
-
-        return
-
+    # TODO: might want to try cache first at one point even if it cursifies the whole thing.
+    guild = await ctx.rest.fetch_guild(guild=ctx.guild_id)
     ordered_roles = sorted(
         ((role.position, role) for role in map(guild.roles.get, member.role_ids) if role), reverse=True
     )
@@ -165,8 +152,7 @@ async def member_command(ctx: tanjun.abc.SlashContext, member: hikari.Interactio
         .set_thumbnail(member.avatar_url or member.default_avatar_url)
         .set_footer(text=str(member.user.id), icon=member.user.default_avatar_url)
     )
-    error_manager.clear_rules()
-    await error_manager.try_respond(ctx, embed=embed)
+    await ctx.respond(ctx, embed=embed, component=utility.DELETE_ROW)
 
 
 # TODO: the normal role converter is limited to the current guild right?
@@ -196,13 +182,12 @@ async def role_command(ctx: tanjun.abc.Context, role: hikari.Role) -> None:
     if role.is_mentionable:
         role_information.append("Can be mentioned")
 
-    error_manager = utility.HikariErrorManager(break_on=(hikari.ForbiddenError, hikari.NotFoundError))
     embed = hikari.Embed(
         colour=role.colour,
         title=role.name,
         description="\n".join(role_information) + f"\n\nPermissions:\n{permissions}",
     )
-    await error_manager.try_respond(ctx, embed=embed)
+    await ctx.respond(embed=embed, component=utility.DELETE_ROW)
 
 
 @util_component.with_slash_command
@@ -234,8 +219,7 @@ async def user_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> Non
         .set_thumbnail(user.avatar_url or user.default_avatar_url)
         .set_footer(text=str(user.id), icon=user.default_avatar_url)
     )
-    error_manager = utility.HikariErrorManager(break_on=(hikari.ForbiddenError, hikari.NotFoundError))
-    await error_manager.try_respond(ctx, embed=embed)
+    await ctx.respond(embed=embed, component=utility.DELETE_ROW)
 
 
 @util_component.with_slash_command
@@ -253,10 +237,9 @@ async def avatar_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> N
     if user is None:
         user = ctx.author
 
-    error_manager = utility.HikariErrorManager(break_on=(hikari.ForbiddenError, hikari.NotFoundError))
     avatar = user.avatar_url or user.default_avatar_url
     embed = hikari.Embed(title=str(user), url=str(avatar), colour=utility.embed_colour()).set_image(avatar)
-    await error_manager.try_respond(ctx, embed=embed)
+    await ctx.respond(embed=embed, component=utility.DELETE_ROW)
 
 
 # TODO: check if the user can access the provided channel
@@ -281,30 +264,14 @@ async def mentions_command(
             If this isn't provided then the command will assume the message is in the current channel.
     """
     channel_id = channel.id if channel else ctx.channel_id
-
-    # TODO: set maximum?
-    retry = backoff.Backoff()
-    error_manager = utility.HikariErrorManager(retry).with_rule(
-        (hikari.NotFoundError, hikari.ForbiddenError, hikari.BadRequestError),
-        utility.raise_error("Message not found."),
-    )
-    async for _ in retry:
-        with error_manager:
-            message = await ctx.rest.fetch_message(channel_id, message_id)
-            break
-
-    else:
-        message = await ctx.rest.fetch_message(channel_id, message_id)
-
-    error_manager.clear_rules(break_on=(hikari.NotFoundError, hikari.ForbiddenError))
-
+    message = await ctx.rest.fetch_message(channel_id, message_id)
     mentions: str | None = None
     if message.mentions.users:
         assert not isinstance(message.mentions.users, hikari.UndefinedType)
         mentions = ", ".join(map(str, message.mentions.users.values()))
 
-    await error_manager.try_respond(
-        ctx, content=f"Pinging mentions: {mentions}" if mentions else "No pinging mentions."
+    await ctx.respond(
+        content=f"Pinging mentions: {mentions}" if mentions else "No pinging mentions.", component=utility.DELETE_ROW
     )
 
 
@@ -329,7 +296,7 @@ async def members_command(ctx: tanjun.abc.Context, name: str) -> None:
     else:
         content = "No similar members found"
 
-    await utility.HikariErrorManager().try_respond(ctx, content=content)
+    await ctx.respond(content=content, component=utility.DELETE_ROW)
 
 
 def _format_char_line(char: str, to_file: bool) -> str:
@@ -367,7 +334,7 @@ async def char_command(ctx: tanjun.abc.Context, characters: str, file: bool = Fa
     else:
         content = content
 
-    await ctx.respond(content=content or "hi there")
+    await ctx.respond(content=content or "hi there", component=utility.DELETE_ROW)
 
     if response_file is not hikari.UNDEFINED:
         await ctx.edit_last_response(content=None, attachment=response_file)

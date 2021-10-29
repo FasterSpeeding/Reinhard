@@ -41,6 +41,8 @@ from collections import abc as collections
 import hikari
 import tanjun
 
+from .. import utility
+
 MAX_MESSAGE_BULK_DELETE = datetime.timedelta(weeks=2)
 
 
@@ -192,7 +194,7 @@ async def clear_command(
         await ctx.rest.delete_messages(ctx.channel_id, *messages)
         break
 
-    await ctx.respond(content="Cleared messages.")
+    await ctx.respond(content="Cleared messages.", component=utility.DELETE_ROW)
     await asyncio.sleep(2)
     try:
         await ctx.delete_last_response()

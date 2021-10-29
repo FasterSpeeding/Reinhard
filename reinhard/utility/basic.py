@@ -31,15 +31,26 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["basic_name_grid", "prettify_date", "prettify_index", "raise_error"]
+__all__: list[str] = [
+    "basic_name_grid",
+    "DELETE_CUSTOM_ID",
+    "DELETE_ROW",
+    "delete_message_button",
+    "prettify_date",
+    "prettify_index",
+    "raise_error",
+]
 
 import enum
 import typing
 
+import hikari
 from tanjun import errors
 
 if typing.TYPE_CHECKING:
     import datetime
+
+    import yuyo
 
 
 def prettify_date(date: datetime.datetime) -> str:
@@ -96,3 +107,22 @@ def basic_name_grid(flags: enum.IntFlag) -> str:  # TODO: actually deal with max
 
     name_grid[-1] = name_grid[-1].strip(",")
     return "\n".join(name_grid)
+
+
+async def delete_message_button(ctx: yuyo.ComponentContext) -> None:
+    if ctx.interaction.message.interaction and ctx.interaction.message.interaction.user.id == ctx.interaction.user.id:
+        await ctx.defer(hikari.ResponseType.DEFERRED_MESSAGE_UPDATE)
+        await ctx.delete_initial_response()
+
+    await ctx.create_initial_response(
+        hikari.ResponseType.MESSAGE_CREATE, "You do not own this message", flags=hikari.MessageFlag.EPHEMERAL
+    )
+
+
+DELETE_CUSTOM_ID = "AUTHOR_DELETE_BUTTON"
+DELETE_ROW = (
+    hikari.impl.ActionRowBuilder()
+    .add_button(hikari.ButtonStyle.DANGER, DELETE_CUSTOM_ID)
+    .set_emoji("\N{HEAVY MULTIPLICATION X}\N{VARIATION SELECTOR-16}")
+    .add_to_container()
+)
