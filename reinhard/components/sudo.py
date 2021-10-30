@@ -103,7 +103,7 @@ async def echo_command(
 
 
 def _yields_results(*args: io.StringIO) -> collections.Iterator[str]:
-    for name, stream in zip("stdout stderr".split(), args):
+    for name, stream in zip(("stdout", "stderr"), args):
         yield f"- /dev/{name}:"
         while lines := stream.readlines(25):
             yield from (line[:-1] for line in lines)
@@ -154,17 +154,12 @@ async def eval_python_code(
 
 async def eval_python_code_no_capture(ctx: tanjun.abc.Context, component: tanjun.abc.Component, code: str) -> None:
     globals_ = build_eval_globals(ctx, component)
-    try:
-        compiled_code = compile(code, "", "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
-        if compiled_code.co_flags & inspect.CO_COROUTINE:
-            await eval(compiled_code, globals_)
+    compiled_code = compile(code, "", "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
+    if compiled_code.co_flags & inspect.CO_COROUTINE:
+        await eval(compiled_code, globals_)
 
-        else:
-            eval(compiled_code, globals_)
-
-    except BaseException:
-        traceback.print_exc()
-        pass
+    else:
+        eval(compiled_code, globals_)
 
 
 @sudo_component.with_message_command
