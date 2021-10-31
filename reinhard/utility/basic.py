@@ -35,7 +35,7 @@ __all__: list[str] = [
     "basic_name_grid",
     "DELETE_CUSTOM_ID",
     "DELETE_ROW",
-    "delete_message_button",
+    "DeleteMessageButton",
     "prettify_date",
     "prettify_index",
     "raise_error",
@@ -109,15 +109,38 @@ def basic_name_grid(flags: enum.IntFlag) -> str:  # TODO: actually deal with max
     return "\n".join(name_grid)
 
 
-async def delete_message_button(ctx: yuyo.ComponentContext) -> None:
-    if ctx.interaction.message.interaction and ctx.interaction.message.interaction.user.id == ctx.interaction.user.id:
-        await ctx.defer(hikari.ResponseType.DEFERRED_MESSAGE_UPDATE)
-        await ctx.delete_initial_response()
+class DeleteMessageButton:
+    __slots__ = ("cache", "rest")
 
-    else:
-        await ctx.create_initial_response(
-            hikari.ResponseType.MESSAGE_CREATE, "You do not own this message", flags=hikari.MessageFlag.EPHEMERAL
-        )
+    def __init__(self, rest: hikari.api.RESTClient, cache: typing.Optional[hikari.api.Cache] = None) -> None:
+        self.cache = cache
+        self.rest = rest
+
+    async def __call__(self, ctx: yuyo.ComponentContext) -> None:
+        can_delete = ctx.interaction.user.id == ctx.interaction.message.author.id
+        message_ref = ctx.interaction.message.message_reference
+        if not can_delete and message_ref and message_ref.channel_id == ctx.interaction.channel_id and message_ref.id:
+            message = self.cache.get_message(message_ref.id) if self.cache else None
+            try:
+                message = message or await self.rest.fetch_message(message_ref.channel_id, message_ref.id)
+
+            except hikari.NotFoundError:
+                pass
+
+            else:
+                can_delete = ctx.interaction.user.id in (
+                    message.author.id,
+                    message.interaction and message.interaction.user.id,
+                )
+
+        if can_delete:
+            await ctx.defer(hikari.ResponseType.DEFERRED_MESSAGE_UPDATE)
+            await ctx.delete_initial_response()
+
+        else:
+            await ctx.create_initial_response(
+                hikari.ResponseType.MESSAGE_CREATE, "You do not own this message", flags=hikari.MessageFlag.EPHEMERAL
+            )
 
 
 DELETE_CUSTOM_ID = "AUTHOR_DELETE_BUTTON"

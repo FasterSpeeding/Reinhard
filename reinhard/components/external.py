@@ -35,6 +35,7 @@ from __future__ import annotations
 __all__: list[str] = ["external_component", "load_external", "unload_external"]
 
 import collections.abc as collections
+import datetime
 import logging
 import time
 import typing
@@ -250,12 +251,33 @@ async def lyrics_command(
             yuyo.pagination.RIGHT_TRIANGLE,
             yuyo.pagination.RIGHT_DOUBLE_TRIANGLE,
         ),
+        timeout=datetime.timedelta(days=500),  # TODO: switch to passing None here once its supported
     )
     first_response = await response_paginator.get_next_entry()
     assert first_response
     content, embed = first_response
-    message = await ctx.respond(content=content, embed=embed, component=response_paginator, ensure_result=True)
-    component_client.set_executor(message, response_paginator)
+
+    async def send_file(ctx_: yuyo.ComponentContext) -> None:
+        await ctx_.defer(hikari.ResponseType.DEFERRED_MESSAGE_CREATE)
+        await ctx_.edit_initial_response(
+            attachment=hikari.Bytes(data["lyrics"], f"{title} lyrics.txt"), component=utility.DELETE_ROW
+        )
+
+        await ctx.edit_initial_response(component=response_paginator)
+
+    executor = (
+        yuyo.MultiComponentExecutor()
+        .add_executor(response_paginator)
+        .add_builder(response_paginator)
+        .add_action_row()
+        .add_button(hikari.ButtonStyle.SECONDARY, send_file)
+        .set_emoji("\N{CARD FILE BOX}\N{VARIATION SELECTOR-16}")
+        .add_to_container()
+        .add_to_parent()
+    )
+
+    message = await ctx.respond(content=content, embed=embed, components=executor.builders, ensure_result=True)
+    component_client.set_executor(message, executor)
 
 
 @external_component.with_slash_command

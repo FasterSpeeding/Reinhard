@@ -36,7 +36,7 @@ __all__: list[str] = [
     "basic_name_grid",
     "DELETE_CUSTOM_ID",
     "DELETE_ROW",
-    "delete_message_button",
+    "DeleteMessageButton",
     "prettify_date",
     "prettify_index",
     "raise_error",
