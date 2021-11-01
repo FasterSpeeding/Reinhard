@@ -36,6 +36,7 @@ __all__: list[str] = ["moderation_component", "load_moderation", "unload_moderat
 import asyncio
 import datetime
 import re
+import typing
 from collections import abc as collections
 
 import hikari
@@ -43,8 +44,8 @@ import tanjun
 
 from .. import utility
 
-MAX_MESSAGE_BULK_DELETE = datetime.timedelta(weeks=2)
-
+MAX_MESSAGE_BULK_DELETE = datetime.timedelta(weeks=2) - datetime.timedelta(minutes=2)
+_SlashCommandT = typing.TypeVar("_SlashCommandT", bound=tanjun.SlashCommand)
 
 moderation_component = tanjun.Component(name="moderation", strict=True)
 
@@ -61,6 +62,9 @@ def iter_messages(
     regex: re.Pattern[str] | None,
     users: collections.Collection[hikari.Snowflake] | None,
 ) -> hikari.LazyIterator[hikari.Message]:
+    if human_only and bot_only:
+        raise tanjun.CommandError("Can only specify one of `human_only` or `user_only`")
+
     if count is None and after is None:
         raise tanjun.CommandError("Must specify `count` when `after` is not specified")
 
@@ -107,6 +111,33 @@ def iter_messages(
     return iterator
 
 
+def _with_message_filter_options(command: _SlashCommandT, /) -> _SlashCommandT:
+    return (
+        command.add_int_option("count", "The amount of entities to target.", default=None)  # TODO: max, min
+        .add_str_option(
+            "regex", "A regular expression to match against message contents.", converters=re.compile, default=None
+        )
+        .add_bool_option("has_embeds", "Whether this should only target messages which have embeds.", default=False)
+        .add_bool_option(
+            "has_attachments", "Whether this should only delete messages which have attachments.", default=False
+        )
+        .add_bool_option("human_only", "Whether this should only target messages sent by actual users.", default=False)
+        .add_bool_option(
+            "bot_only", "Whether this should only target messages sent by bots and webhooks.", default=False
+        )
+        .add_str_option(
+            "before", "Target messages sent before this message.", converters=tanjun.to_snowflake, default=None
+        )
+        .add_str_option(
+            "after", "Target messages sent after this message.", converters=tanjun.to_snowflake, default=None
+        )
+    )
+
+
+def _now() -> datetime.datetime:
+    return datetime.datetime.now(tz=datetime.timezone.utc)
+
+
 @moderation_component.with_slash_command
 @tanjun.with_own_permission_check(
     hikari.Permissions.MANAGE_MESSAGES | hikari.Permissions.VIEW_CHANNEL | hikari.Permissions.READ_MESSAGE_HISTORY
@@ -114,34 +145,13 @@ def iter_messages(
 @tanjun.with_author_permission_check(
     hikari.Permissions.MANAGE_MESSAGES | hikari.Permissions.VIEW_CHANNEL | hikari.Permissions.READ_MESSAGE_HISTORY
 )
-@tanjun.with_str_slash_option(
-    "after", "ID of a message to delete messages which were sent after.", converters=tanjun.to_snowflake, default=None
-)
-@tanjun.with_str_slash_option(
-    "before", "ID of a message to delete messages which were sent before.", converters=tanjun.to_snowflake, default=None
-)
-@tanjun.with_bool_slash_option(
-    "bot_only", "Whether this should only delete messages sent by bots and webhooks.", default=False
-)
-@tanjun.with_bool_slash_option(
-    "human_only", "Whether this should only delete messages sent by actual users.", default=False
-)
-@tanjun.with_bool_slash_option(
-    "has_attachments", "Whether this should only delete messages which have attachments.", default=False
-)
-@tanjun.with_bool_slash_option(
-    "has_embeds", "Whether this should only delete messages which have embeds.", default=False
-)
-@tanjun.with_str_slash_option(
-    "regex", "A regular expression to match against the message content.", converters=re.compile, default=None
-)
+@_with_message_filter_options
 @tanjun.with_str_slash_option(
     "users",
     "Users to delete messages for",
     converters=lambda value: map(tanjun.conversion.parse_user_id, value.split()),
     default=None,
 )
-@tanjun.with_int_slash_option("count", "The amount of messages to delete.", default=None)
 @tanjun.as_slash_command("clear", "Clear new messages from chat as a moderator.")
 async def clear_command(
     ctx: tanjun.abc.Context,
@@ -173,10 +183,7 @@ async def clear_command(
         * suppress (-s, --suppress): Provided without a value to stop the bot from sending a message once the
             command's finished.
     """
-    if human_only and bot_only:
-        raise tanjun.CommandError("Can only specify one of `--human` or `--user`")
-
-    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    now = _now()
     after_too_old = after and now - after.created_at >= MAX_MESSAGE_BULK_DELETE
     before_too_old = before and now - before.created_at >= MAX_MESSAGE_BULK_DELETE
 
@@ -185,11 +192,12 @@ async def clear_command(
 
     iterator = (
         iter_messages(ctx, count, after, before, bot_only, human_only, has_attachments, has_embeds, regex, users)
-        .filter(lambda message: now - message.created_at < MAX_MESSAGE_BULK_DELETE)
+        .take_while(lambda message: _now() - message.created_at < MAX_MESSAGE_BULK_DELETE)
         .map(lambda x: x.id)
         .chunk(100)
     )
 
+    # await ctx.respond("Starting message deletes", delete_after=2)
     async for messages in iterator:
         await ctx.rest.delete_messages(ctx.channel_id, *messages)
         break
