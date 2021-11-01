@@ -61,7 +61,7 @@ def iter_messages(
     regex: re.Pattern[str] | None,
     users: collections.Collection[hikari.Snowflake] | None,
 ) -> hikari.LazyIterator[hikari.Message]:
-    if count is None and after is not None:
+    if count is None and after is None:
         raise tanjun.CommandError("Must specify `count` when `after` is not specified")
 
     elif count is not None and count <= 0:

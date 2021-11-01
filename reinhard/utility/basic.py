@@ -117,7 +117,10 @@ class DeleteMessageButton:
         self.rest = rest
 
     async def __call__(self, ctx: yuyo.ComponentContext) -> None:
-        can_delete = ctx.interaction.user.id == ctx.interaction.message.author.id
+        can_delete = (
+            ctx.interaction.message.interaction
+            and ctx.interaction.user.id == ctx.interaction.message.interaction.user.id
+        )
         message_ref = ctx.interaction.message.message_reference
         if not can_delete and message_ref and message_ref.channel_id == ctx.interaction.channel_id and message_ref.id:
             message = self.cache.get_message(message_ref.id) if self.cache else None
