@@ -34,6 +34,7 @@ from __future__ import annotations
 __all__: list[str] = ["moderation_component", "load_moderation", "unload_moderation"]
 
 import asyncio
+import dataclasses
 import datetime
 import re
 import typing
@@ -200,6 +201,194 @@ async def clear_command(
         await ctx.delete_last_response()
     except hikari.NotFoundError:
         pass
+
+
+ban_group = moderation_component.with_slash_command(
+    tanjun.slash_command_group("ban", "Ban commands")
+    .add_check(tanjun.GuildCheck())
+    .add_check(tanjun.AuthorPermissionCheck(hikari.Permissions.BAN_MEMBERS))
+    .add_check(tanjun.OwnPermissionCheck(hikari.Permissions.BAN_MEMBERS))
+)
+
+
+def get_top_role(
+    role_ids: collections.Sequence[hikari.Snowflake], roles: collections.Mapping[hikari.Snowflake, hikari.Role]
+) -> hikari.Role | None:
+    try:
+        next(iter(sorted(((role.position, role) for role in map(roles.get, role_ids) if role), reverse=True)))[1]
+
+    except StopIteration:
+        return None
+
+
+@dataclasses.dataclass(slots=True)
+class _MultiBanner:
+    ctx: tanjun.abc.Context
+    reason: str
+    author_role_position: int
+    author_is_guild_owner: bool
+    guild: hikari.Guild
+    delete_message_days: int
+    members_only: bool
+    roles: collections.Mapping[hikari.Snowflake, hikari.Role]
+    passed: set[hikari.Snowflake] = dataclasses.field(default_factory=set)
+    failed: dict[hikari.Snowflake, str] = dataclasses.field(default_factory=dict)
+
+    @classmethod
+    async def build(
+        cls, ctx: tanjun.abc.Context, reason: str, delete_message_days: int, members_only: bool
+    ) -> _MultiBanner:
+        assert ctx.member is not None
+
+        guild = ctx.get_guild() or await ctx.fetch_guild()
+        assert guild is not None
+        is_owner = ctx.member.id == guild.owner_id
+
+        if not ctx.member.role_ids and not is_owner:
+            # If they have no role and aren't the guild owner then the role
+            # hierarchy would never let them ban anyone.
+            raise tanjun.CommandError("You cannot ban any of these members")
+
+        if is_owner:
+            # If the author is the owner then we don't actually check the role
+            # hierarchy so dummy data can be safely used here.
+            top_role_position = 999999
+            roles: collections.Mapping[hikari.Snowflake, hikari.Role] = {}
+
+        elif isinstance(guild, hikari.RESTGuild):
+            roles = guild.roles
+            top_role = get_top_role(ctx.member.role_ids, roles)
+            top_role_position = top_role.position if top_role else 0
+
+        else:
+            roles = guild.get_roles() or {r.id: r for r in await guild.fetch_roles()}
+            top_role = get_top_role(ctx.member.role_ids, roles)
+            top_role_position = top_role.position if top_role else 0
+
+        return cls(
+            ctx=ctx,
+            reason=reason,
+            author_role_position=top_role_position,
+            author_is_guild_owner=is_owner,
+            guild=guild,
+            delete_message_days=delete_message_days,
+            members_only=members_only,
+            roles=roles,
+        )
+
+    async def try_ban(self, target: hikari.Snowflake) -> None:
+        if target == self.guild.owner_id:
+            self.failed[target] = "Cannot ban the guild owner."
+            return
+
+        if target == self.ctx.author:
+            self.failed[target] = "You cannot ban yourself."
+            return
+
+        # If this command was called by the guild owner and we aren't only banning
+        # current members then we can avoid getting the target member's object
+        # altogether.
+        if not self.author_is_guild_owner or self.members_only:
+            try:
+                member = self.guild.get_member(target) or await self.ctx.rest.fetch_member(self.guild, target)
+
+            except hikari.NotFoundError:
+                member = None
+
+            except Exception as exc:
+                self.failed[target] = str(exc)
+                return
+
+            else:
+                top_role = get_top_role(member.role_ids, self.roles)
+
+                if not top_role or top_role.position >= self.author_role_position:
+                    self.failed[target] = "User is higher than or equal to author's top role"
+                    return
+
+            if self.members_only and not member:
+                self.failed[target] = "User is not a member of the guild"
+                return
+
+        try:
+            await self.guild.ban(target, reason=self.reason, delete_message_days=self.delete_message_days)
+
+        except Exception as exc:
+            self.failed[target] = str(exc)
+
+        else:
+            self.passed.add(target)
+
+    def make_response(self) -> tuple[str, hikari.UndefinedOr[hikari.Bytes]]:
+        if self.passed:
+            page = "Failed bans:\n" + "\n".join(f"* {user_id}: {exc}" for user_id, exc in self.failed.items())
+            return (
+                f"Successfully banned {len(self.passed)} members but failed to ban {len(self.failed)} members",
+                hikari.Bytes(page.encode(), "failed_bans.md", mimetype="text/markdown;charset=UTF-8"),
+            )
+
+        return f"Successfully banned {len(self.passed)} members", hikari.UNDEFINED
+
+
+@ban_group.with_command
+@tanjun.with_bool_slash_option("members_only", "Only ban users which are currently in the guild.", default=False)
+# TODO: max, min
+@tanjun.with_int_slash_option("clear_message_days", "Number of days to clear their recent messages for.", default=0)
+@tanjun.with_str_slash_option(
+    "users",
+    "Space separated sequence of users to ban",
+    converters=lambda value: set(map(tanjun.conversion.parse_user_id, value.split())),
+)
+@tanjun.as_slash_command("members", "Ban one or more members")
+async def multi_ban_command(
+    ctx: tanjun.abc.SlashContext, users: set[hikari.Snowflake], clear_message_days: int, members_only: bool
+) -> None:
+    """Ban multiple users from using the bot.
+
+    Arguments:
+        * users: Mentions and IDs of the users to ban.
+    """
+    banner = await _MultiBanner.build(
+        ctx,
+        reason=f"Bulk ban triggered by {ctx.author.username} ({ctx.author.id})",
+        delete_message_days=clear_message_days,
+        members_only=members_only,
+    )
+    await ctx.respond("Starting bans \N{THUMBS UP SIGN}")
+    await asyncio.gather(*(banner.try_ban(target=user) for user in users))
+
+    content, attachment = banner.make_response()
+    await ctx.create_followup(content, attachment=attachment)
+
+
+@ban_group.with_command
+@tanjun.with_bool_slash_option("members_only", "Only ban users which are currently in the guild.", default=False)
+@tanjun.with_bool_slash_option("clear_messages", "Delete the messages after banning. Defaults to False.", default=False)
+@_with_message_filter_options
+@tanjun.as_slash_command("authors", "Ban the authors of recent messages.")
+async def ban_authors_command(
+    ctx: tanjun.abc.SlashContext, count: int | None, clear_message_days: int, members_only: bool, **kwargs: typing.Any
+) -> None:
+    found_authors = set[hikari.Snowflake]()
+    banner = await _MultiBanner.build(
+        ctx,
+        reason=f"Bulk ban triggered by {ctx.author.username} ({ctx.author.id})",
+        delete_message_days=clear_message_days,
+        members_only=members_only,
+    )
+    authors = (
+        iter_messages(ctx, count, **kwargs, users=None)
+        .map(lambda message: message.author.id)
+        .filter(lambda author: author not in found_authors)
+    )
+
+    await ctx.respond("Starting bans \N{THUMBS UP SIGN}")
+    async for author in authors:
+        found_authors.add(author)
+        await banner.try_ban(author)
+
+    content, attachment = banner.make_response()
+    await ctx.create_followup(content, attachment=attachment)
 
 
 @tanjun.as_loader

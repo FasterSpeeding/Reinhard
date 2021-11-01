@@ -130,11 +130,10 @@ class DeleteMessageButton:
             except hikari.NotFoundError:
                 pass
 
-            else:
-                can_delete = ctx.interaction.user.id in (
-                    message.author.id,
-                    message.interaction and message.interaction.user.id,
-                )
+            can_delete = message and ctx.interaction.user.id in (
+                message.author.id,
+                message.interaction and message.interaction.user.id,
+            )
 
         if can_delete:
             await ctx.defer(hikari.ResponseType.DEFERRED_MESSAGE_UPDATE)
