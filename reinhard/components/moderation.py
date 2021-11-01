@@ -285,6 +285,8 @@ class _MultiBanner:
             self.failed[target] = "You cannot ban yourself."
             return
 
+        # TODO: do we want to explicitly check to see if the bot can target them?
+
         # If this command was called by the guild owner and we aren't only banning
         # current members then we can avoid getting the target member's object
         # altogether.
@@ -331,7 +333,7 @@ class _MultiBanner:
 
 
 @ban_group.with_command
-@tanjun.with_bool_slash_option("members_only", "Only ban users which are currently in the guild.", default=False)
+@tanjun.with_bool_slash_option("members_only", "Only ban users who are currently in the guild.", default=False)
 # TODO: max, min
 @tanjun.with_int_slash_option("clear_message_days", "Number of days to clear their recent messages for.", default=0)
 @tanjun.with_str_slash_option(
@@ -356,13 +358,12 @@ async def multi_ban_command(
     )
     await ctx.respond("Starting bans \N{THUMBS UP SIGN}")
     await asyncio.gather(*(banner.try_ban(target=user) for user in users))
-
     content, attachment = banner.make_response()
     await ctx.create_followup(content, attachment=attachment)
 
 
 @ban_group.with_command
-@tanjun.with_bool_slash_option("members_only", "Only ban users which are currently in the guild.", default=False)
+@tanjun.with_bool_slash_option("members_only", "Only ban users who are currently in the guild.", default=False)
 @tanjun.with_bool_slash_option("clear_messages", "Delete the messages after banning. Defaults to False.", default=False)
 @_with_message_filter_options
 @tanjun.as_slash_command("authors", "Ban the authors of recent messages.")
