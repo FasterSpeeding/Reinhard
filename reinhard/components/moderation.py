@@ -74,14 +74,15 @@ def iter_messages(
     if before is None and after is None:
         before = hikari.Snowflake.from_datetime(ctx.created_at)
 
-    iterator = ctx.rest.fetch_messages(
-        ctx.channel_id,
-        before=hikari.UNDEFINED if before is None else before,
-        after=(hikari.UNDEFINED if after is None else after) if before is None else hikari.UNDEFINED,
-    )
+    if before is not None and after is not None:
+        iterator = ctx.rest.fetch_messages(ctx.channel_id, before=before).take_while(lambda message: message.id > after)
 
-    if before and after:
-        iterator = iterator.filter(lambda message: message.id > after)
+    else:
+        iterator = ctx.rest.fetch_messages(
+            ctx.channel_id,
+            before=hikari.UNDEFINED if before is None else before,
+            after=hikari.UNDEFINED if after is None else after,
+        )
 
     if human_only:
         iterator = iterator.filter(lambda message: not message.author.is_bot)
@@ -149,21 +150,12 @@ def _now() -> datetime.datetime:
 @tanjun.with_str_slash_option(
     "users",
     "Users to delete messages for",
-    converters=lambda value: map(tanjun.conversion.parse_user_id, value.split()),
+    converters=lambda value: list(map(tanjun.conversion.parse_user_id, value.split())),
     default=None,
 )
 @tanjun.as_slash_command("clear", "Clear new messages from chat as a moderator.")
 async def clear_command(
-    ctx: tanjun.abc.Context,
-    count: int | None,
-    after: hikari.Snowflake | None,
-    before: hikari.Snowflake | None,
-    bot_only: bool,
-    human_only: bool,
-    has_attachments: bool,
-    has_embeds: bool,
-    regex: re.Pattern[str] | None,
-    users: collections.Collection[hikari.Snowflake] | None,
+    ctx: tanjun.abc.Context, after: hikari.Snowflake | None, before: hikari.Snowflake | None, **kwargs: typing.Any
 ) -> None:
     """Clear new messages from chat.
 
@@ -191,7 +183,7 @@ async def clear_command(
         raise tanjun.CommandError("Cannot delete messages that are over 14 days old")
 
     iterator = (
-        iter_messages(ctx, count, after, before, bot_only, human_only, has_attachments, has_embeds, regex, users)
+        iter_messages(ctx, after=after, before=before, **kwargs)
         .take_while(lambda message: _now() - message.created_at < MAX_MESSAGE_BULK_DELETE)
         .map(lambda x: x.id)
         .chunk(100)
