@@ -60,6 +60,7 @@ async def colour_command(ctx: tanjun.abc.Context, color: hikari.Colour | None, r
         color = role.color
 
     elif color is None:
+        # TODO: delete row
         raise tanjun.CommandError("Either role or color must be provided")
 
     embed = (

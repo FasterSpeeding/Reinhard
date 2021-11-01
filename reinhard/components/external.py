@@ -208,6 +208,7 @@ async def lyrics_command(
             break
 
     else:
+        # TODO: delete row
         raise tanjun.CommandError("Couldn't get the lyrics in time") from None
 
     try:
@@ -221,6 +222,7 @@ async def lyrics_command(
             await response.text(),
             exc_info=exc,
         )
+        # TODO: delete row
         raise tanjun.CommandError("Failed to receive lyrics")
 
     icon: str | None = None
@@ -348,6 +350,7 @@ async def youtube_command(
             safe_search = not channel_is_nsfw
 
         elif not safe_search and not channel_is_nsfw:
+            # TODO: delete row
             raise tanjun.CommandError("Cannot disable safe search in a sfw channel")
 
     parameters: dict[str, str | int] = {
@@ -356,7 +359,7 @@ async def youtube_command(
         "order": order,
         "part": "snippet",
         "q": query,
-        "safeSearch": "strict" if safe_search else "none",  # TODO: channel.nsfw
+        "safeSearch": "strict" if safe_search else "none",
         "type": resource_type,
     }
 
@@ -371,10 +374,10 @@ async def youtube_command(
         if not (first_response := await response_paginator.get_next_entry()):
             # data["pageInfo"]["totalResults"] will not reliably be `0` when no data is returned and they don't use 404
             # for that so we'll just check to see if nothing is being returned.
-            raise tanjun.CommandError(f"Couldn't find `{query}`.")
+            raise tanjun.CommandError(f"Couldn't find `{query}`.")  # TODO: delete row
 
     except RuntimeError as exc:
-        raise tanjun.CommandError(str(exc)) from None
+        raise tanjun.CommandError(str(exc)) from None  # TODO: delete row
 
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError) as exc:
         _LOGGER.exception("Youtube returned invalid data", exc_info=exc)
@@ -419,7 +422,7 @@ async def moe_command(
             break
 
     else:
-        raise tanjun.CommandError("Couldn't get an image in time") from None
+        raise tanjun.CommandError("Couldn't get an image in time") from None  # TODO: delete row
 
     try:
         data = (await response.json())["data"]
@@ -457,14 +460,15 @@ async def query_nekos_life(
         status_code = response.status
 
     if status_code == 404:
-        raise tanjun.CommandError("Query not found.") from None
+        raise tanjun.CommandError("Query not found.") from None  # TODO: delete row
 
     if status_code >= 500 or data is None or response_key not in data:
         raise tanjun.CommandError(
             "Unable to fetch image at the moment due to server error or malformed response."
-        ) from None
+        ) from None  # TODO: delete row
 
     if status_code >= 300:
+        # TODO: delete row
         raise tanjun.CommandError(f"Unable to fetch image due to unexpected error {status_code}") from None
 
     result = data[response_key]
@@ -513,7 +517,7 @@ async def spotify_command(
     """
     resource_type = resource_type.lower()
     if resource_type not in SPOTIFY_RESOURCE_TYPES:
-        raise tanjun.CommandError(f"{resource_type!r} is not a valid resource type")
+        raise tanjun.CommandError(f"{resource_type!r} is not a valid resource type")  # TODO: delete row
 
     response_paginator = yuyo.ComponentPaginator(
         SpotifyPaginator(spotify_auth.acquire_token, session, {"query": query, "type": resource_type}),
@@ -522,10 +526,10 @@ async def spotify_command(
 
     try:
         if not (first_response := await response_paginator.get_next_entry()):
-            raise tanjun.CommandError(f"Couldn't find {resource_type}") from None
+            raise tanjun.CommandError(f"Couldn't find {resource_type}") from None  # TODO: delete row
 
     except RuntimeError as exc:
-        raise tanjun.CommandError(str(exc)) from None
+        raise tanjun.CommandError(str(exc)) from None  # TODO: delete row
 
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError) as exc:
         _LOGGER.exception("Spotify returned invalid data", exc_info=exc)

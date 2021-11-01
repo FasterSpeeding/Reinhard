@@ -154,6 +154,7 @@ async def old_help_command(
 
     if component_name:
         if component_name.lower() not in help_embeds:
+            # TODO: delete row
             raise tanjun.CommandError(f"Couldn't find component `{component_name}`")
 
         embed_generator = ((hikari.UNDEFINED, embed) for embed in help_embeds[component_name.lower()])
@@ -255,6 +256,7 @@ def _(ctx: tanjun.abc.Context) -> bool:
     if ctx.cache:
         return True
 
+    # TODO: delete row
     raise tanjun.CommandError("Client is cache-less")
 
 

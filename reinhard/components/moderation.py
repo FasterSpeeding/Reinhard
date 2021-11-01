@@ -64,12 +64,15 @@ def iter_messages(
     users: collections.Collection[hikari.Snowflake] | None,
 ) -> hikari.LazyIterator[hikari.Message]:
     if human_only and bot_only:
+        # TODO: delete row
         raise tanjun.CommandError("Can only specify one of `human_only` or `user_only`")
 
     if count is None and after is None:
+        # TODO: delete row
         raise tanjun.CommandError("Must specify `count` when `after` is not specified")
 
     elif count is not None and count <= 0:
+        # TODO: delete row
         raise tanjun.CommandError("Count must be greater than 0.")
 
     if before is None and after is None:
@@ -102,6 +105,7 @@ def iter_messages(
 
     if users is not None:
         if not users:
+            # TODO: delete row
             raise tanjun.CommandError("Must specify at least one user.")
 
         iterator = iterator.filter(lambda message: message.author.id in users)
@@ -181,6 +185,7 @@ async def clear_command(
     before_too_old = before and now - before.created_at >= MAX_MESSAGE_BULK_DELETE
 
     if after_too_old or before_too_old:
+        # TODO: delete row
         raise tanjun.CommandError("Cannot delete messages that are over 14 days old")
 
     iterator = (
@@ -190,12 +195,13 @@ async def clear_command(
         .chunk(100)
     )
 
-    # await ctx.respond("Starting message deletes", delete_after=2)
+    # TODO: delete_after=2 or ephemeral
+    await ctx.respond("Starting message deletes", component=utility.DELETE_ROW)
     async for messages in iterator:
         await ctx.rest.delete_messages(ctx.channel_id, *messages)
         break
 
-    await ctx.respond(content="Cleared messages.", component=utility.DELETE_ROW)
+    await ctx.respond(content="Cleared messages.", component=utility.DELETE_ROW)  # TODO: delete_after=2
     await asyncio.sleep(2)
     try:
         await ctx.delete_last_response()
@@ -247,6 +253,7 @@ class _MultiBanner:
         if not ctx.member.role_ids and not is_owner:
             # If they have no role and aren't the guild owner then the role
             # hierarchy would never let them ban anyone.
+            # TODO: delete row
             raise tanjun.CommandError("You cannot ban any of these members")
 
         if is_owner:
@@ -322,7 +329,7 @@ class _MultiBanner:
             self.passed.add(target)
 
     def make_response(self) -> tuple[str, hikari.UndefinedOr[hikari.Bytes]]:
-        if self.passed:
+        if self.failed:
             page = "Failed bans:\n" + "\n".join(f"* {user_id}: {exc}" for user_id, exc in self.failed.items())
             return (
                 f"Successfully banned {len(self.passed)} members but failed to ban {len(self.failed)} members",
@@ -356,10 +363,11 @@ async def multi_ban_command(
         delete_message_days=clear_message_days,
         members_only=members_only,
     )
-    await ctx.respond("Starting bans \N{THUMBS UP SIGN}")
+    # TODO: delete_after=2 or ephemeral
+    await ctx.respond("Starting bans \N{THUMBS UP SIGN}", component=utility.DELETE_ROW)
     await asyncio.gather(*(banner.try_ban(target=user) for user in users))
     content, attachment = banner.make_response()
-    await ctx.create_followup(content, attachment=attachment)
+    await ctx.create_followup(content, attachment=attachment, component=utility.DELETE_ROW)
 
 
 @ban_group.with_command
@@ -383,13 +391,14 @@ async def ban_authors_command(
         .filter(lambda author: author not in found_authors)
     )
 
-    await ctx.respond("Starting bans \N{THUMBS UP SIGN}")
+    # TODO: delete_after=2 or ephemeral
+    await ctx.respond("Starting bans \N{THUMBS UP SIGN}", component=utility.DELETE_ROW)
     async for author in authors:
         found_authors.add(author)
         await banner.try_ban(author)
 
     content, attachment = banner.make_response()
-    await ctx.create_followup(content, attachment=attachment)
+    await ctx.create_followup(content, attachment=attachment, component=utility.DELETE_ROW)
 
 
 @tanjun.as_loader

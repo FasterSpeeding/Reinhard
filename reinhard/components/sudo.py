@@ -188,6 +188,7 @@ async def eval_command(
     assert ctx.message.content is not None  # This shouldn't ever be the case in a command client.
     code = re.findall(r"```(?:[\w]*\n?)([\s\S(^\\`{3})]*?)\n*```", ctx.message.content)
     if not code:
+        # TODO: delete row
         raise tanjun.CommandError("Expected a python code block.")
 
     if suppress_response:
