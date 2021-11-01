@@ -329,14 +329,25 @@ class _MultiBanner:
             self.passed.add(target)
 
     def make_response(self) -> tuple[str, hikari.UndefinedOr[hikari.Bytes]]:
-        if self.failed:
+        if self.failed and self.passed:
             page = "Failed bans:\n" + "\n".join(f"* {user_id}: {exc}" for user_id, exc in self.failed.items())
             return (
-                f"Successfully banned {len(self.passed)} members but failed to ban {len(self.failed)} members",
+                f"Successfully banned {len(self.passed)} member(s) but failed to ban {len(self.failed)} member(s)",
                 hikari.Bytes(page.encode(), "failed_bans.md", mimetype="text/markdown;charset=UTF-8"),
             )
 
-        return f"Successfully banned {len(self.passed)} members", hikari.UNDEFINED
+        elif self.failed:
+            page = "Failed bans:\n" + "\n".join(f"* {user_id}: {exc}" for user_id, exc in self.failed.items())
+            return (
+                f"Failed to ban {len(self.failed)} member(s)",
+                hikari.Bytes(page.encode(), "failed_bans.md", mimetype="text/markdown;charset=UTF-8"),
+            )
+
+        elif self.passed:
+            return f"Successfully banned {len(self.passed)} member(s)", hikari.UNDEFINED
+
+        else:
+            return "No members were banned", hikari.UNDEFINED
 
 
 @ban_group.with_command
