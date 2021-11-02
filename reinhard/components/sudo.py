@@ -36,6 +36,7 @@ __all__: list[str] = ["sudo_component", "load_sudo", "unload_sudo"]
 import ast
 import asyncio
 import contextlib
+import datetime
 import inspect
 import io
 import json
@@ -124,7 +125,7 @@ def build_eval_globals(ctx: tanjun.abc.Context, component: tanjun.abc.Component,
 
 async def eval_python_code(
     ctx: tanjun.abc.Context, component: tanjun.abc.Component, code: str
-) -> tuple[collections.Iterable[str], int, bool]:
+) -> tuple[io.StringIO, io.StringIO, int, bool]:
     globals_ = build_eval_globals(ctx, component)
     stdout = io.StringIO()
     stderr = io.StringIO()
@@ -149,7 +150,7 @@ async def eval_python_code(
 
     stdout.seek(0)
     stderr.seek(0)
-    return _yields_results(stdout, stderr), exec_time, failed
+    return stdout, stderr, exec_time, failed
 
 
 async def eval_python_code_no_capture(ctx: tanjun.abc.Context, component: tanjun.abc.Component, code: str) -> None:
@@ -160,6 +161,14 @@ async def eval_python_code_no_capture(ctx: tanjun.abc.Context, component: tanjun
 
     else:
         eval(compiled_code, globals_)
+
+
+def _read_and_keep_index(stream: io.StringIO) -> str:
+    index = stream.tell()
+    stream.seek(0)
+    data = stream.read()
+    stream.seek(index)
+    return data
 
 
 @sudo_component.with_message_command
@@ -188,23 +197,27 @@ async def eval_command(
     assert ctx.message.content is not None  # This shouldn't ever be the case in a command client.
     code = re.findall(r"```(?:[\w]*\n?)([\s\S(^\\`{3})]*?)\n*```", ctx.message.content)
     if not code:
-        # TODO: delete row
         raise tanjun.CommandError("Expected a python code block.")
 
     if suppress_response:
         await eval_python_code_no_capture(ctx, component, code[0])
         return
 
-    result, exec_time, failed = await eval_python_code(ctx, component, code[0])
+    stdout, stderr, exec_time, failed = await eval_python_code(ctx, component, code[0])
 
     if file_output:
         await ctx.respond(
-            attachment=hikari.Bytes("\n".join(result), "output.py", mimetype="text/x-python;charset=utf-8")
+            attachments=[
+                hikari.Bytes(stdout, "stdout.py", mimetype="text/x-python;charset=utf-8"),
+                hikari.Bytes(stderr, "stderr.py", mimetype="text/x-python;charset=utf-8"),
+            ]
         )
         return
 
     colour = utility.FAILED_COLOUR if failed else utility.PASS_COLOUR
-    string_paginator = yuyo.sync_paginate_string(iter(result), wrapper="```python\n{}\n```", char_limit=2034)
+    string_paginator = yuyo.sync_paginate_string(
+        _yields_results(stdout, stderr), wrapper="```python\n{}\n```", char_limit=2034
+    )
     embed_generator = (
         (
             hikari.UNDEFINED,
@@ -224,12 +237,35 @@ async def eval_command(
             yuyo.pagination.RIGHT_TRIANGLE,
             yuyo.pagination.RIGHT_DOUBLE_TRIANGLE,
         ),
+        timeout=datetime.timedelta(days=99999),  # TODO: switch to passing None here
     )
     first_response = await response_paginator.get_next_entry()
+
+    async def send_file(ctx_: yuyo.ComponentContext) -> None:
+        await ctx_.defer(hikari.ResponseType.DEFERRED_MESSAGE_CREATE)
+        await ctx_.edit_initial_response(
+            attachments=[
+                hikari.Bytes(_read_and_keep_index(stdout), "stdout.py", mimetype="text/x-python;charset=utf-8"),
+                hikari.Bytes(_read_and_keep_index(stderr), "stderr.py", mimetype="text/x-python;charset=utf-8"),
+            ]
+        )
+        await ctx.edit_initial_response(component=response_paginator)
+
+    executor = (
+        yuyo.MultiComponentExecutor()  # TODO: add authors here
+        .add_executor(response_paginator)
+        .add_builder(response_paginator)
+        .add_action_row()
+        .add_button(hikari.ButtonStyle.SECONDARY, send_file)
+        .set_emoji("\N{CARD FILE BOX}\N{VARIATION SELECTOR-16}")
+        .add_to_container()
+        .add_to_parent()
+    )
+
     assert first_response is not None
     content, embed = first_response
-    message = await ctx.respond(content=content, embed=embed, component=response_paginator, ensure_result=True)
-    component_client.set_executor(message, response_paginator)
+    message = await ctx.respond(content=content, embed=embed, components=executor.builders, ensure_result=True)
+    component_client.set_executor(message, executor)
 
 
 @tanjun.as_loader
