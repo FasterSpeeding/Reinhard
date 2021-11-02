@@ -126,7 +126,6 @@ def build_eval_globals(ctx: tanjun.abc.Context, component: tanjun.abc.Component,
 async def eval_python_code(
     ctx: tanjun.abc.Context, component: tanjun.abc.Component, code: str
 ) -> tuple[io.StringIO, io.StringIO, int, bool]:
-    globals_ = build_eval_globals(ctx, component)
     stdout = io.StringIO()
     stderr = io.StringIO()
     # contextlib.redirect_xxxxx doesn't work properly with contextlib.ExitStack
@@ -134,13 +133,7 @@ async def eval_python_code(
         with contextlib.redirect_stderr(stderr):
             start_time = time.perf_counter()
             try:
-                compiled_code = compile(code, "", "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
-                if compiled_code.co_flags & inspect.CO_COROUTINE:
-                    await eval(compiled_code, globals_)
-
-                else:
-                    eval(compiled_code, globals_)
-
+                await eval_python_code_no_capture(ctx, component, code)
                 failed = False
             except Exception:
                 traceback.print_exc()
