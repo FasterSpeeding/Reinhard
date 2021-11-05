@@ -104,8 +104,8 @@ def spell_check(session: nox.Session) -> None:
         "pyproject.toml",
         "README.md",
         "./github",
-        "-I",
-        "./codespell_ignore.txt",
+        "--ignore-words-list",
+        "nd",
     )
 
 
