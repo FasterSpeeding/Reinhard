@@ -383,11 +383,11 @@ async def multi_ban_command(
 
 @ban_group.with_command
 @tanjun.with_bool_slash_option("members_only", "Only ban users who are currently in the guild.", default=False)
-@tanjun.with_bool_slash_option("clear_messages", "Delete the messages after banning. Defaults to False.", default=False)
+@tanjun.with_int_slash_option("clear_message_days", "Number of days to clear their recent messages for.", default=0)
 @_with_message_filter_options
 @tanjun.as_slash_command("authors", "Ban the authors of recent messages.")
 async def ban_authors_command(
-    ctx: tanjun.abc.SlashContext, count: int | None, clear_message_days: int, members_only: bool, **kwargs: typing.Any
+    ctx: tanjun.abc.SlashContext, clear_message_days: int, members_only: bool, **kwargs: typing.Any
 ) -> None:
     found_authors = set[hikari.Snowflake]()
     banner = await _MultiBanner.build(
@@ -397,7 +397,7 @@ async def ban_authors_command(
         members_only=members_only,
     )
     authors = (
-        iter_messages(ctx, count, **kwargs, users=None)
+        iter_messages(ctx, **kwargs, users=None)
         .map(lambda message: message.author.id)
         .filter(lambda author: author not in found_authors)
     )

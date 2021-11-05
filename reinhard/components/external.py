@@ -36,6 +36,8 @@ __all__: list[str] = ["external_component", "load_external", "unload_external"]
 
 import collections.abc as collections
 import datetime
+import hashlib
+import json
 import logging
 import time
 import typing
@@ -587,6 +589,32 @@ async def ytdl_command(
         path.unlink(missing_ok=True)
 
     await ctx.respond(content=file_path)
+
+
+def _parse_hashes(data: typing.Any) -> list[str]:
+    if isinstance(data := json.loads(data), list):
+        return typing.cast("list[str]", data)
+
+    raise ValueError("Got response of type {}, expected a list of strings", type(data))
+
+
+@external_component.with_slash_command
+@tanjun.with_str_slash_option("url", "The domain to check", converters=urllib.parse.urlparse)
+@tanjun.as_slash_command("check_domain", 'Check whether a domain is on Discord\'s "bad" domain list')
+async def check_domain(
+    ctx: tanjun.abc.Context,
+    url: urllib.parse.ParseResult,
+    bad_domains: list[str] = tanjun.cached_inject(
+        utility.FetchedResource("https://cdn.discordapp.com/bad-domains/hashes.json", _parse_hashes),
+        expire_after=datetime.timedelta(hours=12),
+    ),
+) -> None:
+    domain = url.netloc or url.path
+    domain_hash = hashlib.sha256(domain.encode("utf-8")).hexdigest()
+    if domain_hash in bad_domains:
+        await ctx.respond(content="Domain is on the bad domains list.", component=utility.DELETE_ROW)
+    else:
+        await ctx.respond(content="Domain is not on the bad domains list.", component=utility.DELETE_ROW)
 
 
 @tanjun.as_loader
