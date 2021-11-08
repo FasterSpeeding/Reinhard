@@ -3,5 +3,5 @@ codespell==2.1.0
 flake8==4.0.1
 isort==5.10.0
 mypy==0.910
-pyright==0.0.11
+pyright==0.0.12
 pytest==6.2.5
