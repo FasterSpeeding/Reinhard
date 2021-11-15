@@ -48,8 +48,6 @@ from .. import utility
 MAX_MESSAGE_BULK_DELETE = datetime.timedelta(weeks=2) - datetime.timedelta(minutes=2)
 _SlashCommandT = typing.TypeVar("_SlashCommandT", bound=tanjun.SlashCommand)
 
-moderation_component = tanjun.Component(name="moderation", strict=True)
-
 
 def iter_messages(
     ctx: tanjun.abc.Context,
@@ -144,20 +142,19 @@ def _now() -> datetime.datetime:
     return datetime.datetime.now(tz=datetime.timezone.utc)
 
 
-@moderation_component.with_slash_command
 @tanjun.with_own_permission_check(
     hikari.Permissions.MANAGE_MESSAGES | hikari.Permissions.VIEW_CHANNEL | hikari.Permissions.READ_MESSAGE_HISTORY
 )
 @tanjun.with_author_permission_check(
     hikari.Permissions.MANAGE_MESSAGES | hikari.Permissions.VIEW_CHANNEL | hikari.Permissions.READ_MESSAGE_HISTORY
 )
-@_with_message_filter_options
 @tanjun.with_str_slash_option(
     "users",
     "Users to delete messages for",
     converters=lambda value: list(map(tanjun.conversion.parse_user_id, value.split())),
     default=None,
 )
+@_with_message_filter_options
 @tanjun.as_slash_command("clear", "Clear new messages from chat as a moderator.")
 async def clear_command(
     ctx: tanjun.abc.Context, after: hikari.Snowflake | None, before: hikari.Snowflake | None, **kwargs: typing.Any
@@ -195,21 +192,15 @@ async def clear_command(
         .chunk(100)
     )
 
-    # TODO: delete_after=2 or ephemeral
     await ctx.respond("Starting message deletes", component=utility.DELETE_ROW)
     async for messages in iterator:
         await ctx.rest.delete_messages(ctx.channel_id, *messages)
         break
 
-    await ctx.respond(content="Cleared messages.", component=utility.DELETE_ROW)  # TODO: delete_after=2
-    await asyncio.sleep(2)
-    try:
-        await ctx.delete_last_response()
-    except hikari.NotFoundError:
-        pass
+    await ctx.edit_last_response(content="Cleared messages.", component=utility.DELETE_ROW, delete_after=2)
 
 
-ban_group = moderation_component.with_slash_command(
+ban_group = (
     tanjun.slash_command_group("ban", "Ban commands")
     .add_check(tanjun.GuildCheck())
     .add_check(tanjun.AuthorPermissionCheck(hikari.Permissions.BAN_MEMBERS))
@@ -374,8 +365,7 @@ async def multi_ban_command(
         delete_message_days=clear_message_days,
         members_only=members_only,
     )
-    # TODO: delete_after=2 or ephemeral
-    await ctx.respond("Starting bans \N{THUMBS UP SIGN}", component=utility.DELETE_ROW)
+    await ctx.respond("Starting bans \N{THUMBS UP SIGN}", component=utility.DELETE_ROW, delete_after=2)
     await asyncio.gather(*(banner.try_ban(target=user) for user in users))
     content, attachment = banner.make_response()
     await ctx.create_followup(content, attachment=attachment, component=utility.DELETE_ROW)
@@ -402,14 +392,16 @@ async def ban_authors_command(
         .filter(lambda author: author not in found_authors)
     )
 
-    # TODO: delete_after=2 or ephemeral
-    await ctx.respond("Starting bans \N{THUMBS UP SIGN}", component=utility.DELETE_ROW)
+    await ctx.respond("Starting bans \N{THUMBS UP SIGN}", component=utility.DELETE_ROW, delete_after=2)
     async for author in authors:
         found_authors.add(author)
         await banner.try_ban(author)
 
     content, attachment = banner.make_response()
     await ctx.create_followup(content, attachment=attachment, component=utility.DELETE_ROW)
+
+
+moderation_component = tanjun.Component(name="moderation", strict=True).detect_commands()
 
 
 @tanjun.as_loader

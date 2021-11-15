@@ -63,10 +63,6 @@ def gen_help_embeds(
     return help_embeds
 
 
-basic_component = tanjun.Component(name="basic", strict=True)
-
-
-@basic_component.with_slash_command
 @tanjun.as_slash_command("about", "Get basic information about the current bot instance.")
 async def about_command(
     ctx: tanjun.abc.Context,
@@ -108,13 +104,11 @@ async def about_command(
     await ctx.respond(embed=embed, component=utility.DELETE_ROW)
 
 
-@basic_component.with_message_command
 @tanjun.as_message_command("help")
 async def help_command(ctx: tanjun.abc.Context) -> None:
     await ctx.respond("See the slash command menu")
 
 
-# @basic_component.with_message_command
 # @tanjun.with_greedy_argument("command_name", default=None)
 # @tanjun.with_option("component_name", "--component", default=None)
 # @tanjun.with_parser
@@ -172,7 +166,6 @@ async def old_help_command(
         component_client.set_executor(message, paginator)
 
 
-@basic_component.with_slash_command
 @tanjun.as_slash_command("ping", "Get the bot's current delay.")
 async def ping_command(ctx: tanjun.abc.Context, /) -> None:
     """Get the bot's current delay."""
@@ -200,7 +193,6 @@ _about_lines: list[tuple[str, collections.Callable[[hikari.api.Cache], int]]] = 
 ]
 
 
-@basic_component.with_slash_command
 @tanjun.as_slash_command("cache", "Get general information about this bot's cache.")
 async def cache_command(
     ctx: tanjun.abc.Context,
@@ -260,13 +252,15 @@ def _(ctx: tanjun.abc.Context) -> bool:
     raise tanjun.CommandError("Client is cache-less")
 
 
-@basic_component.with_slash_command
 @tanjun.as_slash_command("invite", "Invite the bot to your server(s)")
 async def invite_command(ctx: tanjun.abc.Context, me: hikari.OwnUser = tanjun.inject_lc(hikari.OwnUser)) -> None:
     await ctx.respond(
         f"https://discord.com/oauth2/authorize?client_id={me.id}&scope=bot%20applications.commands&permissions=8",
         component=utility.DELETE_ROW,
     )
+
+
+basic_component = tanjun.Component(name="basic", strict=True).detect_commands()
 
 
 @tanjun.as_loader

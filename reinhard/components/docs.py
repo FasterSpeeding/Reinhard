@@ -48,9 +48,7 @@ import yuyo
 
 from .. import utility
 
-docs_component = tanjun.Component(name="docs", strict=True)
-docs_group = docs_component.with_slash_command(tanjun.slash_command_group("docs", "Search relevant document sites."))
-
+docs_group = tanjun.slash_command_group("docs", "Search relevant document sites.")
 
 _DocIndexT = typing.TypeVar("_DocIndexT", bound="DocIndex")
 _ValueT = typing.TypeVar("_ValueT")
@@ -408,6 +406,9 @@ def yuyo_docs_command(
     return _docs_command(
         ctx, path, component_client, index, public, simple, YUYO_PAGES, YUYO_PAGES + "/release/", "Tanjun"
     )
+
+
+docs_component = tanjun.Component(name="docs", strict=True).detect_commands()
 
 
 @tanjun.as_loader

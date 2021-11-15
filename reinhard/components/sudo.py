@@ -55,17 +55,13 @@ from .. import utility
 
 CallbackT = collections.Callable[..., collections.Coroutine[typing.Any, typing.Any, typing.Any]]
 
-sudo_component = tanjun.Component(name="sudo", strict=True)
 
-
-@sudo_component.with_message_command
 @tanjun.as_message_command("error")
 async def error_message_command(_: tanjun.abc.Context) -> None:
     """Command used for testing the current error handling."""
     raise Exception("This is an exception, get used to it.")
 
 
-@sudo_component.with_message_command
 @tanjun.with_option("raw_embed", "--embed", "-e", converters=json.loads, default=hikari.UNDEFINED)
 @tanjun.with_greedy_argument("content", default=hikari.UNDEFINED)
 @tanjun.with_parser
@@ -164,7 +160,6 @@ def _read_and_keep_index(stream: io.StringIO) -> str:
     return data
 
 
-@sudo_component.with_message_command
 # @tanjun.with_option("ephemeral_response", "-e", "--ephemeral", converters=bool, default=False, empty_value=True)
 @tanjun.with_option("suppress_response", "-s", "--suppress", converters=bool, default=False, empty_value=True)
 @tanjun.with_option("file_output", "-f", "--file-out", "--file", converters=bool, default=False, empty_value=True)
@@ -259,6 +254,9 @@ async def eval_command(
     content, embed = first_response
     message = await ctx.respond(content=content, embed=embed, components=executor.builders, ensure_result=True)
     component_client.set_executor(message, executor)
+
+
+sudo_component = tanjun.Component(name="sudo", strict=True).detect_commands()
 
 
 @tanjun.as_loader

@@ -184,10 +184,6 @@ class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
         return (self._buffer.pop(0)["external_urls"]["spotify"], hikari.UNDEFINED)
 
 
-external_component = tanjun.Component(name="external", strict=True)
-
-
-@external_component.with_slash_command
 @tanjun.with_str_slash_option("query", "Query string (e.g. name) to search a song by.")
 @tanjun.as_slash_command("lyrics", "Get a song's lyrics.")
 async def lyrics_command(
@@ -284,7 +280,6 @@ async def lyrics_command(
     component_client.set_executor(message, executor)
 
 
-@external_component.with_slash_command
 @tanjun.with_bool_slash_option(
     "safe_search",
     "Whether safe search should be enabled or not. The default for this is based on the current channel.",
@@ -398,7 +393,6 @@ def _(_: tanjun.abc.Context, tokens: config_.Tokens = tanjun.inject(type=config_
 
 
 # This API is currently dead (always returning 5xxs)
-# @external_component.with_message_command
 # @utility.with_parameter_doc("--source | -s", "The optional argument of a show's title.")
 # @utility.with_command_doc("Get a random cute anime image.")
 # @tanjun.with_option("source", "--source", "-s", default=None)
@@ -490,7 +484,6 @@ def _build_spotify_auth(
 
 
 # TODO: add valid options for Options maybe?
-@external_component.with_slash_command
 @tanjun.with_str_slash_option(
     "resource_type",
     "Type of resource to search for. Defaults to track.",
@@ -544,7 +537,6 @@ async def spotify_command(
         component_client.set_executor(message, response_paginator)
 
 
-@external_component.with_message_command
 @tanjun.with_owner_check
 @tanjun.with_argument("url", converters=urllib.parse.ParseResult)
 @tanjun.with_parser
@@ -598,7 +590,6 @@ def _parse_hashes(data: typing.Any) -> list[str]:
     raise ValueError("Got response of type {}, expected a list of strings", type(data))
 
 
-@external_component.with_slash_command
 @tanjun.with_str_slash_option("url", "The domain to check", converters=urllib.parse.urlparse)
 @tanjun.as_slash_command("check_domain", 'Check whether a domain is on Discord\'s "bad" domain list')
 async def check_domain(
@@ -615,6 +606,9 @@ async def check_domain(
         await ctx.respond(content="Domain is on the bad domains list.", component=utility.DELETE_ROW)
     else:
         await ctx.respond(content="Domain is not on the bad domains list.", component=utility.DELETE_ROW)
+
+
+external_component = tanjun.Component(name="external", strict=True).detect_commands()
 
 
 @tanjun.as_loader

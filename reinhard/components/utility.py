@@ -40,10 +40,7 @@ import tanjun
 
 from .. import utility
 
-util_component = tanjun.Component(name="utility", strict=True)
 
-
-@util_component.with_slash_command
 @tanjun.with_role_slash_option("role", "A role to get the colour for.", default=None)
 @tanjun.with_str_slash_option(
     "color", "the hex/int literal representation of a colour to show", converters=tanjun.to_colour, default=None
@@ -88,7 +85,6 @@ async def colour_command(ctx: tanjun.abc.Context, color: hikari.Colour | None, r
 #         ...  # TODO: Implement this to allow getting the embeds from a suppressed message.
 
 
-@util_component.with_slash_command
 @tanjun.with_guild_check
 @tanjun.with_member_slash_option(
     "member",
@@ -157,7 +153,6 @@ async def member_command(ctx: tanjun.abc.SlashContext, member: hikari.Interactio
 
 
 # TODO: the normal role converter is limited to the current guild right?
-@util_component.with_slash_command
 @tanjun.with_role_slash_option("role", "The role to get information about.")
 @tanjun.with_guild_check
 @tanjun.as_slash_command("role", "Get information about a role in the current guild.")
@@ -191,7 +186,6 @@ async def role_command(ctx: tanjun.abc.Context, role: hikari.Role) -> None:
     await ctx.respond(embed=embed, component=utility.DELETE_ROW)
 
 
-@util_component.with_slash_command
 @tanjun.with_user_slash_option(
     "user", "The user to target. If left as None then this will target the command's author.", default=None
 )
@@ -223,7 +217,6 @@ async def user_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> Non
     await ctx.respond(embed=embed, component=utility.DELETE_ROW)
 
 
-@util_component.with_slash_command
 @tanjun.with_user_slash_option(
     "user", "User to get the avatar for. If not provided then this returns the current user's avatar.", default=None
 )
@@ -244,7 +237,6 @@ async def avatar_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> N
 
 
 # TODO: check if the user can access the provided channel
-@util_component.with_slash_command
 @tanjun.with_channel_slash_option("channel", "The channel the message is in.", default=None)
 @tanjun.with_str_slash_option(
     "message_id", "ID of the message to get the ping list for.", converters=(hikari.Snowflake,)
@@ -276,7 +268,6 @@ async def mentions_command(
     )
 
 
-@util_component.with_slash_command
 @tanjun.with_guild_check
 @tanjun.with_str_slash_option("name", "Greedy argument of the name to search for.")
 @tanjun.as_slash_command("members", "Search for a member in the current guild.")
@@ -309,7 +300,6 @@ def _format_char_line(char: str, to_file: bool) -> str:
     return f"`\\U{code:08x}`/`{char}`: {name} <http://www.fileformat.info/info/unicode/char/{code:x}>"
 
 
-@util_component.with_slash_command
 @tanjun.with_bool_slash_option(
     "file", "Whether this should send a file response regardless of response length", default=False
 )
@@ -339,6 +329,9 @@ async def char_command(ctx: tanjun.abc.Context, characters: str, file: bool = Fa
 
     if response_file is not hikari.UNDEFINED:
         await ctx.edit_last_response(content=None, attachment=response_file)
+
+
+util_component = tanjun.Component(name="utility", strict=True).detect_commands()
 
 
 @tanjun.as_loader
