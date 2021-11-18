@@ -1,4 +1,4 @@
-asyncpg~=0.24.0
+asyncpg~=0.25.0
 python-dotenv~=0.19
 # hikari[speedups]~=2.0.0.dev103
 git+https://github.com/hikari-py/hikari#egg=hikari[speedups]
