@@ -139,8 +139,8 @@ def delete_row(ctx: tanjun_abc.Context) -> hikari.impl.ActionRowBuilder:
     )
 
 
-def delete_row_multiple_authors(*authors: hikari.SnowflakeishOr[hikari.User]) -> hikari.impl.ActionRowBuilder:
-    author_ids = ",".join(map(str, map(hikari.Snowflake, authors)))
+def delete_row_multiple_authors(*authors: hikari.Snowflakeish) -> hikari.impl.ActionRowBuilder:
+    author_ids = ",".join(map(str, authors))
     return (
         hikari.impl.ActionRowBuilder()
         .add_button(hikari.ButtonStyle.DANGER, DELETE_CUSTOM_ID + author_ids)

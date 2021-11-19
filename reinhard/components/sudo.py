@@ -31,7 +31,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["sudo_component", "load_sudo", "unload_sudo"]
+__all__: list[str] = ["sudo_loader"]
 
 import ast
 import asyncio
@@ -258,14 +258,6 @@ async def eval_command(
     component_client.set_executor(message, executor)
 
 
-sudo_component = tanjun.Component(name="sudo", strict=True).detect_commands()
-
-
-@tanjun.as_loader
-def load_sudo(cli: tanjun.Client, /) -> None:
-    cli.add_component(sudo_component.copy().add_check(tanjun.checks.OwnerCheck()))
-
-
-@tanjun.as_unloader
-def unload_sudo(cli: tanjun.Client, /) -> None:
-    cli.remove_component_by_name(sudo_component.name)
+sudo_loader = (
+    tanjun.Component(name="sudo", strict=True).add_check(tanjun.checks.OwnerCheck()).detect_commands().make_loader()
+)

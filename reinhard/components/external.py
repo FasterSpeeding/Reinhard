@@ -32,7 +32,7 @@
 """Commands used to interact with external APIs."""
 from __future__ import annotations
 
-__all__: list[str] = ["external_component", "load_external", "unload_external"]
+__all__: list[str] = ["external_loader"]
 
 import collections.abc as collections
 import datetime
@@ -608,14 +608,4 @@ async def check_domain(
         await ctx.respond(content="Domain is not on the bad domains list.", component=utility.delete_row(ctx))
 
 
-external_component = tanjun.Component(name="external", strict=True).detect_commands()
-
-
-@tanjun.as_loader
-def load_external(cli: tanjun.Client, /) -> None:
-    cli.add_component(external_component.copy())
-
-
-@tanjun.as_unloader
-def unload_external(cli: tanjun.Client, /) -> None:
-    cli.remove_component_by_name(external_component.name)
+external_loader = tanjun.Component(name="external", strict=True).detect_commands().make_loader()

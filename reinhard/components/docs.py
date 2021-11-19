@@ -32,7 +32,7 @@
 """Commands used to search Hikari and Tanjun's docs."""
 from __future__ import annotations
 
-__all__: list[str] = ["docs_component", "load_docs", "unload_docs"]
+__all__: list[str] = ["docs_loader"]
 
 import abc
 import collections.abc as collections
@@ -408,14 +408,4 @@ def yuyo_docs_command(
     )
 
 
-docs_component = tanjun.Component(name="docs", strict=True).detect_commands()
-
-
-@tanjun.as_loader
-def load_docs(cli: tanjun.Client, /) -> None:
-    cli.add_component(docs_component.copy())
-
-
-@tanjun.as_unloader
-def unload_docs(cli: tanjun.Client, /) -> None:
-    cli.remove_component_by_name(docs_component.name)
+docs_loader = tanjun.Component(name="docs", strict=True).detect_commands().make_loader()

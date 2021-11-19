@@ -31,7 +31,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["util_component", "load_utility", "unload_utility"]
+__all__: list[str] = ["utility_loader"]
 
 import unicodedata
 
@@ -332,14 +332,4 @@ async def char_command(ctx: tanjun.abc.Context, characters: str, file: bool = Fa
         await ctx.edit_last_response(content=None, attachment=response_file)
 
 
-util_component = tanjun.Component(name="utility", strict=True).detect_commands()
-
-
-@tanjun.as_loader
-def load_utility(cli: tanjun.Client, /) -> None:
-    cli.add_component(util_component.copy())
-
-
-@tanjun.as_unloader
-def unload_utility(cli: tanjun.Client, /) -> None:
-    cli.remove_component_by_name(util_component.name)
+utility_loader = tanjun.Component(name="utility", strict=True).detect_commands().make_loader()

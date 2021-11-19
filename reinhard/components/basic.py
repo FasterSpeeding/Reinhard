@@ -31,7 +31,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["basic_component", "load_basic", "unload_basic"]
+__all__: list[str] = ["basic_loader"]
 
 import collections.abc as collections
 import datetime
@@ -260,14 +260,4 @@ async def invite_command(ctx: tanjun.abc.Context, me: hikari.OwnUser = tanjun.in
     )
 
 
-basic_component = tanjun.Component(name="basic", strict=True).detect_commands()
-
-
-@tanjun.as_loader
-def load_basic(cli: tanjun.Client, /) -> None:
-    cli.add_component(basic_component.copy())
-
-
-@tanjun.as_unloader
-def unload_basic(cli: tanjun.Client, /) -> None:
-    cli.remove_component_by_name(basic_component.name)
+basic_loader = tanjun.Component(name="basic", strict=True).detect_commands().make_loader()

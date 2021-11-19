@@ -31,7 +31,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["moderation_component", "load_moderation", "unload_moderation"]
+__all__: list[str] = ["moderation_loader"]
 
 import asyncio
 import dataclasses
@@ -404,14 +404,4 @@ async def ban_authors_command(
     await ctx.create_followup(content, attachment=attachment, component=utility.delete_row(ctx))
 
 
-moderation_component = tanjun.Component(name="moderation", strict=True).detect_commands()
-
-
-@tanjun.as_loader
-def load_moderation(cli: tanjun.Client, /) -> None:
-    cli.add_component(moderation_component.copy())
-
-
-@tanjun.as_unloader
-def unload_moderation(cli: tanjun.Client, /) -> None:
-    cli.remove_component_by_name(moderation_component.name)
+moderation_loader = tanjun.Component(name="moderation", strict=True).detect_commands().make_loader()

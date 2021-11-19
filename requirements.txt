@@ -2,8 +2,8 @@ asyncpg~=0.25.0
 python-dotenv~=0.19
 # hikari[speedups]~=2.0.0.dev103
 git+https://github.com/hikari-py/hikari#egg=hikari[speedups]
-hikari-tanjun~=2.1.4a1
-hikari-yuyo~=1.0.3a1
+# hikari-tanjun~=2.1.4a1
+git+https://github.com/FasterSpeeding/Tanjun@task/to-loadable
 # hikari-yuyo~=1.0.3a1
 git+https://github.com/FasterSpeeding/Yuyo@task/custom-id-prefix
 markdownify~=0.10.0
