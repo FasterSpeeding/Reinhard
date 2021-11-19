@@ -192,12 +192,15 @@ async def clear_command(
         .chunk(100)
     )
 
-    await ctx.respond("Starting message deletes", component=utility.DELETE_ROW)
+    await ctx.respond("Starting message deletes", component=utility.delete_row(ctx))
     async for messages in iterator:
         await ctx.rest.delete_messages(ctx.channel_id, *messages)
         break
 
-    await ctx.edit_last_response(content="Cleared messages.", component=utility.DELETE_ROW, delete_after=2)
+    try:
+        await ctx.edit_last_response(content="Cleared messages.", component=utility.delete_row(ctx), delete_after=2)
+    except hikari.NotFoundError:
+        await ctx.respond(content="Cleared messages.", component=utility.delete_row(ctx), delete_after=2)
 
 
 ban_group = (
@@ -365,10 +368,10 @@ async def multi_ban_command(
         delete_message_days=clear_message_days,
         members_only=members_only,
     )
-    await ctx.respond("Starting bans \N{THUMBS UP SIGN}", component=utility.DELETE_ROW, delete_after=2)
+    await ctx.respond("Starting bans \N{THUMBS UP SIGN}", component=utility.delete_row(ctx), delete_after=2)
     await asyncio.gather(*(banner.try_ban(target=user) for user in users))
     content, attachment = banner.make_response()
-    await ctx.create_followup(content, attachment=attachment, component=utility.DELETE_ROW)
+    await ctx.create_followup(content, attachment=attachment, component=utility.delete_row(ctx))
 
 
 @ban_group.with_command
@@ -392,13 +395,13 @@ async def ban_authors_command(
         .filter(lambda author: author not in found_authors)
     )
 
-    await ctx.respond("Starting bans \N{THUMBS UP SIGN}", component=utility.DELETE_ROW, delete_after=2)
+    await ctx.respond("Starting bans \N{THUMBS UP SIGN}", component=utility.delete_row(ctx), delete_after=2)
     async for author in authors:
         found_authors.add(author)
         await banner.try_ban(author)
 
     content, attachment = banner.make_response()
-    await ctx.create_followup(content, attachment=attachment, component=utility.DELETE_ROW)
+    await ctx.create_followup(content, attachment=attachment, component=utility.delete_row(ctx))
 
 
 moderation_component = tanjun.Component(name="moderation", strict=True).detect_commands()

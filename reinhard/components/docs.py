@@ -281,7 +281,7 @@ async def _docs_command(
     description_splitter: str = "\n",
 ) -> None:
     if not path:
-        await ctx.respond(base_url, component=utility.DELETE_ROW)
+        await ctx.respond(base_url, component=utility.delete_row(ctx))
         return
 
     if simple:
@@ -322,7 +322,7 @@ async def _docs_command(
         component_client.set_executor(message, paginator)
         return
 
-    await ctx.respond("Entry not found", component=utility.DELETE_ROW)
+    await ctx.respond("Entry not found", component=utility.delete_row(ctx))
 
 
 @docs_group.with_command

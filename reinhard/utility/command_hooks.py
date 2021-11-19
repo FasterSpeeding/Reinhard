@@ -47,11 +47,7 @@ async def on_error(ctx: tanjun.abc.Context, exception: BaseException) -> None:
         colour=constants.FAILED_COLOUR,
         description=f"```python\n{str(exception)[:1950]}```",
     )
-    if isinstance(ctx, tanjun.SlashContext):
-        # The delete row only works for slash command responses.
-        await ctx.respond(embed=embed, component=basic.DELETE_ROW)
-    else:
-        await ctx.respond(embed=embed)
+    await ctx.respond(embed=embed, component=basic.delete_row(ctx))
 
 
 async def on_parser_error(ctx: tanjun.abc.Context, exception: tanjun.ParserError) -> None:
@@ -65,8 +61,4 @@ async def on_parser_error(ctx: tanjun.abc.Context, exception: tanjun.ParserError
         else:
             message = f"{message}: `{exception.errors[0]}`"
 
-    if isinstance(ctx, tanjun.SlashContext):
-        # The delete row only works for slash command responses.
-        await ctx.respond(content=message, component=basic.DELETE_ROW)
-    else:
-        await ctx.respond(content=message)
+    await ctx.respond(content=message, component=basic.delete_row(ctx))

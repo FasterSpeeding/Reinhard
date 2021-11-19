@@ -101,7 +101,7 @@ async def about_command(
         )
     )
 
-    await ctx.respond(embed=embed, component=utility.DELETE_ROW)
+    await ctx.respond(embed=embed, component=utility.delete_row(ctx))
 
 
 @tanjun.as_message_command("help")
@@ -174,7 +174,7 @@ async def ping_command(ctx: tanjun.abc.Context, /) -> None:
     time_taken = (time.perf_counter() - start_time) * 1_000
     heartbeat_latency = ctx.shards.heartbeat_latency * 1_000 if ctx.shards else float("NAN")
     await ctx.respond(
-        f"PONG\n - REST: {time_taken:.0f}ms\n - Gateway: {heartbeat_latency:.0f}ms", component=utility.DELETE_ROW
+        f"PONG\n - REST: {time_taken:.0f}ms\n - Gateway: {heartbeat_latency:.0f}ms", component=utility.delete_row(ctx)
     )
 
 
@@ -240,7 +240,7 @@ async def cache_command(
         )
     )
 
-    await ctx.respond(content=f"{storage_time_taken * 1_000:.4g} ms", embed=embed, component=utility.DELETE_ROW)
+    await ctx.respond(content=f"{storage_time_taken * 1_000:.4g} ms", embed=embed, component=utility.delete_row(ctx))
 
 
 @cache_command.with_check
@@ -256,7 +256,7 @@ def _(ctx: tanjun.abc.Context) -> bool:
 async def invite_command(ctx: tanjun.abc.Context, me: hikari.OwnUser = tanjun.inject_lc(hikari.OwnUser)) -> None:
     await ctx.respond(
         f"https://discord.com/oauth2/authorize?client_id={me.id}&scope=bot%20applications.commands&permissions=8",
-        component=utility.DELETE_ROW,
+        component=utility.delete_row(ctx),
     )
 
 

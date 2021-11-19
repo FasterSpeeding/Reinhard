@@ -93,10 +93,10 @@ async def echo_command(
             return
 
     if content or embed:
-        await ctx.respond(content=content, embed=embed)
+        await ctx.respond(content=content, embed=embed, component=utility.delete_row(ctx))
 
     else:
-        await ctx.respond(content="No content provided")
+        await ctx.respond(content="No content provided", component=utility.delete_row(ctx))
 
 
 def _yields_results(*args: io.StringIO) -> collections.Iterator[str]:
@@ -198,7 +198,8 @@ async def eval_command(
             attachments=[
                 hikari.Bytes(stdout, "stdout.py", mimetype="text/x-python;charset=utf-8"),
                 hikari.Bytes(stderr, "stderr.py", mimetype="text/x-python;charset=utf-8"),
-            ]
+            ],
+            component=utility.delete_row(ctx),
         )
         return
 
@@ -231,13 +232,14 @@ async def eval_command(
 
     async def send_file(ctx_: yuyo.ComponentContext) -> None:
         await ctx_.defer(hikari.ResponseType.DEFERRED_MESSAGE_CREATE)
+        await ctx.edit_initial_response(component=response_paginator)
         await ctx_.edit_initial_response(
             attachments=[
                 hikari.Bytes(_read_and_keep_index(stdout), "stdout.py", mimetype="text/x-python;charset=utf-8"),
                 hikari.Bytes(_read_and_keep_index(stderr), "stderr.py", mimetype="text/x-python;charset=utf-8"),
-            ]
+            ],
+            component=utility.delete_row(ctx),
         )
-        await ctx.edit_initial_response(component=response_paginator)
 
     executor = (
         yuyo.MultiComponentExecutor()  # TODO: add authors here

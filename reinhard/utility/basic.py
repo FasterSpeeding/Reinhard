@@ -34,8 +34,9 @@ from __future__ import annotations
 __all__: list[str] = [
     "basic_name_grid",
     "DELETE_CUSTOM_ID",
-    "DELETE_ROW",
-    "DeleteMessageButton",
+    "delete_button_callback",
+    "delete_row",
+    "delete_row_multiple_authors",
     "prettify_date",
     "prettify_index",
     "raise_error",
@@ -51,6 +52,7 @@ if typing.TYPE_CHECKING:
     import datetime
 
     import yuyo
+    from tanjun import abc as tanjun_abc
 
 
 def prettify_date(date: datetime.datetime) -> str:
@@ -109,46 +111,39 @@ def basic_name_grid(flags: enum.IntFlag) -> str:  # TODO: actually deal with max
     return "\n".join(name_grid)
 
 
-class DeleteMessageButton:
-    __slots__ = ("cache", "rest")
+async def delete_button_callback(ctx: yuyo.ComponentContext) -> None:
+    author_ids = set(map(hikari.Snowflake, ctx.interaction.custom_id.removeprefix(DELETE_CUSTOM_ID).split(",")))
+    if (
+        ctx.interaction.user.id in author_ids
+        or ctx.interaction.member
+        and author_ids.intersection(ctx.interaction.member.role_ids)
+    ):
+        await ctx.defer(hikari.ResponseType.DEFERRED_MESSAGE_UPDATE)
+        await ctx.delete_initial_response()
 
-    def __init__(self, rest: hikari.api.RESTClient, cache: typing.Optional[hikari.api.Cache] = None) -> None:
-        self.cache = cache
-        self.rest = rest
-
-    async def __call__(self, ctx: yuyo.ComponentContext) -> None:
-        can_delete = (
-            ctx.interaction.message.interaction
-            and ctx.interaction.user.id == ctx.interaction.message.interaction.user.id
+    else:
+        await ctx.create_initial_response(
+            hikari.ResponseType.MESSAGE_CREATE, "You do not own this message", flags=hikari.MessageFlag.EPHEMERAL
         )
-        message_ref = ctx.interaction.message.message_reference
-        if not can_delete and message_ref and message_ref.channel_id == ctx.interaction.channel_id and message_ref.id:
-            message = self.cache.get_message(message_ref.id) if self.cache else None
-            try:
-                message = message or await self.rest.fetch_message(message_ref.channel_id, message_ref.id)
-
-            except hikari.NotFoundError:
-                pass
-
-            can_delete = message and ctx.interaction.user.id in (
-                message.author.id,
-                message.interaction and message.interaction.user.id,
-            )
-
-        if can_delete:
-            await ctx.defer(hikari.ResponseType.DEFERRED_MESSAGE_UPDATE)
-            await ctx.delete_initial_response()
-
-        else:
-            await ctx.create_initial_response(
-                hikari.ResponseType.MESSAGE_CREATE, "You do not own this message", flags=hikari.MessageFlag.EPHEMERAL
-            )
 
 
-DELETE_CUSTOM_ID = "AUTHOR_DELETE_BUTTON"
-DELETE_ROW = (
-    hikari.impl.ActionRowBuilder()
-    .add_button(hikari.ButtonStyle.DANGER, DELETE_CUSTOM_ID)
-    .set_emoji("\N{HEAVY MULTIPLICATION X}\N{VARIATION SELECTOR-16}")
-    .add_to_container()
-)
+DELETE_CUSTOM_ID = "AUTHOR_DELETE_BUTTON:"
+
+
+def delete_row(ctx: tanjun_abc.Context) -> hikari.impl.ActionRowBuilder:
+    return (
+        hikari.impl.ActionRowBuilder()
+        .add_button(hikari.ButtonStyle.DANGER, DELETE_CUSTOM_ID + str(ctx.author.id))
+        .set_emoji("\N{HEAVY MULTIPLICATION X}\N{VARIATION SELECTOR-16}")
+        .add_to_container()
+    )
+
+
+def delete_row_multiple_authors(*authors: hikari.SnowflakeishOr[hikari.User]) -> hikari.impl.ActionRowBuilder:
+    author_ids = ",".join(map(str, map(hikari.Snowflake, authors)))
+    return (
+        hikari.impl.ActionRowBuilder()
+        .add_button(hikari.ButtonStyle.DANGER, DELETE_CUSTOM_ID + author_ids)
+        .set_emoji("\N{HEAVY MULTIPLICATION X}\N{VARIATION SELECTOR-16}")
+        .add_to_container()
+    )

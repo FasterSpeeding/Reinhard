@@ -212,7 +212,7 @@ async def lyrics_command(
     try:
         data = await response.json()
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError) as exc:
-        await ctx.respond(content="Invalid data returned by server.", component=utility.DELETE_ROW)
+        await ctx.respond(content="Invalid data returned by server.", component=utility.delete_row(ctx))
 
         _LOGGER.exception(
             "Received unexpected data from lyrics.tsu.sh of type %s\n %s",
@@ -260,7 +260,7 @@ async def lyrics_command(
     async def send_file(ctx_: yuyo.ComponentContext) -> None:
         await ctx_.defer(hikari.ResponseType.DEFERRED_MESSAGE_CREATE)
         await ctx_.edit_initial_response(
-            attachment=hikari.Bytes(data["lyrics"], f"{title} lyrics.txt"), component=utility.DELETE_ROW
+            attachment=hikari.Bytes(data["lyrics"], f"{title} lyrics.txt"), component=utility.delete_row(ctx)
         )
 
         await ctx.edit_initial_response(component=response_paginator)
@@ -378,7 +378,7 @@ async def youtube_command(
 
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError) as exc:
         _LOGGER.exception("Youtube returned invalid data", exc_info=exc)
-        await ctx.respond(content="Youtube returned invalid data.", component=utility.DELETE_ROW)
+        await ctx.respond(content="Youtube returned invalid data.", component=utility.delete_row(ctx))
         raise
 
     else:
@@ -423,11 +423,11 @@ async def moe_command(
     try:
         data = (await response.json())["data"]
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, LookupError, ValueError) as exc:
-        await ctx.respond(content="Image API returned invalid data.", component=utility.DELETE_ROW)
+        await ctx.respond(content="Image API returned invalid data.", component=utility.delete_row(ctx))
         raise exc
 
     await ctx.respond(
-        content=f"{data['image']} (source {data.get('source') or 'unknown'})", component=utility.DELETE_ROW
+        content=f"{data['image']} (source {data.get('source') or 'unknown'})", component=utility.delete_row(ctx)
     )
 
 
@@ -528,7 +528,7 @@ async def spotify_command(
 
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError) as exc:
         _LOGGER.exception("Spotify returned invalid data", exc_info=exc)
-        await ctx.respond(content="Spotify returned invalid data.", component=utility.DELETE_ROW)
+        await ctx.respond(content="Spotify returned invalid data.", component=utility.delete_row(ctx))
         raise
 
     else:
@@ -603,9 +603,9 @@ async def check_domain(
     domain = url.netloc or url.path
     domain_hash = hashlib.sha256(domain.encode("utf-8")).hexdigest()
     if domain_hash in bad_domains:
-        await ctx.respond(content="Domain is on the bad domains list.", component=utility.DELETE_ROW)
+        await ctx.respond(content="Domain is on the bad domains list.", component=utility.delete_row(ctx))
     else:
-        await ctx.respond(content="Domain is not on the bad domains list.", component=utility.DELETE_ROW)
+        await ctx.respond(content="Domain is not on the bad domains list.", component=utility.delete_row(ctx))
 
 
 external_component = tanjun.Component(name="external", strict=True).detect_commands()

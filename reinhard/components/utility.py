@@ -65,7 +65,7 @@ async def colour_command(ctx: tanjun.abc.Context, color: hikari.Colour | None, r
         .add_field(name="RGB", value=str(color.rgb))
         .add_field(name="HEX", value=str(color.hex_code))
     )
-    await ctx.respond(embed=embed, component=utility.DELETE_ROW)
+    await ctx.respond(embed=embed, component=utility.delete_row(ctx))
 
 
 # # @decorators.as_message_command
@@ -149,7 +149,7 @@ async def member_command(ctx: tanjun.abc.SlashContext, member: hikari.Interactio
         .set_thumbnail(member.avatar_url or member.default_avatar_url)
         .set_footer(text=str(member.user.id), icon=member.user.default_avatar_url)
     )
-    await ctx.respond(ctx, embed=embed, component=utility.DELETE_ROW)
+    await ctx.respond(ctx, embed=embed, component=utility.delete_row(ctx))
 
 
 # TODO: the normal role converter is limited to the current guild right?
@@ -183,7 +183,7 @@ async def role_command(ctx: tanjun.abc.Context, role: hikari.Role) -> None:
         title=role.name,
         description="\n".join(role_information) + f"\n\nPermissions:\n{permissions}",
     )
-    await ctx.respond(embed=embed, component=utility.DELETE_ROW)
+    await ctx.respond(embed=embed, component=utility.delete_row(ctx))
 
 
 @tanjun.with_user_slash_option(
@@ -214,7 +214,7 @@ async def user_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> Non
         .set_thumbnail(user.avatar_url or user.default_avatar_url)
         .set_footer(text=str(user.id), icon=user.default_avatar_url)
     )
-    await ctx.respond(embed=embed, component=utility.DELETE_ROW)
+    await ctx.respond(embed=embed, component=utility.delete_row(ctx))
 
 
 @tanjun.with_user_slash_option(
@@ -233,7 +233,7 @@ async def avatar_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> N
 
     avatar = user.avatar_url or user.default_avatar_url
     embed = hikari.Embed(title=str(user), url=str(avatar), colour=utility.embed_colour()).set_image(avatar)
-    await ctx.respond(embed=embed, component=utility.DELETE_ROW)
+    await ctx.respond(embed=embed, component=utility.delete_row(ctx))
 
 
 # TODO: check if the user can access the provided channel
@@ -264,7 +264,8 @@ async def mentions_command(
         mentions = ", ".join(map(str, message.mentions.users.values()))
 
     await ctx.respond(
-        content=f"Pinging mentions: {mentions}" if mentions else "No pinging mentions.", component=utility.DELETE_ROW
+        content=f"Pinging mentions: {mentions}" if mentions else "No pinging mentions.",
+        component=utility.delete_row(ctx),
     )
 
 
@@ -288,7 +289,7 @@ async def members_command(ctx: tanjun.abc.Context, name: str) -> None:
     else:
         content = "No similar members found"
 
-    await ctx.respond(content=content, component=utility.DELETE_ROW)
+    await ctx.respond(content=content, component=utility.delete_row(ctx))
 
 
 def _format_char_line(char: str, to_file: bool) -> str:
@@ -325,7 +326,7 @@ async def char_command(ctx: tanjun.abc.Context, characters: str, file: bool = Fa
     else:
         content = content
 
-    await ctx.respond(content=content or "hi there", component=utility.DELETE_ROW)
+    await ctx.respond(content=content or "hi there", component=utility.delete_row(ctx))
 
     if response_file is not hikari.UNDEFINED:
         await ctx.edit_last_response(content=None, attachment=response_file)
