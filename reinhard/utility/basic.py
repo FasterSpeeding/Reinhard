@@ -60,16 +60,16 @@ def prettify_date(date: datetime.datetime) -> str:
 
 
 def prettify_index(index: int, max_digit_count: int) -> str:
-    remainder = index % 10
     name = str(index).zfill(max_digit_count)
-    if remainder == 1 and index % 100 != 11:
-        return f"{name}st"
-    if remainder == 2 and index % 100 != 12:
-        return f"{name}nd"
-    if remainder == 3 and index % 100 != 13:
-        return f"{name}rd"
-
-    return f"{name}th"
+    match index % 10:
+        case 1 if index % 100 == 11:
+            return f"{name}st"
+        case 2 if index % 100 == 12:
+            return f"{name}nd"
+        case 3 if index % 100 == 13:
+            return f"{name}rd"
+        case _:
+            return f"{name}th"
 
 
 class _ErrorRaiserT(typing.Protocol):
@@ -140,10 +140,9 @@ def delete_row(ctx: tanjun_abc.Context) -> hikari.impl.ActionRowBuilder:
 
 
 def delete_row_multiple_authors(*authors: hikari.Snowflakeish) -> hikari.impl.ActionRowBuilder:
-    author_ids = ",".join(map(str, authors))
     return (
         hikari.impl.ActionRowBuilder()
-        .add_button(hikari.ButtonStyle.DANGER, DELETE_CUSTOM_ID + author_ids)
+        .add_button(hikari.ButtonStyle.DANGER, DELETE_CUSTOM_ID + ",".join(map(str, authors)))
         .set_emoji("\N{HEAVY MULTIPLICATION X}\N{VARIATION SELECTOR-16}")
         .add_to_container()
     )
