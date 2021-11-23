@@ -259,5 +259,5 @@ async def eval_command(
 
 
 sudo_loader = (
-    tanjun.Component(name="sudo", strict=True).add_check(tanjun.checks.OwnerCheck()).detect_commands().make_loader()
+    tanjun.Component(name="sudo", strict=True).add_check(tanjun.checks.OwnerCheck()).load_from_scope().make_loader()
 )

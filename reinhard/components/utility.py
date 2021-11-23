@@ -332,4 +332,4 @@ async def char_command(ctx: tanjun.abc.Context, characters: str, file: bool = Fa
         await ctx.edit_last_response(content=None, attachment=response_file)
 
 
-utility_loader = tanjun.Component(name="utility", strict=True).detect_commands().make_loader()
+utility_loader = tanjun.Component(name="utility", strict=True).load_from_scope().make_loader()

@@ -408,4 +408,4 @@ def yuyo_docs_command(
     )
 
 
-docs_loader = tanjun.Component(name="docs", strict=True).detect_commands().make_loader()
+docs_loader = tanjun.Component(name="docs", strict=True).load_from_scope().make_loader()

@@ -608,4 +608,4 @@ async def check_domain(
         await ctx.respond(content="Domain is not on the bad domains list.", component=utility.delete_row(ctx))
 
 
-external_loader = tanjun.Component(name="external", strict=True).detect_commands().make_loader()
+external_loader = tanjun.Component(name="external", strict=True).load_from_scope().make_loader()

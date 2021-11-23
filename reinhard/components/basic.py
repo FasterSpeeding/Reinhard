@@ -260,4 +260,4 @@ async def invite_command(ctx: tanjun.abc.Context, me: hikari.OwnUser = tanjun.in
     )
 
 
-basic_loader = tanjun.Component(name="basic", strict=True).detect_commands().make_loader()
+basic_loader = tanjun.Component(name="basic", strict=True).load_from_scope().make_loader()
