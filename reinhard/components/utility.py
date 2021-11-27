@@ -144,7 +144,7 @@ async def member_command(ctx: tanjun.abc.SlashContext, member: hikari.Interactio
             description="\n".join(member_information) + f"\n\nRoles:\n{roles_repr}\n\nPermissions:\n{permissions_grid}",
             colour=colour,
             title=f"{member.user.username}#{member.user.discriminator}",
-            url=f"https://discordapp.com/users/{member.user.id}",
+            url=f"https://discord.com/users/{member.user.id}",
         )
         .set_thumbnail(member.avatar_url or member.default_avatar_url)
         .set_footer(text=str(member.user.id), icon=member.user.default_avatar_url)
@@ -209,7 +209,7 @@ async def user_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> Non
                 f"Joined Discord: {tanjun.from_datetime(user.created_at)}\n\nFlags: {int(user.flags)}\n{flags}"
             ),
             title=f"{user.username}#{user.discriminator}",
-            url=f"https://discordapp.com/users/{user.id}",
+            url=f"https://discord.com/users/{user.id}",
         )
         .set_thumbnail(user.avatar_url or user.default_avatar_url)
         .set_footer(text=str(user.id), icon=user.default_avatar_url)
