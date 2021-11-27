@@ -35,6 +35,7 @@ from __future__ import annotations
 __slots__: list[str] = ["reference_loader"]
 
 import inspect
+import logging
 import re
 import sys
 import types
@@ -51,6 +52,7 @@ from .. import utility
 
 _ReferenceIndexT = typing.TypeVar("_ReferenceIndexT", bound="ReferenceIndex")
 _SlashCommandT = typing.TypeVar("_SlashCommandT", bound=tanjun.SlashCommand)
+_LOGGER = logging.getLogger("hikari.reinhard.reference_index")
 
 
 def _is_public(key: str) -> bool:
@@ -80,6 +82,8 @@ def _combine_imports(part_1: str, part_2: str) -> str:
 
 
 class ReferenceIndex:
+    """Index used for tracking references to types in specified modules."""
+
     __slots__ = (
         "_indexed_modules",
         "_module_imports",
@@ -180,7 +184,6 @@ class ReferenceIndex:
 
     def _handle_annotation(self, module_name: str, path: str, annotation: typing.Union[type[typing.Any], str]) -> None:
         if not isinstance(annotation, str):
-            # LOG?
             return
 
         annotation = annotation.strip()
@@ -202,10 +205,9 @@ class ReferenceIndex:
 
             else:
                 # This should indicate that the annotation refers to a 3rd party type which we don't care about.
-                ...  # TODO: debug log statement
+                _LOGGER.debug("Ignoring %r annotation from out-of-scope library at %r", annotation, path)
 
         else:
-            ...
             # If we got this far then it is located in the current module.
             self._add_use(f"{module_name}.{annotation}", path)
 
@@ -256,6 +258,12 @@ class ReferenceIndex:
         return False
 
     def build_search_tree(self: _ReferenceIndexT) -> _ReferenceIndexT:
+        """Build the internal search tree to enable searching for types.
+
+        .. warning::
+            If this isn't called then `search` and `get_references` will always return
+            `None`.
+        """
         for full_path in self._object_paths_to_uses.keys():
             _, name = full_path.rsplit(".", 1)
 
@@ -277,6 +285,15 @@ class ReferenceIndex:
         return self
 
     def index_module(self: _ReferenceIndexT, module: types.ModuleType, /) -> _ReferenceIndexT:
+        """Add a module to the internal index of in-scope modules.
+
+        Any types declared in these modules will have their uses tracked.
+
+        Parameters
+        ----------
+        module : types.ModuleType
+            The module to index.
+        """
         self._indexed_modules[module.__name__] = module
         self._top_level_modules.add(module.__name__.split(".", 1)[0])
         return self
@@ -289,6 +306,25 @@ class ReferenceIndex:
         check: typing.Optional[collections.Callable[[types.ModuleType], bool]] = None,
         recursive: bool = False,
     ) -> _ReferenceIndexT:
+        """Add a module's sub-modules to the internal index of in-scope modules.
+
+        Any types declared in these modules will have their uses tracked.
+
+        Parameters
+        ----------
+        module : types.ModuleType
+            The module to scan for sub-modules to index.
+
+        Other Parameters
+        ----------------
+        check : typing.Optional[collections.Callable[[types.ModuleType], bool]]
+            If provided, a callback which will decide which sub-modules should be indexed.
+            If `None` then all sub-modules will be indexed.
+        recursive : bool
+            If `True` then sub-modules of sub-modules will also be scanned and indexed.
+
+            Defaults to `False`.
+        """
         for _, sub_module in filter(_is_public_key, inspect.getmembers(module)):
             if isinstance(sub_module, types.ModuleType):
                 if check and not check(sub_module):
@@ -301,12 +337,20 @@ class ReferenceIndex:
         return self
 
     def scan_indexed_modules(self: _ReferenceIndexT) -> _ReferenceIndexT:
+        """Scan the indexed modules for type references."""
         for module in self._indexed_modules.values():
             self.scan_module(module)
 
         return self
 
     def scan_module(self: _ReferenceIndexT, module: types.ModuleType, /) -> _ReferenceIndexT:
+        """Scan a module for type references.
+
+        Parameters
+        ----------
+        module : types.ModuleType
+            The module to scan for type references.
+        """
         module_members = dict[str, typing.Any](filter(_is_public_key, inspect.getmembers(module)))
         for name, obj in module_members.items():
             if isinstance(obj, (types.MethodType, types.FunctionType, type)):
@@ -315,6 +359,22 @@ class ReferenceIndex:
         return self
 
     def search(self, path: str, /) -> typing.Optional[tuple[str, collections.Sequence[str]]]:
+        """Search for a type to get its references.
+
+        Parameters
+        ----------
+        path : str
+            Partial path of the type to search for.
+
+            This will be matched case-insensitively.
+
+        Returns
+        -------
+        typing.Optional[tuple[str, collections.Sequence[str]]]
+            The type's full path and a list of references to it.
+
+            If the type was not found then `None` is returned.
+        """
         split = path.rsplit(".", 1)
         if len(split) > 1:
             name = split[1]
@@ -336,7 +396,21 @@ class ReferenceIndex:
                 if key.endswith(path):
                     return (key, self._object_paths_to_uses[key])
 
-    def get_uses(self, path: str, /) -> typing.Optional[collections.Sequence[str]]:
+    def get_references(self, path: str, /) -> typing.Optional[collections.Sequence[str]]:
+        """Get the tracked references for a type by its absolute path.
+
+        Parameters
+        ----------
+        path : str
+            The absolute path of the type to get references for.
+
+            This is matched case-sensitively.
+
+        Returns
+        -------
+        typing.Optional[collections.Sequence[str]]
+            The references to the type if found else `None`.
+        """
         return self._object_paths_to_uses.get(path)
 
 
@@ -377,7 +451,7 @@ async def _index_command(
     public: bool,
 ):
     if absolute:
-        result = index.get_uses(path)
+        result = index.get_references(path)
 
         if not result:
             raise tanjun.CommandError(f"No references found for the absolute path `{path}`")

@@ -58,13 +58,6 @@ __all__: list[str] = [
     # dependencies.py
     "dependencies",
     "SessionManager",
-    # help.py
-    "help",
-    "generate_command_embed",
-    "generate_help_embeds",
-    "get_command_doc",
-    "get_component_doc",
-    "with_docs",
     # rest.py
     "rest",
     "AIOHTTPStatusHandler",
@@ -79,13 +72,11 @@ from . import basic
 from . import command_hooks
 from . import constants
 from . import dependencies
-from . import help
 from . import rest
 from . import ytdl
 from .basic import *
 from .command_hooks import *
 from .constants import *
 from .dependencies import *
-from .help import *
 from .rest import *
 from .ytdl import *

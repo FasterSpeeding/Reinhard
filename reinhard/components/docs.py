@@ -60,14 +60,34 @@ SPECIAL_KEYS: frozenset[str] = frozenset(("df", "tf", "docs"))
 
 @dataclasses.dataclass(slots=True)
 class DocEntry:
+    """Dataclass used to represent a documentation entry."""
+
     doc: str
+    """The entry's doc string."""
+
     type: str
+    """The type of entry this is.
+
+    This will be either "function", "class", "module" or "???".
+    """
+
     func_def: str | None
+    """How this function was defined if this is a function.
+
+    This will be either "def", "async def" or `None`.
+    """
+
     fullname: str
+    """The entry's fullname."""
+
     module_name: str
+    """Name of the module this entry is in."""
+
     qualname: str
-    func_def: str | None
+    """The entry's qualified name."""
+
     parameters: list[str] | None
+    """A list of the entry's parameter names if this is a function."""
 
     @classmethod
     def from_entry(cls, data: dict[str, typing.Any], doc: str, /) -> DocEntry:
@@ -96,6 +116,8 @@ def _collect_pdoc_paths(data: dict[str, typing.Any], path_filter: str = "") -> c
 
 
 class DocIndex(abc.ABC):
+    """Abstract class of a documentation store index."""
+
     __slots__ = ("_metadata", "_search_index")
 
     def __init__(self, data: dict[str, typing.Any], /, *, process_doc: bool = True) -> None:
@@ -113,25 +135,73 @@ class DocIndex(abc.ABC):
 
     @classmethod
     def from_json(cls: type[_DocIndexT], data: str | bytes, /) -> _DocIndexT:
+        """Build this index from a JSON payload."""
         return cls(json.loads(data))
 
     def get_entry(self, path: str, /) -> DocEntry:
+        """Get an entry from the index from an absolute path.
+
+        Parameters
+        ----------
+        path : str
+            The absolute path to the entry.
+
+            This is matched case-sensitively.
+
+        Returns
+        -------
+        DocEntry
+            The entry.
+
+        Raises
+        ------
+        KeyError
+            If the path is not found.
+        """
         return self._metadata[path]
 
     @abc.abstractmethod
     def make_link(self, base_url: str, entry: DocEntry, /) -> str:
-        ...
+        """Make a web link to a documentation entry.
 
-    def search(self, full_name: str, /) -> collections.Iterator[DocEntry]:
-        full_name = full_name.lower()
-        if not full_name:
+        Parameters
+        ----------
+        base_url : str
+            The base URL of the documentation site.
+
+        entry : DocEntry
+            The entry to link to.
+
+        Returns
+        -------
+        str
+            The link.
+        """
+
+    def search(self, search_path: str, /) -> collections.Iterator[DocEntry]:
+        """Search the index for an entry.
+
+        Parameters
+        ----------
+        search_path : str
+            The partial path to search for.
+
+            This is matched case-insensitively.
+
+        Returns
+        -------
+        collections.abc.Iterator[DocEntry]
+            An iterator of the matching entries.
+        """
+        search_path = search_path.lower()
+        if not search_path:
             return
 
         try:
-            path, name = full_name.rsplit(".", 1)
+            path, name = search_path.rsplit(".", 1)
         except ValueError:
             path = ""
-            name = full_name
+            name = search_path
 
         position: dict[str, typing.Any] = self._search_index["root"]
         for char in name:
@@ -139,7 +209,7 @@ class DocIndex(abc.ABC):
                 # Sometimes the search path ends a bit pre-maturely.
                 if docs := position.get("docs"):
                     # Since this isn't recursive, no de-duplication is necessary.
-                    yield from (self._metadata[path] for path in docs.keys() if full_name in path.lower())
+                    yield from (self._metadata[path] for path in docs.keys() if search_path in path.lower())
                     return
 
                 return
@@ -158,6 +228,18 @@ PLACEHOLDER = "???"
 
 
 def process_hikari_index(data: dict[str, typing.Any]) -> dict[str, typing.Any]:
+    """Process Hikari's unique index format to make it compatible with the logic for Tanjun's index.
+
+    Parameters
+    ----------
+    data : dict[str, typing.Any]
+        The index data.
+
+    Returns
+    -------
+    dict[str, typing.Any]
+        The processed index data.
+    """
     base_urls: dict[str, typing.Any] = {}
 
     for path in (".".join(url.split("/")) for url in data["urls"]):
@@ -217,6 +299,8 @@ def process_hikari_index(data: dict[str, typing.Any]) -> dict[str, typing.Any]:
 
 
 class HikariIndex(DocIndex):
+    """Doc index specialised for Hikari's documentation."""
+
     __slots__ = ()
 
     def __init__(self, data: dict[str, typing.Any], /) -> None:
@@ -231,6 +315,8 @@ class HikariIndex(DocIndex):
 
 
 class PdocIndex(DocIndex):
+    """Doc index specialised for Pdoc indexes."""
+
     __slots__ = ()
 
     def make_link(self, base_url: str, entry: DocEntry, /) -> str:

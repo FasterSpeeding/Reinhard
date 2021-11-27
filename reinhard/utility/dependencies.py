@@ -48,6 +48,8 @@ _LOGGER = logging.getLogger("hikari.reinhard")
 
 
 class SessionManager:
+    """Utility class for managing an `aiohttp.ClientSession` type dependency."""
+
     __slots__ = ("http_settings", "proxy_settings", "_session", "user_agent")
 
     def __init__(
@@ -65,12 +67,19 @@ class SessionManager:
         return self._session
 
     def load_into_client(self, client: tanjun.Client) -> None:
+        if client.is_alive:
+            raise RuntimeError("This should be loaded into the client before it has started.")
+
         client.add_client_callback(tanjun.ClientCallbackNames.STARTING, self.open).add_client_callback(
             tanjun.ClientCallbackNames.CLOSED, self.close
         )
 
     # TODO: switch over to tanjun.InjectorClient
     def open(self, client: tanjun.Client = tanjun.inject(type=tanjun.Client)) -> None:
+        """Start the session.
+
+        This will normally be called by a client callback.
+        """
         if self._session:
             raise RuntimeError("Session already running")
 

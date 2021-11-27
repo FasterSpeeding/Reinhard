@@ -35,7 +35,6 @@ __all__: list[str] = ["basic_loader"]
 
 import collections.abc as collections
 import datetime
-import itertools
 import math
 import platform
 import time
@@ -43,24 +42,9 @@ import time
 import hikari
 import psutil
 import tanjun
-import yuyo
 from hikari import snowflakes
 
 from .. import utility
-
-
-def gen_help_embeds(
-    ctx: tanjun.abc.Context = tanjun.inject(type=tanjun.abc.Context),
-    client: tanjun.abc.Client = tanjun.inject(type=tanjun.abc.Client),
-) -> dict[str, list[hikari.Embed]]:
-    prefix = next(iter(client.prefixes)) if client and client.prefixes else ""
-
-    help_embeds: dict[str, list[hikari.Embed]] = {}
-    for component in ctx.client.components:
-        if value := utility.generate_help_embeds(component, prefix=prefix):
-            help_embeds[value[0].lower()] = [v for v in value[1]]
-
-    return help_embeds
 
 
 @tanjun.as_slash_command("about", "Get basic information about the current bot instance.")
@@ -107,63 +91,6 @@ async def about_command(
 @tanjun.as_message_command("help")
 async def help_command(ctx: tanjun.abc.Context) -> None:
     await ctx.respond("See the slash command menu")
-
-
-# @tanjun.with_greedy_argument("command_name", default=None)
-# @tanjun.with_option("component_name", "--component", default=None)
-# @tanjun.with_parser
-# # TODO: specify a group or command
-# @tanjun.as_message_command("help")
-async def old_help_command(
-    ctx: tanjun.abc.Context,
-    command_name: str | None,
-    component_name: str | None,
-    component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
-    help_embeds: dict[str, list[hikari.Embed]] = tanjun.cached_inject(gen_help_embeds),
-) -> None:
-    """Get information about the commands in this bot.
-
-    Arguments
-        * command name: Optional greedy argument of a name to get a command's documentation by.
-
-    Options
-        * component name (--component): Name of a component to get the documentation for.
-    """
-    if command_name is not None:
-        for own_prefix in ctx.client.prefixes:
-            if command_name.startswith(own_prefix):
-                command_name = command_name[len(own_prefix) :]
-                break
-
-        prefix = next(iter(ctx.client.prefixes)) if ctx.client.prefixes else ""
-        for _, command in ctx.client.check_message_name(command_name):
-            if command_embed := utility.generate_command_embed(command, prefix=prefix):
-                await ctx.respond(embed=command_embed)
-                break
-
-        else:
-            await ctx.respond(f"Couldn't find `{command_name}` command.")
-
-        return
-
-    if component_name:
-        if component_name.lower() not in help_embeds:
-            # TODO: delete row
-            raise tanjun.CommandError(f"Couldn't find component `{component_name}`")
-
-        embed_generator = ((hikari.UNDEFINED, embed) for embed in help_embeds[component_name.lower()])
-
-    else:
-        embed_generator = (
-            (hikari.UNDEFINED, embed) for embed in itertools.chain.from_iterable(list(help_embeds.values()))
-        )
-
-    paginator = yuyo.ComponentPaginator(embed_generator, authors=(ctx.author,))
-
-    if first_entry := await paginator.get_next_entry():
-        content, embed = first_entry
-        message = await ctx.respond(content=content, embed=embed, component=paginator, ensure_result=True)
-        component_client.set_executor(message, paginator)
 
 
 @tanjun.as_slash_command("ping", "Get the bot's current delay.")

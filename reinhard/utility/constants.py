@@ -39,7 +39,10 @@ import typing
 from hikari import colours
 
 FAILED_COLOUR: typing.Final[colours.Colour] = colours.Colour(0xF04747)
+"""Colour used to represent a failed execution/attempt."""
+
 PASS_COLOUR: typing.Final[colours.Colour] = colours.Colour(0x43B581)
+"""Colour used to represent a successful execution/attempt."""
 
 MAYA_BLUE: typing.Final[colours.Colour] = colours.Colour(0x55CDFC)
 WHITE: typing.Final[colours.Colour] = colours.Colour(0xFFFFFE)  # 0xFFFFFF is treated as no colour in embeds by Discord.

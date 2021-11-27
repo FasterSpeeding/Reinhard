@@ -41,6 +41,17 @@ from . import constants
 
 
 async def on_error(ctx: tanjun.abc.Context, exception: BaseException) -> None:
+    """Handle an unexpected error during command execution.
+
+    This is the default error handler for all commands.
+
+    Parameters
+    ----------
+    ctx : tanjun.abc.Context
+        The context of the command.
+    exception : BaseException
+        The exception that was raised.
+    """
     # TODO: better permission checks
     embed = hikari.Embed(
         title=f"An unexpected {type(exception).__name__} occurred",
@@ -51,6 +62,15 @@ async def on_error(ctx: tanjun.abc.Context, exception: BaseException) -> None:
 
 
 async def on_parser_error(ctx: tanjun.abc.Context, exception: tanjun.ParserError) -> None:
+    """Handle a parser error.
+
+    Parameters
+    ----------
+    ctx : tanjun.abc.Context
+        The context of the command.
+    exception : tanjun.ParserError
+        The exception that was raised.
+    """
     # TODO: better permission checks
     message = str(exception)
 
