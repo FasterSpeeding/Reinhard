@@ -34,6 +34,7 @@ from __future__ import annotations
 
 __slots__: list[str] = ["reference_loader"]
 
+import datetime
 import inspect
 import logging
 import re
@@ -69,7 +70,7 @@ _IMPORT_CAPTURE_PATTERN = re.compile(
     r"\s*import ([\w\.]+)(?: as (\w+))?|\s*from ([\w\.]+) import ([\w\.]+)(?: as (\w+))?", flags=re.ASCII
 )
 _RELATIVE_IMPORT_DOT_PATTERN = re.compile(r"^(\.*)")
-_IGNORED_NAMES = set(filter(_is_public, __builtins__.keys()))
+_BUILTIN_TYPES = set(filter(_is_public, __builtins__.keys()))
 _END_KEY = "_link"
 
 
@@ -82,9 +83,19 @@ def _combine_imports(part_1: str, part_2: str) -> str:
 
 
 class ReferenceIndex:
-    """Index used for tracking references to types in specified modules."""
+    """Index used for tracking references to types in specified modules.
+
+    Other Parameters
+    ----------------
+    track_3rd_party : bool
+        Whether to track references to types in 3rd party (non-indexed) modules.
+    track_builtins : bool
+        Whether to track references to types in the builtin module.
+    """
 
     __slots__ = (
+        "_is_tracking_3rd_party",
+        "_is_tracking_builtins",
         "_indexed_modules",
         "_module_imports",
         "_object_paths_to_uses",
@@ -92,7 +103,9 @@ class ReferenceIndex:
         "_top_level_modules",
     )
 
-    def __init__(self):
+    def __init__(self, *, track_builtins: bool = False, track_3rd_party: bool = False) -> None:
+        self._is_tracking_3rd_party = track_3rd_party
+        self._is_tracking_builtins = track_builtins
         self._indexed_modules: dict[str, types.ModuleType] = {}
         self._module_imports: dict[str, dict[str, str]] = {}
         self._object_paths_to_uses: dict[str, list[str]] = {}
@@ -137,7 +150,7 @@ class ReferenceIndex:
                 else:  # Case not defined by the regex
                     raise RuntimeError("This shouldn't ever happen")
 
-                if imported_from.split(".", 1)[0] in self._top_level_modules:
+                if self._is_tracking_3rd_party or imported_from.split(".", 1)[0] in self._top_level_modules:
                     imports[imported_name] = imported_from
 
                 elif imported_from.startswith("."):
@@ -147,7 +160,7 @@ class ReferenceIndex:
                     assert module_name.count(".") > (dot_count - 2), "This import is invalid, how'd you get this far?"
                     parent_path = module_name.rsplit(".", dot_count - 1)[0] + imported_from[dot_count - 1 :]
 
-                    if parent_path.split(".", 1)[0] in self._top_level_modules:
+                    if self._is_tracking_3rd_party or parent_path.split(".", 1)[0] in self._top_level_modules:
                         imports[imported_name] = parent_path
 
         self._module_imports[module_name] = imports
@@ -189,11 +202,16 @@ class ReferenceIndex:
         annotation = annotation.strip()
         module_imports = self._get_or_parse_module_imports(module_name)
         if (
-            annotation in _IGNORED_NAMES
-            or self._capture_generic(module_name, path, annotation)
+            self._capture_generic(module_name, path, annotation)
             or not _NAME_PATTERN.fullmatch(annotation)
             or not _is_public(annotation)
         ):
+            return
+
+        if annotation in _BUILTIN_TYPES:
+            if self._is_tracking_builtins:
+                self._add_use(f"builtins.{annotation}", path)
+
             return
 
         if "." in annotation:
@@ -203,8 +221,10 @@ class ReferenceIndex:
                     self._add_use(import_path + without_key, path)
                     return
 
+            # If we hit this statement then this indicates that the annotation
+            # refers to a 3rd party type and that we aren't tracking 3rd party
+            # types so this can be safely ignored.
             else:
-                # This should indicate that the annotation refers to a 3rd party type which we don't care about.
                 _LOGGER.debug("Ignoring %r annotation from out-of-scope library at %r", annotation, path)
 
         else:
@@ -415,7 +435,9 @@ class ReferenceIndex:
 
 
 def _make_standard_index(top_module: types.ModuleType, nested_modules: set[types.ModuleType]) -> ReferenceIndex:
-    index = ReferenceIndex().index_sub_modules(top_module, check=lambda m: m.__name__.startswith(top_module.__name__))
+    index = ReferenceIndex(track_builtins=False, track_3rd_party=False).index_sub_modules(
+        top_module, check=lambda m: m.__name__.startswith(top_module.__name__)
+    )
 
     for module in nested_modules:
         index.index_module(module)
@@ -473,12 +495,43 @@ async def _index_command(
         title=f"References found for {full_path}",
     )
 
-    paginator = yuyo.ComponentPaginator(iterator, authors=(ctx.author,) if not public else ())
+    paginator = yuyo.ComponentPaginator(
+        iterator,
+        authors=(ctx.author,) if not public else (),
+        triggers=(
+            yuyo.pagination.LEFT_DOUBLE_TRIANGLE,
+            yuyo.pagination.LEFT_TRIANGLE,
+            yuyo.pagination.STOP_SQUARE,
+            yuyo.pagination.RIGHT_TRIANGLE,
+            yuyo.pagination.RIGHT_DOUBLE_TRIANGLE,
+        ),
+        timeout=datetime.timedelta(days=99999),  # TODO: switch to passing None here
+    )
+
+    async def send_file(ctx_: yuyo.ComponentContext) -> None:
+        await ctx_.defer(hikari.ResponseType.DEFERRED_MESSAGE_CREATE)
+        await ctx.edit_initial_response(component=paginator)
+        await ctx_.edit_initial_response(
+            attachments=[hikari.Bytes("\n".join(uses), "results.txt")],
+            component=utility.delete_row(ctx),
+        )
+
+    executor = (
+        yuyo.MultiComponentExecutor()  # TODO: add authors here
+        .add_executor(paginator)
+        .add_builder(paginator)
+        .add_action_row()
+        .add_button(hikari.ButtonStyle.SECONDARY, send_file)
+        .set_emoji(utility.FILE_EMOJI)
+        .add_to_container()
+        .add_to_parent()
+    )
+
     first_response = await paginator.get_next_entry()
     assert first_response
     content, embed = first_response
-    message = await ctx.respond(content=content, component=paginator, embed=embed, ensure_result=True)
-    component_client.set_executor(message, paginator)
+    message = await ctx.respond(content=content, components=executor.builders, embed=embed, ensure_result=True)
+    component_client.set_executor(message, executor)
 
 
 @reference_group.with_command

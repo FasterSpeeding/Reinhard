@@ -31,23 +31,40 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__ = ["AMARANTH_PINK", "embed_colour", "FAILED_COLOUR", "MAYA_BLUE", "PASS_COLOUR", "WHITE"]
+__all__ = [
+    "AMARANTH_PINK",
+    "DELETE_EMOJI",
+    "embed_colour",
+    "FAILED_COLOUR",
+    "FILE_EMOJI",
+    "MAYA_BLUE",
+    "PASS_COLOUR",
+    "WHITE",
+]
 
 import random
 import typing
 
-from hikari import colours
+import hikari
 
-FAILED_COLOUR: typing.Final[colours.Colour] = colours.Colour(0xF04747)
+FAILED_COLOUR: typing.Final[hikari.Colour] = hikari.Colour(0xF04747)
 """Colour used to represent a failed execution/attempt."""
 
-PASS_COLOUR: typing.Final[colours.Colour] = colours.Colour(0x43B581)
+PASS_COLOUR: typing.Final[hikari.Colour] = hikari.Colour(0x43B581)
 """Colour used to represent a successful execution/attempt."""
 
-MAYA_BLUE: typing.Final[colours.Colour] = colours.Colour(0x55CDFC)
-WHITE: typing.Final[colours.Colour] = colours.Colour(0xFFFFFE)  # 0xFFFFFF is treated as no colour in embeds by Discord.
-AMARANTH_PINK: typing.Final[colours.Colour] = colours.Colour(0xF7A8B8)
+MAYA_BLUE: typing.Final[hikari.Colour] = hikari.Colour(0x55CDFC)
+WHITE: typing.Final[hikari.Colour] = hikari.Colour(0xFFFFFE)  # 0xFFFFFF is treated as no colour in embeds by Discord.
+AMARANTH_PINK: typing.Final[hikari.Colour] = hikari.Colour(0xF7A8B8)
+
+DELETE_EMOJI: typing.Final[hikari.UnicodeEmoji] = hikari.UnicodeEmoji(
+    "\N{HEAVY MULTIPLICATION X}\N{VARIATION SELECTOR-16}"
+)
+"""Emoji used for "delete" buttons."""
+
+FILE_EMOJI: typing.Final[hikari.UnicodeEmoji] = hikari.UnicodeEmoji("\N{CARD FILE BOX}\N{VARIATION SELECTOR-16}")
+"""Emoji used for "to file" buttons."""
 
 
-def embed_colour() -> colours.Colour:
+def embed_colour() -> hikari.Colour:
     return random.choices((MAYA_BLUE, WHITE, AMARANTH_PINK), (2, 1, 2))[0]

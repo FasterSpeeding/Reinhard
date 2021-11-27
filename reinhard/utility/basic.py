@@ -180,7 +180,7 @@ def delete_row(ctx: tanjun_abc.Context) -> hikari.impl.ActionRowBuilder:
     return (
         hikari.impl.ActionRowBuilder()
         .add_button(hikari.ButtonStyle.DANGER, DELETE_CUSTOM_ID + str(ctx.author.id))
-        .set_emoji("\N{HEAVY MULTIPLICATION X}\N{VARIATION SELECTOR-16}")
+        .set_emoji(constants.DELETE_EMOJI)
         .add_to_container()
     )
 
@@ -189,6 +189,6 @@ def delete_row_multiple_authors(*authors: hikari.Snowflakeish) -> hikari.impl.Ac
     return (
         hikari.impl.ActionRowBuilder()
         .add_button(hikari.ButtonStyle.DANGER, DELETE_CUSTOM_ID + ",".join(map(str, authors)))
-        .set_emoji("\N{HEAVY MULTIPLICATION X}\N{VARIATION SELECTOR-16}")
+        .set_emoji(constants.DELETE_EMOJI)
         .add_to_container()
     )

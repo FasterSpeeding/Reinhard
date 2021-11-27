@@ -50,8 +50,10 @@ __all__: list[str] = [
     # constants.py
     "constants",
     "AMARANTH_PINK",
+    "DELETE_EMOJI",
     "embed_colour",
     "FAILED_COLOUR",
+    "FILE_EMOJI",
     "MAYA_BLUE",
     "PASS_COLOUR",
     "WHITE",

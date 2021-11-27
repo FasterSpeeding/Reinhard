@@ -267,7 +267,7 @@ async def lyrics_command(
         .add_builder(response_paginator)
         .add_action_row()
         .add_button(hikari.ButtonStyle.SECONDARY, send_file)
-        .set_emoji("\N{CARD FILE BOX}\N{VARIATION SELECTOR-16}")
+        .set_emoji(utility.FILE_EMOJI)
         .add_to_container()
         .add_to_parent()
     )
