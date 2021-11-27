@@ -435,7 +435,7 @@ class ReferenceIndex:
 
 
 def _make_standard_index(top_module: types.ModuleType, nested_modules: set[types.ModuleType]) -> ReferenceIndex:
-    index = ReferenceIndex(track_builtins=False, track_3rd_party=False).index_sub_modules(
+    index = ReferenceIndex(track_builtins=True, track_3rd_party=True).index_sub_modules(
         top_module, check=lambda m: m.__name__.startswith(top_module.__name__)
     )
 
