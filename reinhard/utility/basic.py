@@ -33,10 +33,12 @@ from __future__ import annotations
 
 __all__: list[str] = [
     "basic_name_grid",
+    "chunk",
     "DELETE_CUSTOM_ID",
     "delete_button_callback",
     "delete_row",
     "delete_row_multiple_authors",
+    "embed_iterator",
     "prettify_date",
     "prettify_index",
     "raise_error",
@@ -48,11 +50,55 @@ import typing
 import hikari
 from tanjun import errors
 
+from . import constants
+
 if typing.TYPE_CHECKING:
     import datetime
+    from collections import abc as collections
 
     import yuyo
     from tanjun import abc as tanjun_abc
+
+    _ValueT = typing.TypeVar("_ValueT")
+
+
+def embed_iterator(
+    descriptions: collections.Iterator[_ValueT],
+    description_cast: collections.Callable[[_ValueT], str] = lambda v: str(v),
+    /,
+    *,
+    title: typing.Any = None,
+    url: typing.Optional[str] = None,
+    color: typing.Optional[hikari.Colorish] = None,
+    timestamp: typing.Optional[datetime.datetime] = None,
+    cast_embed: typing.Optional[collections.Callable[[hikari.Embed], hikari.Embed]] = None,
+) -> collections.Iterator[typing.Tuple[hikari.UndefinedType, hikari.Embed]]:
+    iterator = (
+        (
+            hikari.UNDEFINED,
+            hikari.Embed(
+                description=description_cast(description) if description_cast else description,
+                color=constants.embed_colour() if color is None else color,
+                title=title,
+                url=url,
+                timestamp=timestamp,
+            ).set_footer(text=f"Page {index + 1}"),
+        )
+        for index, description in enumerate(descriptions)
+    )
+    return map(lambda v: (hikari.UNDEFINED, cast_embed(v[1])), iterator) if cast_embed else iterator
+
+
+def chunk(iterator: collections.Iterator[_ValueT], max: int) -> collections.Iterator[list[_ValueT]]:
+    chunk: list[_ValueT] = []
+    for entry in iterator:
+        chunk.append(entry)
+        if len(chunk) == max:
+            yield chunk
+            chunk = []
+
+    if chunk:
+        yield chunk
 
 
 def prettify_date(date: datetime.datetime) -> str:

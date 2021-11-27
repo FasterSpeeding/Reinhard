@@ -36,6 +36,7 @@ __all__ = [
     "docs_loader",
     "external_loader",
     "moderation_loader",
+    "reference_loader",
     "sudo_loader",
     # "tags_loader",
     # "roles_loader",
@@ -46,6 +47,7 @@ from .basic import basic_loader
 from .docs import docs_loader
 from .external import external_loader
 from .moderation import moderation_loader
+from .reference_index import reference_loader
 from .sudo import sudo_loader
 
 # from .tags import tags_loader

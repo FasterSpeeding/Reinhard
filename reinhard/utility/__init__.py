@@ -34,10 +34,12 @@ __all__: list[str] = [
     # basic.py
     "basic",
     "basic_name_grid",
+    "chunk",
     "DELETE_CUSTOM_ID",
     "delete_button_callback",
     "delete_row",
     "delete_row_multiple_authors",
+    "embed_iterator",
     "prettify_date",
     "prettify_index",
     "raise_error",

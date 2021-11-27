@@ -232,14 +232,10 @@ async def lyrics_command(
     if artists := data["artists"]:
         title += " - " + " | ".join((a["name"] for a in artists))
 
-    pages = (
-        (
-            hikari.UNDEFINED,
-            hikari.Embed(description=page, colour=utility.embed_colour())
-            .set_footer(text=f"Page {index + 1}")
-            .set_author(icon=icon, name=title),
-        )
-        for page, index in yuyo.sync_paginate_string(iter(data["lyrics"].splitlines() or ["..."]))
+    pages = utility.embed_iterator(
+        yuyo.sync_paginate_string(iter(data["lyrics"].splitlines() or ["..."])),
+        lambda v: v[0],
+        cast_embed=lambda e: e.set_author(icon=icon, name=title),
     )
     response_paginator = yuyo.ComponentPaginator(
         pages,

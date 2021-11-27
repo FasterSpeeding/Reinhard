@@ -51,7 +51,7 @@ from .. import utility
 docs_group = tanjun.slash_command_group("docs", "Search relevant document sites.")
 
 _DocIndexT = typing.TypeVar("_DocIndexT", bound="DocIndex")
-_ValueT = typing.TypeVar("_ValueT")
+_SlashCommandT = typing.TypeVar("_SlashCommandT", bound=tanjun.SlashCommand)
 HIKARI_PAGES = "https://www.hikari-py.dev"
 TANJUN_PAGES = "https://tanjun.cursed.solutions"
 YUYO_PAGES = "https://yuyo.cursed.solutions"
@@ -241,18 +241,6 @@ class PdocIndex(DocIndex):
         return base_url + "/".join(entry.module_name.split(".")) + fragment
 
 
-def _chunk(iterator: collections.Iterator[_ValueT], max: int) -> collections.Iterator[list[_ValueT]]:
-    chunk: list[_ValueT] = []
-    for entry in iterator:
-        chunk.append(entry)
-        if len(chunk) == max:
-            yield chunk
-            chunk = []
-
-    if chunk:
-        yield chunk
-
-
 def _form_description(metadata: DocEntry, *, description_splitter: str = "\n") -> str:
     if metadata.doc:
         summary = metadata.doc.split(description_splitter, 1)[0]
@@ -288,17 +276,8 @@ async def _docs_command(
         results = map(
             lambda metadata: f"[{metadata.fullname}]({index.make_link(docs_url, metadata)})", index.search(path)
         )
-        iterator = (
-            (
-                hikari.UNDEFINED,
-                hikari.Embed(
-                    description="\n".join(entries),
-                    color=utility.embed_colour(),
-                    title=f"{name} Documentation",
-                    url=docs_url,
-                ).set_footer(text=f"Page {index + 1}"),
-            )
-            for index, entries in enumerate(_chunk(results, 10))
+        iterator = utility.embed_iterator(
+            utility.chunk(results, 10), lambda entries: "\n".join(entries), title=f"{name} Documentation", url=docs_url
         )
 
     else:
@@ -325,12 +304,20 @@ async def _docs_command(
     await ctx.respond("Entry not found", component=utility.delete_row(ctx))
 
 
+def _with_docs_options(command: _SlashCommandT, /) -> _SlashCommandT:
+    return (
+        command.add_str_option("path", "Optional path to query the documentation by.", default=None)
+        .add_bool_option(
+            "public",
+            "Whether other people should be able to interact with the response. Defaults to False",
+            default=False,
+        )
+        .add_bool_option("simple", "Whether this should only list links. Defaults to False.", default=False)
+    )
+
+
 @docs_group.with_command
-@tanjun.with_bool_slash_option("simple", "Whether this should only list links. Defaults to False.", default=False)
-@tanjun.with_bool_slash_option(
-    "public", "Whether other people should be able to interact with the response. Defaults to False", default=False
-)
-@tanjun.with_str_slash_option("path", "Optional path to query Hikari's documentation by.", default=None)
+@_with_docs_options
 @tanjun.as_slash_command("hikari", "Search Hikari's documentation")
 def docs_hikari_command(
     ctx: tanjun.abc.Context,
@@ -363,11 +350,7 @@ def docs_hikari_command(
 
 
 @docs_group.with_command
-@tanjun.with_bool_slash_option("simple", "Whether this should only list links. Defaults to False.", default=False)
-@tanjun.with_bool_slash_option(
-    "public", "Whether other people should be able to interact with the response. Defaults to False", default=False
-)
-@tanjun.with_str_slash_option("path", "Optional path to query Tanjun's documentation by.", default=None)
+@_with_docs_options
 @tanjun.as_slash_command("tanjun", "Search Tanjun's documentation")
 def tanjun_docs_command(
     ctx: tanjun.abc.Context,
@@ -386,11 +369,7 @@ def tanjun_docs_command(
 
 
 @docs_group.with_command
-@tanjun.with_bool_slash_option("simple", "Whether this should only list links. Defaults to False.", default=False)
-@tanjun.with_bool_slash_option(
-    "public", "Whether other people should be able to interact with the response. Defaults to False", default=False
-)
-@tanjun.with_str_slash_option("path", "Optional path to query Tanjun's documentation by.", default=None)
+@_with_docs_options
 @tanjun.as_slash_command("yuyo", "Search Yuyo's documentation")
 def yuyo_docs_command(
     ctx: tanjun.abc.Context,
