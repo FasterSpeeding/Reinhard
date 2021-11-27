@@ -205,7 +205,7 @@ async def user_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> Non
         hikari.Embed(
             colour=utility.embed_colour(),
             description=(
-                f"Bot: {user.is_system}\nSystem bot: {user.is_system}\n"
+                f"Bot: {user.is_bot}\nSystem bot: {user.is_system}\n"
                 f"Joined Discord: {tanjun.from_datetime(user.created_at)}\n\nFlags: {int(user.flags)}\n{flags}"
             ),
             title=f"{user.username}#{user.discriminator}",

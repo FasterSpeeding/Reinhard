@@ -108,6 +108,8 @@ def build_from_gateway_bot(
         )
         .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open)
         .add_client_callback(tanjun.ClientCallbackNames.CLOSING, component_client.close)
+        .add_client_callback(tanjun.ClientCallbackNames.STARTING, reaction_client.open)
+        .add_client_callback(tanjun.ClientCallbackNames.CLOSING, reaction_client.close)
         .set_type_dependency(yuyo.ReactionClient, reaction_client)
         .set_type_dependency(yuyo.ComponentClient, component_client),
         config,
