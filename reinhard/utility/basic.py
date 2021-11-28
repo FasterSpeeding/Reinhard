@@ -32,6 +32,7 @@
 from __future__ import annotations
 
 __all__: list[str] = [
+    "paginator_with_to_file",
     "basic_name_grid",
     "chunk",
     "DELETE_CUSTOM_ID",
@@ -49,6 +50,7 @@ import enum
 import typing
 
 import hikari
+import yuyo
 from tanjun import errors
 
 from . import constants
@@ -57,7 +59,6 @@ if typing.TYPE_CHECKING:
     import datetime
     from collections import abc as collections
 
-    import yuyo
     from tanjun import abc as tanjun_abc
 
     _ValueT = typing.TypeVar("_ValueT")
@@ -159,6 +160,13 @@ def basic_name_grid(flags: enum.IntFlag) -> str:  # TODO: actually deal with max
 
 
 async def delete_button_callback(ctx: yuyo.ComponentContext) -> None:
+    """Constant callback used by delete buttons.
+
+    Parameters
+    ----------
+    ctx : yuyo.ComponentContext
+        The context that triggered this delete.
+    """
     author_ids = set(map(hikari.Snowflake, ctx.interaction.custom_id.removeprefix(DELETE_CUSTOM_ID).split(",")))
     if (
         ctx.interaction.user.id in author_ids
@@ -175,9 +183,24 @@ async def delete_button_callback(ctx: yuyo.ComponentContext) -> None:
 
 
 DELETE_CUSTOM_ID = "AUTHOR_DELETE_BUTTON:"
+"""Prefix ID used for delete buttons."""
 
 
 def delete_row(ctx: tanjun_abc.Context) -> hikari.impl.ActionRowBuilder:
+    """Make an action row builder with a delete button from a context.
+
+    Parameters
+    ----------
+    ctx : tanjun.abc.Context
+        Context to use to make this row builder.
+
+        This will only allow the context's author to delete the response.
+
+    Returns
+    -------
+    hikari.impl.ActionRowBuilder
+        Action row builder with a delete button.
+    """
     return (
         hikari.impl.ActionRowBuilder()
         .add_button(hikari.ButtonStyle.DANGER, DELETE_CUSTOM_ID + str(ctx.author.id))
@@ -187,6 +210,22 @@ def delete_row(ctx: tanjun_abc.Context) -> hikari.impl.ActionRowBuilder:
 
 
 def delete_row_from_authors(*authors: hikari.Snowflakeish) -> hikari.impl.ActionRowBuilder:
+    """Make an action row builder with a delete button from a list of authors.
+
+    Parameters
+    ----------
+    *authors: hikari.Snowflakeish
+        IDs of authors who should be allowed to delete the response.
+
+        Both user IDs and role IDs are supported with no IDs indicating
+        that anybody should be able to delete the response.
+
+    Returns
+    -------
+    hikari.impl.ActionRowBuilder
+        Action row builder with a delete button.
+    """
+
     return (
         hikari.impl.ActionRowBuilder()
         .add_button(hikari.ButtonStyle.DANGER, DELETE_CUSTOM_ID + ",".join(map(str, authors)))
@@ -196,6 +235,25 @@ def delete_row_from_authors(*authors: hikari.Snowflakeish) -> hikari.impl.Action
 
 
 class FileCallback:
+    """Callback logic used for to file buttons.
+
+    .. note::
+        `files` and `make_files` are mutually exclusive.
+
+    Parameters
+    ----------
+    ctx : tanjun.abc.Context
+        The command context this is linked to.
+
+    Other Parameters
+    ----------------
+    files : collections.abc.Sequence[hikari.Resourceish]
+        Collection of the files to send when the to file button is pressed.
+    make_files : collections.abc.Callable[[], collections.abc.Sequence[hikari.Resourceish]]
+        A callback which returns the files tosend when the to file button is
+        pressed.
+    """
+
     __slots__ = ("_ctx", "_files", "_make_files", "_post_components")
 
     def __init__(
@@ -219,3 +277,51 @@ class FileCallback:
 
         files = self._make_files() if self._make_files else self._files
         await ctx.edit_initial_response(attachments=files, component=delete_row_from_authors(ctx.interaction.user.id))
+
+
+def paginator_with_to_file(
+    ctx: tanjun_abc.Context,
+    paginator: yuyo.ComponentPaginator,
+    /,
+    *,
+    files: collections.Sequence[hikari.Resourceish] = (),
+    make_files: typing.Optional[collections.Callable[[], collections.Sequence[hikari.Resourceish]]] = None,
+) -> yuyo.MultiComponentExecutor:
+    """Wrap a paginator with a "to file" button.
+
+    .. note::
+        `files` and `make_files` are mutually exclusive.
+
+    Parameters
+    ----------
+    ctx : tanjun_abc.Context
+        The context to use.
+    paginator : yuyo.ComponentPaginator
+        The paginator to wrap.
+
+    Other Parameters
+    ----------------
+    files : collections.abc.Sequence[hikari.Resourceish]
+        Collection of the files to send when the to file button is pressed.
+    make_files : typing.Optional[collections.abc.Callable[[], collections.abc.Sequence[hikari.Resourceish]]]
+        A callback which returns the files tosend when the to file button is
+        pressed.
+
+    Returns
+    -------
+    yuyo.MultiComponentExecutor
+        Executor with both the paginator and to file button.
+    """
+    return (
+        yuyo.MultiComponentExecutor()  # TODO: add authors here
+        .add_executor(paginator)
+        .add_builder(paginator)
+        .add_action_row()
+        .add_button(
+            hikari.ButtonStyle.SECONDARY,
+            FileCallback(ctx, files=files, make_files=make_files, post_components=[paginator]),
+        )
+        .set_emoji(constants.FILE_EMOJI)
+        .add_to_container()
+        .add_to_parent()
+    )

@@ -231,20 +231,8 @@ async def eval_command(
         timeout=datetime.timedelta(days=99999),  # TODO: switch to passing None here
     )
     first_response = await paginator.get_next_entry()
-    file_callback = utility.FileCallback(
-        ctx,
-        make_files=lambda: [_bytes_from_io(stdout, "stdout.py"), _bytes_from_io(stderr, "stderr.py")],
-        post_components=[paginator],
-    )
-    executor = (
-        yuyo.MultiComponentExecutor()  # TODO: add authors here
-        .add_executor(paginator)
-        .add_builder(paginator)
-        .add_action_row()
-        .add_button(hikari.ButtonStyle.SECONDARY, file_callback)
-        .set_emoji(utility.FILE_EMOJI)
-        .add_to_container()
-        .add_to_parent()
+    executor = utility.paginator_with_to_file(
+        ctx, paginator, make_files=lambda: [_bytes_from_io(stdout, "stdout.py"), _bytes_from_io(stderr, "stderr.py")]
     )
 
     assert first_response is not None

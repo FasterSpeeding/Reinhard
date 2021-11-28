@@ -590,20 +590,8 @@ async def _index_command(
         timeout=datetime.timedelta(days=99999),  # TODO: switch to passing None here
     )
 
-    executor = (
-        yuyo.MultiComponentExecutor()  # TODO: add authors here
-        .add_executor(paginator)
-        .add_builder(paginator)
-        .add_action_row()
-        .add_button(
-            hikari.ButtonStyle.SECONDARY,
-            utility.FileCallback(
-                ctx, make_files=lambda: [hikari.Bytes("\n".join(uses), "results.txt")], post_components=[paginator]
-            ),
-        )
-        .set_emoji(utility.FILE_EMOJI)
-        .add_to_container()
-        .add_to_parent()
+    executor = utility.paginator_with_to_file(
+        ctx, paginator, make_files=lambda: [hikari.Bytes("\n".join(uses), "results.txt")]
     )
 
     first_response = await paginator.get_next_entry()

@@ -358,15 +358,31 @@ async def _docs_command(
         await ctx.respond(base_url, component=utility.delete_row(ctx))
         return
 
-    results = index.search(path)
-
     if simple:
         iterator = utility.embed_iterator(
-            utility.chunk((f"[{m.fullname}]({index.make_link(docs_url, m)})" for m in results), 10),
+            utility.chunk((f"[{m.fullname}]({index.make_link(docs_url, m)})" for m in index.search(path)), 10),
             lambda entries: "\n".join(entries),
             title=f"{name} Documentation",
             url=docs_url,
         )
+        paginator = yuyo.ComponentPaginator(
+            iterator,
+            authors=(ctx.author,) if not public else (),
+            triggers=(
+                yuyo.pagination.LEFT_DOUBLE_TRIANGLE,
+                yuyo.pagination.LEFT_TRIANGLE,
+                yuyo.pagination.STOP_SQUARE,
+                yuyo.pagination.RIGHT_TRIANGLE,
+                yuyo.pagination.RIGHT_DOUBLE_TRIANGLE,
+            ),
+            timeout=datetime.timedelta(days=99999),  # TODO: switch to passing None here
+        )
+        executor = utility.paginator_with_to_file(
+            ctx,
+            paginator,
+            make_files=lambda: [hikari.Bytes("\n".join(m.fullname for m in index.search(str(path))), "results.txt")],
+        )
+        components = executor.builders
 
     else:
         iterator = (
@@ -379,42 +395,20 @@ async def _docs_command(
                     url=index.make_link(docs_url, metadata),
                 ),
             )
-            for metadata in results
+            for metadata in index.search(path)
         )
-
-    paginator = yuyo.ComponentPaginator(
-        iterator,
-        authors=(ctx.author,) if not public else (),
-        triggers=(
-            yuyo.pagination.LEFT_DOUBLE_TRIANGLE,
-            yuyo.pagination.LEFT_TRIANGLE,
-            yuyo.pagination.STOP_SQUARE,
-            yuyo.pagination.RIGHT_TRIANGLE,
-            yuyo.pagination.RIGHT_DOUBLE_TRIANGLE,
-        ),
-    )
-
-    if simple:
-        file_callback = utility.FileCallback(
-            ctx,
-            make_files=lambda: [hikari.Bytes("\n".join(m.fullname for m in results), "results.txt")],
-            post_components=[paginator],
+        executor = paginator = yuyo.ComponentPaginator(
+            iterator,
+            authors=(ctx.author,) if not public else (),
+            triggers=(
+                yuyo.pagination.LEFT_DOUBLE_TRIANGLE,
+                yuyo.pagination.LEFT_TRIANGLE,
+                yuyo.pagination.STOP_SQUARE,
+                yuyo.pagination.RIGHT_TRIANGLE,
+                yuyo.pagination.RIGHT_DOUBLE_TRIANGLE,
+            ),
         )
-        executor = (
-            yuyo.MultiComponentExecutor()  # TODO: add authors here
-            .add_executor(paginator)
-            .add_builder(paginator)
-            .add_action_row()
-            .add_button(hikari.ButtonStyle.SECONDARY, file_callback)
-            .set_emoji(utility.FILE_EMOJI)
-            .add_to_container()
-            .add_to_parent()
-        )
-        components = executor.builders
-
-    else:
-        executor = paginator
-        components = paginator.builder()
+        components = executor.builder()
 
     if first_response := await paginator.get_next_entry():
         content, embed = first_response

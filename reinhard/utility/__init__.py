@@ -32,6 +32,7 @@
 
 __all__: list[str] = [
     # basic.py
+    "paginator_with_to_file",
     "basic",
     "basic_name_grid",
     "chunk",

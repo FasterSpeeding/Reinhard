@@ -253,22 +253,9 @@ async def lyrics_command(
     assert first_response
     content, embed = first_response
 
-    file_callback = utility.FileCallback(
-        ctx,
-        make_files=lambda: [hikari.Bytes(data["lyrics"], f"{title} lyrics.txt")],
-        post_components=[paginator],
+    executor = utility.paginator_with_to_file(
+        ctx, paginator, make_files=lambda: [hikari.Bytes(data["lyrics"], f"{title} lyrics.txt")]
     )
-    executor = (
-        yuyo.MultiComponentExecutor()
-        .add_executor(paginator)
-        .add_builder(paginator)
-        .add_action_row()
-        .add_button(hikari.ButtonStyle.SECONDARY, file_callback)
-        .set_emoji(utility.FILE_EMOJI)
-        .add_to_container()
-        .add_to_parent()
-    )
-
     message = await ctx.respond(content=content, embed=embed, components=executor.builders, ensure_result=True)
     component_client.set_executor(message, executor)
 
