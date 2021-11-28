@@ -82,6 +82,14 @@ def _combine_imports(part_1: str, part_2: str) -> str:
     return f"{part_1}.{part_2}"
 
 
+def _process_relative_import(import_link: str, current_module: str) -> str:
+    dots = _RELATIVE_IMPORT_DOT_PATTERN.match(import_link)
+    assert dots, "We already know this starts with dots so this'll always pass"
+    dot_count = len(dots.group())
+    assert current_module.count(".") > (dot_count - 2), "This import is invalid, how'd you get this far?"
+    return current_module.rsplit(".", dot_count)[0] + import_link[dot_count - 1 :]
+
+
 class ReferenceIndex:
     """Index used for tracking references to types in specified modules.
 
@@ -150,18 +158,11 @@ class ReferenceIndex:
                 else:  # Case not defined by the regex
                     raise RuntimeError("This shouldn't ever happen")
 
+                if imported_from.startswith("."):
+                    imported_from = _process_relative_import(imported_from, module_name)
+
                 if self._is_tracking_3rd_party or imported_from.split(".", 1)[0] in self._top_level_modules:
                     imports[imported_name] = imported_from
-
-                elif imported_from.startswith("."):
-                    dots = _RELATIVE_IMPORT_DOT_PATTERN.match(imported_from)
-                    assert dots, "We already know this starts with dots so this'll always pass"
-                    dot_count = len(dots.group())
-                    assert module_name.count(".") > (dot_count - 2), "This import is invalid, how'd you get this far?"
-                    parent_path = module_name.rsplit(".", dot_count - 1)[0] + imported_from[dot_count - 1 :]
-
-                    if self._is_tracking_3rd_party or parent_path.split(".", 1)[0] in self._top_level_modules:
-                        imports[imported_name] = parent_path
 
         self._module_imports[module_name] = imports
         return imports
@@ -256,7 +257,7 @@ class ReferenceIndex:
                 # If we ever find a class like ABCMeta, this will error.
                 mro = obj.mro()
             except TypeError:
-                return False
+                return True
 
             # We have to traverse the class's mro to find annotations since __annotations__
             # doesn't include inherited attributes in-order to make resolving said annotations
@@ -318,13 +319,49 @@ class ReferenceIndex:
         self._top_level_modules.add(module.__name__.split(".", 1)[0])
         return self
 
+    def _walk_sub_modules(
+        self: _ReferenceIndexT,
+        start_point: str,
+        found_modules: set[str],
+        callback: collections.Callable[[types.ModuleType], typing.Any],
+        module: types.ModuleType,
+        /,
+        *,
+        check: typing.Optional[collections.Callable[[types.ModuleType], bool]],
+        children_only: bool,
+        recursive: bool,
+    ) -> _ReferenceIndexT:
+        for _, sub_module in filter(_is_public_key, inspect.getmembers(module)):
+            if isinstance(sub_module, types.ModuleType) and sub_module.__name__ not in found_modules:
+                if children_only and not sub_module.__name__.startswith(start_point):
+                    continue
+
+                found_modules.add(sub_module.__name__)
+                if check and not check(sub_module):
+                    continue
+
+                callback(sub_module)
+                if recursive:
+                    self._walk_sub_modules(
+                        start_point,
+                        found_modules,
+                        callback,
+                        sub_module,
+                        check=check,
+                        children_only=children_only,
+                        recursive=True,
+                    )
+
+        return self
+
     def index_sub_modules(
         self: _ReferenceIndexT,
         module: types.ModuleType,
         /,
         *,
         check: typing.Optional[collections.Callable[[types.ModuleType], bool]] = None,
-        recursive: bool = False,
+        children_only: bool = True,
+        recursive: bool = True,
     ) -> _ReferenceIndexT:
         """Add a module's sub-modules to the internal index of in-scope modules.
 
@@ -333,28 +370,33 @@ class ReferenceIndex:
         Parameters
         ----------
         module : types.ModuleType
-            The module to scan for sub-modules to index.
+            The module to index the sub-modules in.
 
         Other Parameters
         ----------------
         check : typing.Optional[collections.Callable[[types.ModuleType], bool]]
             If provided, a callback which will decide which sub-modules should be indexed.
             If `None` then all sub-modules will be indexed.
+        children_only : bool
+            Whether found modules which aren't direct children of the passed
+            module should be ignored.
+
+            Defaults to `True`.
         recursive : bool
-            If `True` then sub-modules of sub-modules will also be scanned and indexed.
+            If `True` then this will recursively index sub-modules instead of just
+            indexing modules directly on the provided module.
 
-            Defaults to `False`.
+            Defaults to `True`.
         """
-        for _, sub_module in filter(_is_public_key, inspect.getmembers(module)):
-            if isinstance(sub_module, types.ModuleType):
-                if check and not check(sub_module):
-                    continue
-
-                self.index_module(sub_module)
-                if recursive:
-                    self.index_sub_modules(sub_module, check=check)
-
-        return self
+        return self._walk_sub_modules(
+            module.__name__,
+            set(),
+            self.index_module,
+            module,
+            check=check,
+            children_only=children_only,
+            recursive=recursive,
+        )
 
     def scan_indexed_modules(self: _ReferenceIndexT) -> _ReferenceIndexT:
         """Scan the indexed modules for type references."""
@@ -377,6 +419,48 @@ class ReferenceIndex:
                 self._recurse_object(f"{module.__name__}.{name}", obj)
 
         return self
+
+    def scan_sub_modules(
+        self: _ReferenceIndexT,
+        module: types.ModuleType,
+        /,
+        *,
+        check: typing.Optional[collections.Callable[[types.ModuleType], bool]] = None,
+        children_only: bool = True,
+        recursive: bool = True,
+    ) -> _ReferenceIndexT:
+        """Scan sub-modules for type references.
+
+        Parameters
+        ----------
+        module : types.ModuleType
+            The module to scan sub-modules in.
+
+        Other Parameters
+        ----------------
+        check : typing.Optional[collections.Callable[[types.ModuleType], bool]]
+            If provided, a callback which will decide which sub-modules should be scanned.
+            If `None` then all sub-modules will be scanned.
+        children_only : bool
+            Whether found modules which aren't direct children of the passed
+            module should be ignored.
+
+            Defaults to `True`.
+        recursive : bool
+            If `True` then this will recursively scan sub-modules instead of just
+            scanning modules directly on the provided module.
+
+            Defaults to `True`.
+        """
+        return self._walk_sub_modules(
+            module.__name__,
+            set(),
+            self.index_module,
+            module,
+            check=check,
+            children_only=children_only,
+            recursive=recursive,
+        )
 
     def search(self, path: str, /) -> typing.Optional[tuple[str, collections.Sequence[str]]]:
         """Search for a type to get its references.
@@ -434,21 +518,24 @@ class ReferenceIndex:
         return self._object_paths_to_uses.get(path)
 
 
-def _make_standard_index(top_module: types.ModuleType, nested_modules: set[types.ModuleType]) -> ReferenceIndex:
-    index = ReferenceIndex(track_builtins=True, track_3rd_party=True).index_sub_modules(
-        top_module, check=lambda m: m.__name__.startswith(top_module.__name__)
-    )
-
-    for module in nested_modules:
-        index.index_module(module)
-
-    index.scan_indexed_modules().build_search_tree()
-    return index
-
-
-hikari_index = _make_standard_index(hikari, {hikari.api, hikari.events, hikari.impl, hikari.interactions})
-tanjun_index = _make_standard_index(tanjun, {tanjun.dependencies})
-yuyo_index = _make_standard_index(yuyo, set())
+hikari_index = (
+    ReferenceIndex(track_builtins=True, track_3rd_party=True)
+    .index_sub_modules(hikari)
+    .scan_indexed_modules()
+    .build_search_tree()
+)
+tanjun_index = (
+    ReferenceIndex(track_builtins=True, track_3rd_party=True)
+    .index_sub_modules(tanjun)
+    .scan_indexed_modules()
+    .build_search_tree()
+)
+yuyo_index = (
+    ReferenceIndex(track_builtins=True, track_3rd_party=True)
+    .index_sub_modules(yuyo)
+    .scan_indexed_modules()
+    .build_search_tree()
+)
 reference_group = tanjun.slash_command_group("find_references", "Find the references for a type in a library")
 
 
@@ -492,7 +579,7 @@ async def _index_command(
     iterator = utility.embed_iterator(
         utility.chunk(iter(uses), 10),
         lambda entries: "Note: This only searches return types and attributes.\n\n" + "\n".join(entries),
-        title=f"References found for {full_path}",
+        title=f"{len(uses)} references found for {full_path}",
     )
 
     paginator = yuyo.ComponentPaginator(
