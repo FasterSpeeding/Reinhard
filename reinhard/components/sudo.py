@@ -152,12 +152,14 @@ async def eval_python_code_no_capture(ctx: tanjun.abc.Context, component: tanjun
         eval(compiled_code, globals_)
 
 
-def _read_and_keep_index(stream: io.StringIO) -> str:
+def _bytes_from_io(
+    stream: io.StringIO, name: str, mimetype: typing.Optional[str] = "text/x-python;charset=utf-8"
+) -> hikari.Bytes:
     index = stream.tell()
     stream.seek(0)
     data = stream.read()
     stream.seek(index)
-    return data
+    return hikari.Bytes(data, name, mimetype=mimetype)
 
 
 # @tanjun.with_option("ephemeral_response", "-e", "--ephemeral", converters=bool, default=False, empty_value=True)
@@ -216,7 +218,7 @@ async def eval_command(
         )
         for text, page in string_paginator
     )
-    response_paginator = yuyo.ComponentPaginator(
+    paginator = yuyo.ComponentPaginator(
         embed_generator,
         authors=[ctx.author.id],
         triggers=(
@@ -228,25 +230,18 @@ async def eval_command(
         ),
         timeout=datetime.timedelta(days=99999),  # TODO: switch to passing None here
     )
-    first_response = await response_paginator.get_next_entry()
-
-    async def send_file(ctx_: yuyo.ComponentContext) -> None:
-        await ctx_.defer(hikari.ResponseType.DEFERRED_MESSAGE_CREATE)
-        await ctx.edit_initial_response(component=response_paginator)
-        await ctx_.edit_initial_response(
-            attachments=[
-                hikari.Bytes(_read_and_keep_index(stdout), "stdout.py", mimetype="text/x-python;charset=utf-8"),
-                hikari.Bytes(_read_and_keep_index(stderr), "stderr.py", mimetype="text/x-python;charset=utf-8"),
-            ],
-            component=utility.delete_row(ctx),
-        )
-
+    first_response = await paginator.get_next_entry()
+    file_callback = utility.FileCallback(
+        ctx,
+        make_files=lambda: [_bytes_from_io(stdout, "stdout.py"), _bytes_from_io(stderr, "stderr.py")],
+        post_components=[paginator],
+    )
     executor = (
         yuyo.MultiComponentExecutor()  # TODO: add authors here
-        .add_executor(response_paginator)
-        .add_builder(response_paginator)
+        .add_executor(paginator)
+        .add_builder(paginator)
         .add_action_row()
-        .add_button(hikari.ButtonStyle.SECONDARY, send_file)
+        .add_button(hikari.ButtonStyle.SECONDARY, file_callback)
         .set_emoji(utility.FILE_EMOJI)
         .add_to_container()
         .add_to_parent()

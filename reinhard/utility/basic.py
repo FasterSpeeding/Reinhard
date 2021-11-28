@@ -37,8 +37,9 @@ __all__: list[str] = [
     "DELETE_CUSTOM_ID",
     "delete_button_callback",
     "delete_row",
-    "delete_row_multiple_authors",
+    "delete_row_from_authors",
     "embed_iterator",
+    "FileCallback",
     "prettify_date",
     "prettify_index",
     "raise_error",
@@ -185,10 +186,36 @@ def delete_row(ctx: tanjun_abc.Context) -> hikari.impl.ActionRowBuilder:
     )
 
 
-def delete_row_multiple_authors(*authors: hikari.Snowflakeish) -> hikari.impl.ActionRowBuilder:
+def delete_row_from_authors(*authors: hikari.Snowflakeish) -> hikari.impl.ActionRowBuilder:
     return (
         hikari.impl.ActionRowBuilder()
         .add_button(hikari.ButtonStyle.DANGER, DELETE_CUSTOM_ID + ",".join(map(str, authors)))
         .set_emoji(constants.DELETE_EMOJI)
         .add_to_container()
     )
+
+
+class FileCallback:
+    __slots__ = ("_ctx", "_files", "_make_files", "_post_components")
+
+    def __init__(
+        self,
+        ctx: tanjun_abc.Context,
+        /,
+        *,
+        files: collections.Sequence[hikari.Resourceish] = (),
+        make_files: typing.Optional[collections.Callable[[], collections.Sequence[hikari.Resourceish]]] = None,
+        post_components: hikari.UndefinedOr[collections.Sequence[hikari.api.ComponentBuilder]] = hikari.UNDEFINED,
+    ) -> None:
+        self._ctx = ctx
+        self._files = files
+        self._make_files = make_files
+        self._post_components = post_components
+
+    async def __call__(self, ctx: yuyo.ComponentContext) -> None:
+        await ctx.defer(hikari.ResponseType.DEFERRED_MESSAGE_CREATE)
+        if self._post_components is not hikari.UNDEFINED:
+            await self._ctx.edit_initial_response(components=self._post_components)
+
+        files = self._make_files() if self._make_files else self._files
+        await ctx.edit_initial_response(attachments=files, component=delete_row_from_authors(ctx.interaction.user.id))

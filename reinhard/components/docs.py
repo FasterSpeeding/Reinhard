@@ -358,12 +358,14 @@ async def _docs_command(
         await ctx.respond(base_url, component=utility.delete_row(ctx))
         return
 
+    results = index.search(path)
+
     if simple:
-        results = map(
-            lambda metadata: f"[{metadata.fullname}]({index.make_link(docs_url, metadata)})", index.search(path)
-        )
         iterator = utility.embed_iterator(
-            utility.chunk(results, 10), lambda entries: "\n".join(entries), title=f"{name} Documentation", url=docs_url
+            utility.chunk((f"[{m.fullname}]({index.make_link(docs_url, m)})" for m in results), 10),
+            lambda entries: "\n".join(entries),
+            title=f"{name} Documentation",
+            url=docs_url,
         )
 
     else:
@@ -377,7 +379,7 @@ async def _docs_command(
                     url=index.make_link(docs_url, metadata),
                 ),
             )
-            for metadata in index.search(path)
+            for metadata in results
         )
 
     paginator = yuyo.ComponentPaginator(
@@ -391,10 +393,33 @@ async def _docs_command(
             yuyo.pagination.RIGHT_DOUBLE_TRIANGLE,
         ),
     )
+
+    if simple:
+        file_callback = utility.FileCallback(
+            ctx,
+            make_files=lambda: [hikari.Bytes("\n".join(m.fullname for m in results), "results.txt")],
+            post_components=[paginator],
+        )
+        executor = (
+            yuyo.MultiComponentExecutor()  # TODO: add authors here
+            .add_executor(paginator)
+            .add_builder(paginator)
+            .add_action_row()
+            .add_button(hikari.ButtonStyle.SECONDARY, file_callback)
+            .set_emoji(utility.FILE_EMOJI)
+            .add_to_container()
+            .add_to_parent()
+        )
+        components = executor.builders
+
+    else:
+        executor = paginator
+        components = paginator.builder()
+
     if first_response := await paginator.get_next_entry():
         content, embed = first_response
-        message = await ctx.respond(content=content, component=paginator, embed=embed, ensure_result=True)
-        component_client.set_executor(message, paginator)
+        message = await ctx.respond(content=content, components=components, embed=embed, ensure_result=True)
+        component_client.set_executor(message, executor)
         return
 
     await ctx.respond("Entry not found", component=utility.delete_row(ctx))

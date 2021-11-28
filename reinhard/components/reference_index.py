@@ -560,18 +560,14 @@ async def _index_command(
     public: bool,
 ):
     if absolute:
-        result = index.get_references(path)
-
-        if not result:
+        if not (result := index.get_references(path)):
             raise tanjun.CommandError(f"No references found for the absolute path `{path}`")
 
         full_path = path
         uses = result
 
     else:
-        result = index.search(path)
-
-        if not result:
+        if not (result := index.search(path)):
             raise tanjun.CommandError(f"No references found for `{path}`")
 
         full_path, uses = result
@@ -581,7 +577,6 @@ async def _index_command(
         lambda entries: "Note: This only searches return types and attributes.\n\n" + "\n".join(entries),
         title=f"{len(uses)} references found for {full_path}",
     )
-
     paginator = yuyo.ComponentPaginator(
         iterator,
         authors=(ctx.author,) if not public else (),
@@ -595,20 +590,17 @@ async def _index_command(
         timeout=datetime.timedelta(days=99999),  # TODO: switch to passing None here
     )
 
-    async def send_file(ctx_: yuyo.ComponentContext) -> None:
-        await ctx_.defer(hikari.ResponseType.DEFERRED_MESSAGE_CREATE)
-        await ctx.edit_initial_response(component=paginator)
-        await ctx_.edit_initial_response(
-            attachments=[hikari.Bytes("\n".join(uses), "results.txt")],
-            component=utility.delete_row(ctx),
-        )
-
     executor = (
         yuyo.MultiComponentExecutor()  # TODO: add authors here
         .add_executor(paginator)
         .add_builder(paginator)
         .add_action_row()
-        .add_button(hikari.ButtonStyle.SECONDARY, send_file)
+        .add_button(
+            hikari.ButtonStyle.SECONDARY,
+            utility.FileCallback(
+                ctx, make_files=lambda: [hikari.Bytes("\n".join(uses), "results.txt")], post_components=[paginator]
+            ),
+        )
         .set_emoji(utility.FILE_EMOJI)
         .add_to_container()
         .add_to_parent()

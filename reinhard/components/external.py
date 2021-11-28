@@ -237,7 +237,7 @@ async def lyrics_command(
         lambda v: v[0],
         cast_embed=lambda e: e.set_author(icon=icon, name=title),
     )
-    response_paginator = yuyo.ComponentPaginator(
+    paginator = yuyo.ComponentPaginator(
         pages,
         authors=(ctx.author.id,),
         triggers=(
@@ -249,24 +249,21 @@ async def lyrics_command(
         ),
         timeout=datetime.timedelta(days=500),  # TODO: switch to passing None here once its supported
     )
-    first_response = await response_paginator.get_next_entry()
+    first_response = await paginator.get_next_entry()
     assert first_response
     content, embed = first_response
 
-    async def send_file(ctx_: yuyo.ComponentContext) -> None:
-        await ctx_.defer(hikari.ResponseType.DEFERRED_MESSAGE_CREATE)
-        await ctx_.edit_initial_response(
-            attachment=hikari.Bytes(data["lyrics"], f"{title} lyrics.txt"), component=utility.delete_row(ctx)
-        )
-
-        await ctx.edit_initial_response(component=response_paginator)
-
+    file_callback = utility.FileCallback(
+        ctx,
+        make_files=lambda: [hikari.Bytes(data["lyrics"], f"{title} lyrics.txt")],
+        post_components=[paginator],
+    )
     executor = (
         yuyo.MultiComponentExecutor()
-        .add_executor(response_paginator)
-        .add_builder(response_paginator)
+        .add_executor(paginator)
+        .add_builder(paginator)
         .add_action_row()
-        .add_button(hikari.ButtonStyle.SECONDARY, send_file)
+        .add_button(hikari.ButtonStyle.SECONDARY, file_callback)
         .set_emoji(utility.FILE_EMOJI)
         .add_to_container()
         .add_to_parent()
@@ -362,9 +359,9 @@ async def youtube_command(
     if language is not None:
         parameters["relevanceLanguage"] = language
 
-    response_paginator = yuyo.ComponentPaginator(YoutubePaginator(session, parameters), authors=[ctx.author.id])
+    paginator = yuyo.ComponentPaginator(YoutubePaginator(session, parameters), authors=[ctx.author.id])
     try:
-        if not (first_response := await response_paginator.get_next_entry()):
+        if not (first_response := await paginator.get_next_entry()):
             # data["pageInfo"]["totalResults"] will not reliably be `0` when no data is returned and they don't use 404
             # for that so we'll just check to see if nothing is being returned.
             raise tanjun.CommandError(f"Couldn't find `{query}`.")  # TODO: delete row
@@ -379,8 +376,8 @@ async def youtube_command(
 
     else:
         content, embed = first_response
-        message = await ctx.respond(content, embed=embed, component=response_paginator, ensure_result=True)
-        component_client.set_executor(message, response_paginator)
+        message = await ctx.respond(content, embed=embed, component=paginator, ensure_result=True)
+        component_client.set_executor(message, paginator)
 
 
 @youtube_command.with_check
@@ -510,13 +507,13 @@ async def spotify_command(
     if resource_type not in SPOTIFY_RESOURCE_TYPES:
         raise tanjun.CommandError(f"{resource_type!r} is not a valid resource type")  # TODO: delete row
 
-    response_paginator = yuyo.ComponentPaginator(
+    paginator = yuyo.ComponentPaginator(
         SpotifyPaginator(spotify_auth.acquire_token, session, {"query": query, "type": resource_type}),
         authors=[ctx.author.id],
     )
 
     try:
-        if not (first_response := await response_paginator.get_next_entry()):
+        if not (first_response := await paginator.get_next_entry()):
             raise tanjun.CommandError(f"Couldn't find {resource_type}") from None  # TODO: delete row
 
     except RuntimeError as exc:
@@ -529,8 +526,8 @@ async def spotify_command(
 
     else:
         content, embed = first_response
-        message = await ctx.respond(content, embed=embed, component=response_paginator, ensure_result=True)
-        component_client.set_executor(message, response_paginator)
+        message = await ctx.respond(content, embed=embed, component=paginator, ensure_result=True)
+        component_client.set_executor(message, paginator)
 
 
 @tanjun.with_owner_check
