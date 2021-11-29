@@ -90,6 +90,24 @@ def _process_relative_import(import_link: str, current_module: str) -> str:
     return current_module.rsplit(".", dot_count)[0] + import_link[dot_count - 1 :]
 
 
+def _split_by_tl_commas(string: str) -> typing.Iterator[str]:
+    depth = 0
+    last_comma = 0
+    for index, char in enumerate(string):
+        if char == "," and depth == 0:
+            yield string[last_comma:index].strip()
+            last_comma = index + 1
+
+        elif char == "[":
+            depth += 1
+
+        elif char == "]":
+            depth -= 1
+
+    else:
+        yield string[last_comma:].strip()
+
+
 class ReferenceIndex:
     """Index used for tracking references to types in specified modules.
 
@@ -170,36 +188,18 @@ class ReferenceIndex:
         self._module_imports[module_name] = imports
         return imports
 
-    @staticmethod
-    def _split_by_tl_commas(string: str) -> typing.Iterator[str]:
-        depth = 0
-        last_comma = 0
-        for index, char in enumerate(string):
-            if char == "," and depth == 0:
-                yield string[last_comma:index].strip()
-                last_comma = index + 1
-
-            elif char == "[":
-                depth += 1
-
-            elif char == "]":
-                depth -= 1
-
-        else:
-            yield string[last_comma:].strip()
-
     def _capture_generic(self, module_name: str, path: str, annotation: str) -> bool:
         if match := _GENERIC_CAPTURE_PATTERN.fullmatch(annotation):
             outer, inner = match.groups()
             self._handle_annotation(module_name, path, outer)
 
-            for value in self._split_by_tl_commas(inner):
+            for value in _split_by_tl_commas(inner):
                 # For Callables we'll get a list of types as the generic's first argument.
                 if value.startswith("[") and value.endswith("]"):
                     value = value.removeprefix("[").removesuffix("]")
                     # ... is a wildcard type and cannot be resolved in this context.
                     if value != "...":
-                        for sub_annotation in self._split_by_tl_commas(value):
+                        for sub_annotation in _split_by_tl_commas(value):
                             self._handle_annotation(module_name, path, sub_annotation)
 
                 else:
