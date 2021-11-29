@@ -167,35 +167,95 @@ class ReferenceIndex:
         self._module_imports[module_name] = imports
         return imports
 
+    @staticmethod
+    def _split_by_tl_commas(string: str) -> typing.Iterator[str]:
+        depth = 0
+        last_comma = 0
+        for index, char in enumerate(string):
+            if char == "," and depth == 0:
+                yield string[last_comma:index].strip()
+                last_comma = index + 1
+
+            elif char == "[":
+                depth += 1
+
+            elif char == "]":
+                depth -= 1
+
+        else:
+            yield string[last_comma:].strip()
+
     def _capture_generic(self, module_name: str, path: str, annotation: str) -> bool:
         if match := _GENERIC_CAPTURE_PATTERN.fullmatch(annotation):
             outer, inner = match.groups()
             self._handle_annotation(module_name, path, outer)
-            last_index = 0
-            bracket_depth = 0
-            char = ""
 
-            for index, char in enumerate(inner):
-                if char == "[":
-                    bracket_depth += 1
-                elif char == "]":
-                    bracket_depth -= 1
+            for value in self._split_by_tl_commas(inner):
+                # For Callables we'll get a list of types as the generic's first argument.
+                if value.startswith("[") and value.endswith("]"):
+                    value = value.removeprefix("[").removesuffix("]")
+                    # ... is a wildcard type and cannot be resolved in this context.
+                    if value != "...":
+                        for sub_annotation in self._split_by_tl_commas(value):
+                            self._handle_annotation(module_name, path, sub_annotation)
 
-                elif char == "," and bracket_depth == 0:
-                    value = inner[last_index:index].strip()
-                    if value.startswith("[") and value.endswith("]"):
-                        value = value.removeprefix("[").removesuffix("]")
-
+                else:
                     self._handle_annotation(module_name, path, value)
-                    last_index = index + 1
-
-            if char != "":
-                self._handle_annotation(module_name, path, inner[last_index:].strip())
 
             return True
 
         return False
 
+    def _try_find_path_source(self, path_to: str) -> str:
+        """Try to normalize paths to a library's type.
+
+        This is used to avoid cases where some references will be pointing
+        towards `hikari.api.RESTClient` while others will be pointing
+        towards `hikari.api.rest.RESTClient` leads to the same type having
+        multiple separate reference tracking entries.
+        """
+        for splice in (path_to.rsplit(".", count) for count in range(path_to.count(".") + 1)):
+            if splice[0] in sys.modules:
+                break
+
+        else:
+            return path_to
+
+        value: typing.Any = sys.modules[splice[0]]
+        try:
+            for attribute in splice[1:]:
+                value = getattr(value, attribute)
+
+        except AttributeError:
+            return path_to
+
+        if isinstance(value, (types.MethodType, types.FunctionType, type, classmethod)):
+            resolved_path = f"{value.__module__}.{value.__qualname__}"
+
+        elif isinstance(value, property) and value.fget:
+            resolved_path = f"{value.fget.__module__}.{value.fget.__qualname__}"
+
+        else:
+            # For the most part this ignores typing generics as these will always link back to typing
+            # regardless of where the type-variable was defined.
+            return path_to
+
+        # typing and collection std generic types will never link back to
+        # where the type variable was defined andm to avoid accidentally linking
+        # to said modules when targeting a type variable, we only resolve links
+        # if the value was defined within library it was found in.
+        if path_to.startswith(resolved_path.split(".", 1)[0]):
+            # If the resolved path is private then we shouldn't use it.
+            if all(map(_is_public, resolved_path.split("."))):
+                return resolved_path
+
+        else:
+            pass  # TODO: can we special case generic types here to capture their inner-values.
+
+        return path_to
+
+    # TODO: could this ever support star imports lol
+    # This could actually try to fallback to the module's name space for that.
     def _handle_annotation(self, module_name: str, path: str, annotation: typing.Union[type[typing.Any], str]) -> None:
         if not isinstance(annotation, str):
             return
@@ -219,7 +279,7 @@ class ReferenceIndex:
             for name, import_path in module_imports.items():
                 without_key = annotation.removeprefix(name)
                 if without_key[0] == ".":
-                    self._add_use(import_path + without_key, path)
+                    self._add_use(self._try_find_path_source(import_path + without_key), path)
                     return
 
             # If we hit this statement then this indicates that the annotation
@@ -229,7 +289,8 @@ class ReferenceIndex:
                 _LOGGER.debug("Ignoring %r annotation from out-of-scope library at %r", annotation, path)
 
         else:
-            # If we got this far then it is located in the current module.
+            # If we got this far then it is either located in the current
+            # module being imported by a star import.
             self._add_use(f"{module_name}.{annotation}", path)
 
     def _recurse_object(
@@ -240,7 +301,7 @@ class ReferenceIndex:
                 self._handle_annotation(obj.__module__, f"{path}()", return_type)
                 return True
 
-        elif isinstance(obj, property):
+        elif isinstance(obj, property) and obj.fget:
             if return_type := obj.fget.__annotations__.get("return"):
                 self._handle_annotation(obj.fget.__module__, path, return_type)
                 return True

@@ -149,7 +149,7 @@ async def member_command(ctx: tanjun.abc.SlashContext, member: hikari.Interactio
         .set_thumbnail(member.avatar_url or member.default_avatar_url)
         .set_footer(text=str(member.user.id), icon=member.user.default_avatar_url)
     )
-    await ctx.respond(ctx, embed=embed, component=utility.delete_row(ctx))
+    await ctx.respond(embed=embed, component=utility.delete_row(ctx))
 
 
 # TODO: the normal role converter is limited to the current guild right?
