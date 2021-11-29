@@ -34,6 +34,7 @@ from __future__ import annotations
 
 __slots__: list[str] = ["reference_loader"]
 
+import dataclasses
 import datetime
 import inspect
 import logging
@@ -160,6 +161,8 @@ class ReferenceIndex:
         assert (
             module_path is not None
         ), "These modules were all imported using the normal import system so this should never be None"
+        # TODO: parse as ast instead to support fancy stuff like multi-line imports.
+        # TODO: do we want to explicitly work out star imports?
         with open(module_path, "r") as file:
             for match in filter(None, map(_IMPORT_CAPTURE_PATTERN.match, file.readlines())):
                 groups = match.groups()
@@ -608,33 +611,63 @@ class ReferenceIndex:
         return self._object_paths_to_uses.get(path)
 
 
-hikari_index = (
-    ReferenceIndex(track_builtins=True, track_3rd_party=True)
-    .index_module(hikari, recursive=True)
-    .scan_indexed_modules()
-    .build_search_tree()
-)
-lightbulb_index = (
-    ReferenceIndex(track_builtins=True, track_3rd_party=True)
-    .index_module(lightbulb, recursive=True)
-    .index_module(hikari, recursive=True)
-    .scan_module(lightbulb, recursive=True)
-    .build_search_tree()
-)
-tanjun_index = (
-    ReferenceIndex(track_builtins=True, track_3rd_party=True)
-    .index_module(tanjun, recursive=True)
-    .index_module(hikari, recursive=True)
-    .scan_module(tanjun, recursive=True)
-    .build_search_tree()
-)
-yuyo_index = (
-    ReferenceIndex(track_builtins=True, track_3rd_party=True)
-    .index_module(yuyo, recursive=True)
-    .scan_indexed_modules()
-    .build_search_tree()
-)
 reference_group = tanjun.slash_command_group("references", "Find the references for a type in a library")
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class _IndexCommand:
+    index: ReferenceIndex
+    library_repr: str
+
+    async def __call__(
+        self,
+        ctx: tanjun.abc.Context,
+        path: str,
+        absolute: bool,
+        public: bool,
+        component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
+    ) -> None:
+        if absolute:
+            if not (result := self.index.get_references(path)):
+                raise tanjun.CommandError(f"No references found for the absolute path `{path}`")
+
+            full_path = path
+            uses = result
+
+        else:
+            if not (result := self.index.search(path)):
+                raise tanjun.CommandError(f"No references found for `{path}`")
+
+            full_path, uses = result
+
+        iterator = utility.embed_iterator(
+            utility.chunk(iter(uses), 10),
+            lambda entries: "Note: This only searches return types and attributes.\n\n" + "\n".join(entries),
+            title=f"{len(uses)} references found for {full_path}",
+            cast_embed=lambda e: e.set_footer(text=self.library_repr),
+        )
+        paginator = yuyo.ComponentPaginator(
+            iterator,
+            authors=(ctx.author,) if not public else (),
+            triggers=(
+                yuyo.pagination.LEFT_DOUBLE_TRIANGLE,
+                yuyo.pagination.LEFT_TRIANGLE,
+                yuyo.pagination.STOP_SQUARE,
+                yuyo.pagination.RIGHT_TRIANGLE,
+                yuyo.pagination.RIGHT_DOUBLE_TRIANGLE,
+            ),
+            timeout=datetime.timedelta(days=99999),  # TODO: switch to passing None here
+        )
+
+        executor = utility.paginator_with_to_file(
+            ctx, paginator, make_files=lambda: [hikari.Bytes("\n".join(uses), "results.txt")]
+        )
+
+        first_response = await paginator.get_next_entry()
+        assert first_response
+        content, embed = first_response
+        message = await ctx.respond(content=content, components=executor.builders, embed=embed, ensure_result=True)
+        component_client.set_executor(message, executor)
 
 
 def _with_index_command_options(command: _SlashCommandT, /) -> _SlashCommandT:
@@ -649,110 +682,75 @@ def _with_index_command_options(command: _SlashCommandT, /) -> _SlashCommandT:
     )
 
 
-async def _index_command(
-    ctx: tanjun.abc.Context,
-    component_client: yuyo.ComponentClient,
-    index: ReferenceIndex,
-    library_repr: str,
-    path: str,
-    absolute: bool,
-    public: bool,
-):
-    if absolute:
-        if not (result := index.get_references(path)):
-            raise tanjun.CommandError(f"No references found for the absolute path `{path}`")
-
-        full_path = path
-        uses = result
-
-    else:
-        if not (result := index.search(path)):
-            raise tanjun.CommandError(f"No references found for `{path}`")
-
-        full_path, uses = result
-
-    iterator = utility.embed_iterator(
-        utility.chunk(iter(uses), 10),
-        lambda entries: "Note: This only searches return types and attributes.\n\n" + "\n".join(entries),
-        title=f"{len(uses)} references found for {full_path}",
-        cast_embed=lambda e: e.set_footer(text=library_repr),
+reference_group.add_command(
+    _with_index_command_options(
+        tanjun.SlashCommand(
+            _IndexCommand(
+                ReferenceIndex(track_builtins=True, track_3rd_party=True)
+                .index_module(hikari, recursive=True)
+                .scan_indexed_modules()
+                .build_search_tree(),
+                f"Hikari v{hikari.__version__}",
+            ),
+            "hikari",
+            "Find the references for types in hikari",
+        )
     )
-    paginator = yuyo.ComponentPaginator(
-        iterator,
-        authors=(ctx.author,) if not public else (),
-        triggers=(
-            yuyo.pagination.LEFT_DOUBLE_TRIANGLE,
-            yuyo.pagination.LEFT_TRIANGLE,
-            yuyo.pagination.STOP_SQUARE,
-            yuyo.pagination.RIGHT_TRIANGLE,
-            yuyo.pagination.RIGHT_DOUBLE_TRIANGLE,
-        ),
-        timeout=datetime.timedelta(days=99999),  # TODO: switch to passing None here
+)
+
+
+reference_group.add_command(
+    _with_index_command_options(
+        tanjun.SlashCommand(
+            _IndexCommand(
+                ReferenceIndex(track_builtins=True, track_3rd_party=True)
+                .index_module(lightbulb, recursive=True)
+                .index_module(hikari, recursive=True)
+                .scan_module(lightbulb, recursive=True)
+                .build_search_tree(),
+                f"Lightbulb v{lightbulb.__version__}",
+            ),
+            "lightbulb",
+            "Find the references for types in lightbulb",
+        )
     )
+)
 
-    executor = utility.paginator_with_to_file(
-        ctx, paginator, make_files=lambda: [hikari.Bytes("\n".join(uses), "results.txt")]
+
+reference_group.add_command(
+    _with_index_command_options(
+        tanjun.SlashCommand(
+            _IndexCommand(
+                ReferenceIndex(track_builtins=True, track_3rd_party=True)
+                .index_module(tanjun, recursive=True)
+                .index_module(hikari, recursive=True)
+                .scan_module(tanjun, recursive=True)
+                .build_search_tree(),
+                f"Tanjun v{tanjun.__version__}",
+            ),
+            "tanjun",
+            "Find the references for types in Tanjun",
+        )
     )
-
-    first_response = await paginator.get_next_entry()
-    assert first_response
-    content, embed = first_response
-    message = await ctx.respond(content=content, components=executor.builders, embed=embed, ensure_result=True)
-    component_client.set_executor(message, executor)
+)
 
 
-@reference_group.with_command
-@_with_index_command_options
-@tanjun.as_slash_command("hikari", "Find the references for types in hikari")
-def hikari_command(
-    ctx: tanjun.abc.Context,
-    path: str,
-    absolute: bool,
-    public: bool,
-    component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
-) -> collections.Awaitable[None]:
-    return _index_command(ctx, component_client, hikari_index, f"Hikari v{hikari.__version__}", path, absolute, public)
-
-
-@reference_group.with_command
-@_with_index_command_options
-@tanjun.as_slash_command("lightbulb", "Find the references for types in lightbulb")
-def lightbulb_command(
-    ctx: tanjun.abc.Context,
-    path: str,
-    absolute: bool,
-    public: bool,
-    component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
-) -> collections.Awaitable[None]:
-    return _index_command(
-        ctx, component_client, lightbulb_index, f"Lightbulb v{lightbulb.__version__}", path, absolute, public
+reference_group.add_command(
+    _with_index_command_options(
+        tanjun.SlashCommand(
+            _IndexCommand(
+                ReferenceIndex(track_builtins=True, track_3rd_party=True)
+                .index_module(yuyo, recursive=True)
+                .index_module(hikari, recursive=True)
+                .scan_module(yuyo, recursive=True)
+                .build_search_tree(),
+                f"Yuyo v{yuyo.__version__}",
+            ),
+            "yuyo",
+            "Find the references for a Yuyo type in Yuyo",
+        )
     )
-
-
-@reference_group.with_command
-@_with_index_command_options
-@tanjun.as_slash_command("tanjun", "Find the references for types in Tanjun")
-def tanjun_command(
-    ctx: tanjun.abc.Context,
-    path: str,
-    absolute: bool,
-    public: bool,
-    component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
-) -> collections.Awaitable[None]:
-    return _index_command(ctx, component_client, tanjun_index, f"Tanjun v{tanjun.__version__}", path, absolute, public)
-
-
-@reference_group.with_command
-@_with_index_command_options
-@tanjun.as_slash_command("yuyo", "Find the references for a Yuyo type in Yuyo")
-def yuyo_command(
-    ctx: tanjun.abc.Context,
-    path: str,
-    absolute: bool,
-    public: bool,
-    component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
-) -> collections.Awaitable[None]:
-    return _index_command(ctx, component_client, yuyo_index, f"Yuyo v{yuyo.__version__}", path, absolute, public)
+)
 
 
 reference_loader = tanjun.Component(name="reference").load_from_scope().make_loader()
