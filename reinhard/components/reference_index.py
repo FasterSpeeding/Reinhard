@@ -143,7 +143,8 @@ class ReferenceIndex:
 
     def _add_use(self, path: str, use: str) -> None:
         if uses := self._object_paths_to_uses.get(path):
-            uses.append(use)
+            if use not in uses:
+                uses.append(use)
 
         else:
             self._object_paths_to_uses[path] = [use]
