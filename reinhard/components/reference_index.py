@@ -102,6 +102,7 @@ class ReferenceIndex:
     """
 
     __slots__ = (
+        # "_aliases",
         "_is_tracking_3rd_party",
         "_is_tracking_builtins",
         "_indexed_modules",
@@ -112,6 +113,8 @@ class ReferenceIndex:
     )
 
     def __init__(self, *, track_builtins: bool = False, track_3rd_party: bool = False) -> None:
+        # TODO: alias resolution?
+        # self._aliases: dict[str, str] = {}
         self._is_tracking_3rd_party = track_3rd_party
         self._is_tracking_builtins = track_builtins
         self._indexed_modules: dict[str, types.ModuleType] = {}
@@ -244,18 +247,21 @@ class ReferenceIndex:
         # where the type variable was defined andm to avoid accidentally linking
         # to said modules when targeting a type variable, we only resolve links
         # if the value was defined within library it was found in.
-        if path_to.startswith(resolved_path.split(".", 1)[0]):
+        library = resolved_path.split(".", 1)[0]
+        if path_to.startswith(library) or library in self._top_level_modules:
             # If the resolved path is private then we shouldn't use it.
             if all(map(_is_public, resolved_path.split("."))):
+                # TODO: alias resolution?
+                # if resolved_path != path_to:
+                #     self._aliases[path_to] = resolved_path
+
                 return resolved_path
 
         else:
-            pass  # TODO: can we special case generic types here to capture their inner-values.
+            pass  # TODO: can we special case generic types here to capture their inner-values?
 
         return path_to
 
-    # TODO: could this ever support star imports lol
-    # This could actually try to fallback to the module's name space for that.
     def _handle_annotation(self, module_name: str, path: str, annotation: typing.Union[type[typing.Any], str]) -> None:
         if not isinstance(annotation, str):
             return
@@ -291,27 +297,37 @@ class ReferenceIndex:
         else:
             # If we got this far then it is either located in the current
             # module being imported by a star import.
-            self._add_use(f"{module_name}.{annotation}", path)
 
-    def _recurse_object(
-        self, path: str, obj: typing.Union[types.MethodType, types.FunctionType, type[typing.Any]]
+            # _try_find_path_source will resolve star imports if the module
+            # and import are both within scope.
+            self._add_use(self._try_find_path_source(f"{module_name}.{annotation}"), path)
+
+    def _recurse_module(
+        self,
+        obj: typing.Union[types.MethodType, types.FunctionType, type[typing.Any]],
+        /,
+        *,
+        path: typing.Optional[str] = None,
     ) -> bool:
         if isinstance(obj, (types.MethodType, types.FunctionType, classmethod)):
             if return_type := obj.__annotations__.get("return"):
-                self._handle_annotation(obj.__module__, f"{path}()", return_type)
+                path = f"{path}()" if path else f"{obj.__module__}.{obj.__qualname__}()"
+                self._handle_annotation(obj.__module__, path, return_type)
                 return True
 
         elif isinstance(obj, property) and obj.fget:
             if return_type := obj.fget.__annotations__.get("return"):
+                path = path or f"{obj.fget.__module__}.{obj.fget.__qualname__}"
                 self._handle_annotation(obj.fget.__module__, path, return_type)
                 return True
 
         elif isinstance(obj, type):
+            path = path or f"{obj.__module__}.{obj.__qualname__}"
             # Used to track attributes which'd been overwritten through inheritance.
             found_attributes: set[str] = set()
 
             for name, attribute in filter(_is_public_key, inspect.getmembers(obj)):
-                if self._recurse_object(f"{path}.{name}", attribute):
+                if self._recurse_module(attribute, path=f"{path}.{name}"):
                     found_attributes.add(attribute)
 
             try:
@@ -366,7 +382,9 @@ class ReferenceIndex:
 
         return self
 
-    def index_module(self: _ReferenceIndexT, module: types.ModuleType, /) -> _ReferenceIndexT:
+    def index_module(
+        self: _ReferenceIndexT, module: types.ModuleType, /, *, recursive: bool = False
+    ) -> _ReferenceIndexT:
         """Add a module to the internal index of in-scope modules.
 
         Any types declared in these modules will have their uses tracked.
@@ -378,6 +396,10 @@ class ReferenceIndex:
         """
         self._indexed_modules[module.__name__] = module
         self._top_level_modules.add(module.__name__.split(".", 1)[0])
+
+        if recursive:
+            return self.index_sub_modules(module)
+
         return self
 
     def _walk_sub_modules(
@@ -466,7 +488,9 @@ class ReferenceIndex:
 
         return self
 
-    def scan_module(self: _ReferenceIndexT, module: types.ModuleType, /) -> _ReferenceIndexT:
+    def scan_module(
+        self: _ReferenceIndexT, module: types.ModuleType, /, *, recursive: bool = False
+    ) -> _ReferenceIndexT:
         """Scan a module for type references.
 
         Parameters
@@ -475,9 +499,12 @@ class ReferenceIndex:
             The module to scan for type references.
         """
         module_members = dict[str, typing.Any](filter(_is_public_key, inspect.getmembers(module)))
-        for name, obj in module_members.items():
+        for _, obj in module_members.items():
             if isinstance(obj, (types.MethodType, types.FunctionType, type)):
-                self._recurse_object(f"{module.__name__}.{name}", obj)
+                self._recurse_module(obj)
+
+        if recursive:
+            self.scan_sub_modules(module)
 
         return self
 
@@ -516,7 +543,7 @@ class ReferenceIndex:
         return self._walk_sub_modules(
             module.__name__,
             set(),
-            self.index_module,
+            self.scan_module,
             module,
             check=check,
             children_only=children_only,
@@ -581,19 +608,20 @@ class ReferenceIndex:
 
 hikari_index = (
     ReferenceIndex(track_builtins=True, track_3rd_party=True)
-    .index_sub_modules(hikari)
+    .index_module(hikari, recursive=True)
     .scan_indexed_modules()
     .build_search_tree()
 )
 tanjun_index = (
     ReferenceIndex(track_builtins=True, track_3rd_party=True)
-    .index_sub_modules(tanjun)
-    .scan_indexed_modules()
+    .index_module(tanjun, recursive=True)
+    .index_module(hikari, recursive=True)
+    .scan_module(tanjun, recursive=True)
     .build_search_tree()
 )
 yuyo_index = (
     ReferenceIndex(track_builtins=True, track_3rd_party=True)
-    .index_sub_modules(yuyo)
+    .index_module(yuyo, recursive=True)
     .scan_indexed_modules()
     .build_search_tree()
 )
