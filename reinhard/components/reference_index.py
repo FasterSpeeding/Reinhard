@@ -46,6 +46,7 @@ from collections import abc as collections
 import hikari
 import hikari.events
 import hikari.interactions
+import lightbulb
 import tanjun
 import yuyo
 
@@ -613,6 +614,13 @@ hikari_index = (
     .scan_indexed_modules()
     .build_search_tree()
 )
+lightbulb_index = (
+    ReferenceIndex(track_builtins=True, track_3rd_party=True)
+    .index_module(lightbulb, recursive=True)
+    .index_module(hikari, recursive=True)
+    .scan_module(lightbulb, recursive=True)
+    .build_search_tree()
+)
 tanjun_index = (
     ReferenceIndex(track_builtins=True, track_3rd_party=True)
     .index_module(tanjun, recursive=True)
@@ -626,7 +634,7 @@ yuyo_index = (
     .scan_indexed_modules()
     .build_search_tree()
 )
-reference_group = tanjun.slash_command_group("find_references", "Find the references for a type in a library")
+reference_group = tanjun.slash_command_group("references", "Find the references for a type in a library")
 
 
 def _with_index_command_options(command: _SlashCommandT, /) -> _SlashCommandT:
@@ -645,6 +653,7 @@ async def _index_command(
     ctx: tanjun.abc.Context,
     component_client: yuyo.ComponentClient,
     index: ReferenceIndex,
+    library_repr: str,
     path: str,
     absolute: bool,
     public: bool,
@@ -666,6 +675,7 @@ async def _index_command(
         utility.chunk(iter(uses), 10),
         lambda entries: "Note: This only searches return types and attributes.\n\n" + "\n".join(entries),
         title=f"{len(uses)} references found for {full_path}",
+        cast_embed=lambda e: e.set_footer(text=library_repr),
     )
     paginator = yuyo.ComponentPaginator(
         iterator,
@@ -693,7 +703,7 @@ async def _index_command(
 
 @reference_group.with_command
 @_with_index_command_options
-@tanjun.as_slash_command("hikari", "Find the references for a hikari type in hikari")
+@tanjun.as_slash_command("hikari", "Find the references for types in hikari")
 def hikari_command(
     ctx: tanjun.abc.Context,
     path: str,
@@ -701,12 +711,27 @@ def hikari_command(
     public: bool,
     component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
 ) -> collections.Awaitable[None]:
-    return _index_command(ctx, component_client, hikari_index, path, absolute, public)
+    return _index_command(ctx, component_client, hikari_index, f"Hikari v{hikari.__version__}", path, absolute, public)
 
 
 @reference_group.with_command
 @_with_index_command_options
-@tanjun.as_slash_command("tanjun", "Find the references for a Tanjun type in Tanjun")
+@tanjun.as_slash_command("lightbulb", "Find the references for types in lightbulb")
+def lightbulb_command(
+    ctx: tanjun.abc.Context,
+    path: str,
+    absolute: bool,
+    public: bool,
+    component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
+) -> collections.Awaitable[None]:
+    return _index_command(
+        ctx, component_client, lightbulb_index, f"Lightbulb v{lightbulb.__version__}", path, absolute, public
+    )
+
+
+@reference_group.with_command
+@_with_index_command_options
+@tanjun.as_slash_command("tanjun", "Find the references for types in Tanjun")
 def tanjun_command(
     ctx: tanjun.abc.Context,
     path: str,
@@ -714,7 +739,7 @@ def tanjun_command(
     public: bool,
     component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
 ) -> collections.Awaitable[None]:
-    return _index_command(ctx, component_client, tanjun_index, path, absolute, public)
+    return _index_command(ctx, component_client, tanjun_index, f"Tanjun v{tanjun.__version__}", path, absolute, public)
 
 
 @reference_group.with_command
@@ -727,7 +752,7 @@ def yuyo_command(
     public: bool,
     component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
 ) -> collections.Awaitable[None]:
-    return _index_command(ctx, component_client, yuyo_index, path, absolute, public)
+    return _index_command(ctx, component_client, yuyo_index, f"Yuyo v{yuyo.__version__}", path, absolute, public)
 
 
 reference_loader = tanjun.Component(name="reference").load_from_scope().make_loader()
