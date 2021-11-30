@@ -683,8 +683,8 @@ def _with_index_message_options(command: _MessageCommandT) -> _MessageCommandT:
     return command.set_parser(
         tanjun.ShlexParser()
         .add_argument("path")
-        .add_option("absolute", "--absolute", "-a", default=False, empty_value=True)
-        .add_option("public", "--public", "-p", default=False, empty_value=True)
+        .add_option("absolute", "--absolute", "-a", converters=tanjun.to_bool, default=False, empty_value=True)
+        .add_option("public", "--public", "-p", converters=tanjun.to_bool, default=False, empty_value=True)
     )
 
 
@@ -752,7 +752,7 @@ tanjun_command = reference_group.with_command(
         )
     )
 )
-tanjun_command = _with_index_message_options(tanjun.MessageCommand(lightbulb_command.callback, "references tanjun"))
+tanjun_command = _with_index_message_options(tanjun.MessageCommand(tanjun_command.callback, "references tanjun"))
 
 
 yuyo_command = reference_group.with_command(

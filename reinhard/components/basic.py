@@ -122,6 +122,17 @@ _about_lines: list[tuple[str, collections.Callable[[hikari.api.Cache], int]]] = 
 ]
 
 
+def cache_check(ctx: tanjun.abc.Context) -> bool:
+    if ctx.cache:
+        return True
+
+    # TODO: delete row
+    raise tanjun.CommandError("Client is cache-less")
+
+
+@tanjun.with_check(cache_check)
+@tanjun.as_message_command("cache")
+@tanjun.with_check(cache_check)
 @tanjun.as_slash_command("cache", "Get general information about this bot's cache.")
 async def cache_command(
     ctx: tanjun.abc.Context,
@@ -170,15 +181,6 @@ async def cache_command(
     )
 
     await ctx.respond(content=f"{storage_time_taken * 1_000:.4g} ms", embed=embed, component=utility.delete_row(ctx))
-
-
-@cache_command.with_check
-def _(ctx: tanjun.abc.Context) -> bool:
-    if ctx.cache:
-        return True
-
-    # TODO: delete row
-    raise tanjun.CommandError("Client is cache-less")
 
 
 @tanjun.as_message_command("invite")

@@ -162,9 +162,11 @@ def _bytes_from_io(
     return hikari.Bytes(data, name, mimetype=mimetype)
 
 
-# @tanjun.with_option("ephemeral_response", "-e", "--ephemeral", converters=bool, default=False, empty_value=True)
-@tanjun.with_option("suppress_response", "-s", "--suppress", converters=bool, default=False, empty_value=True)
-@tanjun.with_option("file_output", "-f", "--file-out", "--file", converters=bool, default=False, empty_value=True)
+# @tanjun.with_option("ephemeral_response", "-e", "--ephemeral", converters=tanjun.to_bool, default=False, empty_value=True)
+@tanjun.with_option("suppress_response", "-s", "--suppress", converters=tanjun.to_bool, default=False, empty_value=True)
+@tanjun.with_option(
+    "file_output", "-f", "--file-out", "--file", converters=tanjun.to_bool, default=False, empty_value=True
+)
 @tanjun.with_parser
 @tanjun.as_message_command("eval", "exec")
 async def eval_command(

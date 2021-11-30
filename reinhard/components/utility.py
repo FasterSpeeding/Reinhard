@@ -41,6 +41,9 @@ import tanjun
 from .. import utility
 
 
+@tanjun.with_option("role", "--role", "-r", converters=tanjun.to_role, default=None)
+@tanjun.with_argument("color", converters=tanjun.to_color, default=None)
+@tanjun.as_message_command("color", "colour")
 @tanjun.with_role_slash_option("role", "A role to get the colour for.", default=None)
 @tanjun.with_str_slash_option(
     "color", "the hex/int literal representation of a colour to show", converters=tanjun.to_colour, default=None
@@ -85,6 +88,9 @@ async def colour_command(ctx: tanjun.abc.Context, color: hikari.Colour | None, r
 #         ...  # TODO: Implement this to allow getting the embeds from a suppressed message.
 
 
+@tanjun.with_guild_check
+@tanjun.with_argument("member", converters=tanjun.to_member, default=None)
+@tanjun.as_message_command("member")
 @tanjun.with_guild_check
 @tanjun.with_member_slash_option(
     "member",
@@ -152,6 +158,9 @@ async def member_command(ctx: tanjun.abc.SlashContext, member: hikari.Interactio
     await ctx.respond(embed=embed, component=utility.delete_row(ctx))
 
 
+@tanjun.with_guild_check
+@tanjun.with_argument("role", converters=tanjun.to_role)
+@tanjun.as_message_command("role")
 # TODO: the normal role converter is limited to the current guild right?
 @tanjun.with_role_slash_option("role", "The role to get information about.")
 @tanjun.with_guild_check
@@ -162,6 +171,8 @@ async def role_command(ctx: tanjun.abc.Context, role: hikari.Role) -> None:
     Arguments:
         * role: Mention or ID of the role to get information about.
     """
+    if role.guild_id != ctx.guild_id:
+        raise tanjun.CommandError("Role not found")
 
     permissions = utility.basic_name_grid(role.permissions) or "None"
     role_information = [f"Created: {tanjun.from_datetime(role.created_at)}", f"Position: {role.position}"]
@@ -186,6 +197,8 @@ async def role_command(ctx: tanjun.abc.Context, role: hikari.Role) -> None:
     await ctx.respond(embed=embed, component=utility.delete_row(ctx))
 
 
+@tanjun.with_argument("user", converters=tanjun.to_user)
+@tanjun.as_message_command("user")
 @tanjun.with_user_slash_option(
     "user", "The user to target. If left as None then this will target the command's author.", default=None
 )
@@ -217,6 +230,8 @@ async def user_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> Non
     await ctx.respond(embed=embed, component=utility.delete_row(ctx))
 
 
+@tanjun.with_argument("user", converters=tanjun.to_user, default=None)
+@tanjun.as_message_command("avatar")
 @tanjun.with_user_slash_option(
     "user", "User to get the avatar for. If not provided then this returns the current user's avatar.", default=None
 )
@@ -236,16 +251,17 @@ async def avatar_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> N
     await ctx.respond(embed=embed, component=utility.delete_row(ctx))
 
 
+@tanjun.with_option("channel", "-c", "--channel", converters=tanjun.parse_channel_id, default=None)
+@tanjun.with_argument("message", converters=tanjun.to_snowflake)
+@tanjun.as_message_command("mentions")
 # TODO: check if the user can access the provided channel
 @tanjun.with_channel_slash_option("channel", "The channel the message is in.", default=None)
-@tanjun.with_str_slash_option(
-    "message_id", "ID of the message to get the ping list for.", converters=(hikari.Snowflake,)
-)
+@tanjun.with_str_slash_option("message", "ID of the message to get the ping list for.", converters=tanjun.to_snowflake)
 @tanjun.as_slash_command("mentions", "Get a list of the users who were pinged by a message.")
 async def mentions_command(
     ctx: tanjun.abc.Context,
     message_id: hikari.Snowflake,
-    channel: hikari.PartialChannel | None,
+    channel: hikari.SnowflakeishOr[hikari.PartialChannel] | None,
 ) -> None:
     """Get a list of the users who were pinged by a message.
 
@@ -256,7 +272,7 @@ async def mentions_command(
         * channel: ID or mention of the channel the message is in.
             If this isn't provided then the command will assume the message is in the current channel.
     """
-    channel_id = channel.id if channel else ctx.channel_id
+    channel_id = hikari.Snowflake(channel) if channel else ctx.channel_id
     message = await ctx.rest.fetch_message(channel_id, message_id)
     mentions: str | None = None
     if message.mentions.users:
@@ -269,6 +285,9 @@ async def mentions_command(
     )
 
 
+@tanjun.with_guild_check
+@tanjun.with_argument("name")
+@tanjun.as_message_command("members")
 @tanjun.with_guild_check
 @tanjun.with_str_slash_option("name", "Greedy argument of the name to search for.")
 @tanjun.as_slash_command("members", "Search for a member in the current guild.")
@@ -301,7 +320,7 @@ def _format_char_line(char: str, to_file: bool) -> str:
     return f"`\\U{code:08x}`/`{char}`: {name} <http://www.fileformat.info/info/unicode/char/{code:x}>"
 
 
-@tanjun.with_option("file", "--file", "-f", default=False, empty_value=True)
+@tanjun.with_option("file", "--file", "-f", converters=tanjun.to_bool, default=False, empty_value=True)
 @tanjun.with_argument("characters")
 @tanjun.as_message_command("char")
 @tanjun.with_bool_slash_option(

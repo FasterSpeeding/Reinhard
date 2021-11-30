@@ -436,8 +436,8 @@ def _with_docs_message_options(command: _MessageCommandT, /) -> _MessageCommandT
     return command.set_parser(
         tanjun.ShlexParser()
         .add_argument("path", default=None)
-        .add_option("public", "-p", "--public", default=False, empty_value=True)
-        .add_option("simple", "-s", "--simple", default=False, empty_value=True)
+        .add_option("public", "-p", "--public", converters=tanjun.to_bool, default=False, empty_value=True)
+        .add_option("simple", "-s", "--simple", converters=tanjun.to_bool, default=False, empty_value=True)
     )
 
 

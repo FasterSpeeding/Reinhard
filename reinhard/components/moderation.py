@@ -46,7 +46,8 @@ import tanjun
 from .. import utility
 
 MAX_MESSAGE_BULK_DELETE = datetime.timedelta(weeks=2) - datetime.timedelta(minutes=2)
-_SlashCommandT = typing.TypeVar("_SlashCommandT", bound=tanjun.SlashCommand)
+_MessageCommandT = typing.TypeVar("_MessageCommandT", bound=tanjun.MessageCommand[typing.Any])
+_SlashCommandT = typing.TypeVar("_SlashCommandT", bound=tanjun.SlashCommand[typing.Any])
 
 
 def iter_messages(
@@ -115,7 +116,7 @@ def iter_messages(
     return iterator
 
 
-def _with_message_filter_options(command: _SlashCommandT, /) -> _SlashCommandT:
+def _with_filter_slash_options(command: _SlashCommandT, /) -> _SlashCommandT:
     return (
         command.add_int_option("count", "The amount of entities to target.", default=None)  # TODO: max, min
         .add_str_option(
@@ -138,23 +139,45 @@ def _with_message_filter_options(command: _SlashCommandT, /) -> _SlashCommandT:
     )
 
 
+def _with_filter_message_options(command: _MessageCommandT, /) -> _MessageCommandT:
+    return command.set_parser(
+        tanjun.ShlexParser()
+        .add_option("count", "-c", "--count", converters=int, default=None)
+        .add_option("regex", "-r", "--regex", converters=re.compile, default=None)
+        .add_option("has_embeds", "-e", "--has-embeds", default=False, converters=tanjun.to_bool, empty_value=True)
+        .add_option(
+            "has_attachments", "-a", "--has-attachments", default=False, converters=tanjun.to_bool, empty_value=True
+        )
+        .add_option("human_only", "-u", "--human-only", default=False, converters=tanjun.to_bool, empty_value=True)
+        .add_option("bot_only", "-b", "--bot-only", default=False, converters=tanjun.to_bool, empty_value=True)
+        .add_option("before", "-B", "--before", converters=tanjun.to_snowflake, default=None)
+        .add_option("after", "-A", "--after", converters=tanjun.to_snowflake, default=None)
+    )
+
+
 def _now() -> datetime.datetime:
     return datetime.datetime.now(tz=datetime.timezone.utc)
 
 
-@tanjun.with_own_permission_check(
+_CLEAR_PERMS = (
     hikari.Permissions.MANAGE_MESSAGES | hikari.Permissions.VIEW_CHANNEL | hikari.Permissions.READ_MESSAGE_HISTORY
 )
-@tanjun.with_author_permission_check(
-    hikari.Permissions.MANAGE_MESSAGES | hikari.Permissions.VIEW_CHANNEL | hikari.Permissions.READ_MESSAGE_HISTORY
-)
+
+
+@tanjun.with_own_permission_check(_CLEAR_PERMS)
+@tanjun.with_author_permission_check(_CLEAR_PERMS)
+@tanjun.with_multi_option("users", "--user", "-u", converters=tanjun.parse_user_id, default=())
+@_with_filter_message_options
+@tanjun.as_message_command("clear")
+@tanjun.with_own_permission_check(_CLEAR_PERMS)
+@tanjun.with_author_permission_check(_CLEAR_PERMS)
 @tanjun.with_str_slash_option(
     "users",
     "Users to delete messages for",
     converters=lambda value: list(map(tanjun.conversion.parse_user_id, value.split())),
     default=None,
 )
-@_with_message_filter_options
+@_with_filter_slash_options
 @tanjun.as_slash_command("clear", "Clear new messages from chat as a moderator.")
 async def clear_command(
     ctx: tanjun.abc.Context, after: hikari.Snowflake | None, before: hikari.Snowflake | None, **kwargs: typing.Any
@@ -344,6 +367,12 @@ class _MultiBanner:
             return "No members were banned", hikari.UNDEFINED
 
 
+@tanjun.with_author_permission_check(hikari.Permissions.BAN_MEMBERS)
+@tanjun.with_own_permission_check(hikari.Permissions.BAN_MEMBERS)
+@tanjun.with_option("members_only", "--members-only", "-m", converters=tanjun.to_bool, default=False, empty_value=True)
+@tanjun.with_option("clear_message_days", "--clear", "-c", converters=int, default=0)
+@tanjun.with_multi_argument("members", converters=tanjun.parse_user_id)
+@tanjun.as_message_command("ban members")
 @ban_group.with_command
 @tanjun.with_bool_slash_option("members_only", "Only ban users who are currently in the guild.", default=False)
 # TODO: max, min
@@ -374,10 +403,16 @@ async def multi_ban_command(
     await ctx.create_followup(content, attachment=attachment, component=utility.delete_row(ctx))
 
 
+@tanjun.with_author_permission_check(hikari.Permissions.BAN_MEMBERS)
+@tanjun.with_own_permission_check(hikari.Permissions.BAN_MEMBERS)
+@tanjun.with_option("members_only", "--members-only", "-m", converters=tanjun.to_bool, default=False, empty_value=True)
+@tanjun.with_option("clear_message_days", "--clear", "-c", converters=int, default=0)
+@_with_filter_message_options
+@tanjun.as_message_command("ban authors")
 @ban_group.with_command
 @tanjun.with_bool_slash_option("members_only", "Only ban users who are currently in the guild.", default=False)
 @tanjun.with_int_slash_option("clear_message_days", "Number of days to clear their recent messages for.", default=0)
-@_with_message_filter_options
+@_with_filter_slash_options
 @tanjun.as_slash_command("authors", "Ban the authors of recent messages.")
 async def ban_authors_command(
     ctx: tanjun.abc.SlashContext, clear_message_days: int, members_only: bool, **kwargs: typing.Any

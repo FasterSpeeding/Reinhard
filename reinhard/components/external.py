@@ -279,13 +279,19 @@ _ORDER_CHOICES = ("relevance", "date", "title", "videoCount", "viewCount")
 _YT_RESOURCES = ("video", "channel", "playlist")
 
 
-@tanjun.with_option("safe_search", "-sf", "--safe-search", converters=bool, default=None, empty_value=True)
+def yt_check(_: tanjun.abc.Context, tokens: config_.Tokens = tanjun.inject(type=config_.Tokens)) -> bool:
+    return tokens.google is not None
+
+
+@tanjun.with_check(yt_check)
+@tanjun.with_option("safe_search", "-sf", "--safe-search", converters=tanjun.to_bool, default=None, empty_value=True)
 @tanjun.with_option("order", "-o", "--order", converters=_assert_in_choices(_ORDER_CHOICES), default=_ORDER_CHOICES[0])
 @tanjun.with_option("language", "-l", default=None)
 @tanjun.with_option("type", "-t", "--type", converters=_assert_in_choices(_YT_RESOURCES), default=_YT_RESOURCES[0])
 @tanjun.with_option("region", "-r", "--region", default=None)
 @tanjun.with_argument("query")
 @tanjun.as_message_command("youtube", "yt")
+@tanjun.with_check(yt_check)
 @tanjun.with_bool_slash_option(
     "safe_search",
     "Whether safe search should be enabled or not. The default for this is based on the current channel.",
@@ -386,11 +392,6 @@ async def youtube_command(
         content, embed = first_response
         message = await ctx.respond(content, embed=embed, component=paginator, ensure_result=True)
         component_client.set_executor(message, paginator)
-
-
-@youtube_command.with_check
-def _(_: tanjun.abc.Context, tokens: config_.Tokens = tanjun.inject(type=config_.Tokens)) -> bool:
-    return tokens.google is not None
 
 
 # This API is currently dead (always returning 5xxs)
