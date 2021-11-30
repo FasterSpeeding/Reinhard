@@ -175,11 +175,24 @@ class ReferenceIndex:
         self._object_search_tree: dict[str, typing.Any] = {}
         self._top_level_modules: set[str] = set()
 
-    def _add_alias(self, alias: str, target: str) -> None:
-        if alias not in self._aliases:
-            _add_search_entry(self._alias_search_tree, alias)
+    def _add_alias(self, alias: str, target: str) -> bool:
+        # If the resolved target is private then we shouldn't use it.
+        if alias == target or not all(map(_is_public, target.split("."))):
+            return False
 
-        self._aliases[alias] = target
+        # typing and collection std generic types will never link back to where
+        # the type variable was defined. To avoid accidentally linking to the
+        # wrong module when targeting a type variable, we only resolve links if
+        # the value was defined within an "indexed" module or the current module.
+        library = target.split(".", 1)[0]
+        if library in self._top_level_modules or (self._is_tracking_3rd_party and alias.startswith(library)):
+            if alias not in self._aliases:
+                _add_search_entry(self._alias_search_tree, alias)
+
+            self._aliases[alias] = target
+            return True
+
+        return False
 
     def _add_use(self, path: str, use: str) -> None:
         if uses := self._object_paths_to_uses.get(path):
@@ -287,22 +300,8 @@ class ReferenceIndex:
             # regardless of where the type-variable was defined.
             return path_to
 
-        # If the resolved path is private then we shouldn't use it.
-        if not all(map(_is_public, resolved_path.split("."))):
-            return path_to
-
-        # typing and collection std generic types will never link back to where
-        # the type variable was defined. To avoid accidentally linking to the
-        # wrong module when targeting a type variable, we only resolve links if
-        # the value was defined within an "indexed" module or the current module.
-        library = resolved_path.split(".", 1)[0]
-        if library in self._top_level_modules:
-            if resolved_path != path_to:
-                self._add_alias(path_to, resolved_path)
-
-            return resolved_path
-
-        elif path_to.startswith(library):
+        # add_alias returns a bool which tells us whether the alias was valid or not.
+        if self._add_alias(path_to, resolved_path):
             return resolved_path
 
         # TODO: can we special case generic types here to capture their inner-values?
@@ -520,15 +519,11 @@ class ReferenceIndex:
         module_members = dict[str, typing.Any](filter(_is_public_key, inspect.getmembers(module)))
         for name, obj in module_members.items():
             if isinstance(obj, (types.FunctionType, types.MethodType, type, classmethod)):
-                if obj.__module__ != module.__name__:
-                    self._add_alias(f"{module.__name__}.{name}", f"{obj.__module__}.{obj.__qualname__}")
-
+                self._add_alias(f"{module.__name__}.{name}", f"{obj.__module__}.{obj.__qualname__}")
                 self._recurse_module(obj)
 
             elif isinstance(obj, property) and obj.fget:
-                if obj.fget.__module__ != module.__name__:
-                    self._add_alias(f"{module.__name__}.{name}", f"{obj.fget.__module__}.{obj.fget.__qualname__}")
-
+                self._add_alias(f"{module.__name__}.{name}", f"{obj.fget.__module__}.{obj.fget.__qualname__}")
                 self._recurse_module(obj)
 
         if recursive:
