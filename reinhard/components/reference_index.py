@@ -590,12 +590,12 @@ class ReferenceIndex:
 
             If the type was not found then `None` is returned.
         """
+        if result := _search_tree(self._object_search_tree, path):
+            return (result, self._object_paths_to_uses[result])
+
         if result := _search_tree(self._alias_search_tree, path):
             result = self._aliases[result]
             return result, self._object_paths_to_uses[result]
-
-        if result := _search_tree(self._object_search_tree, path):
-            return (result, self._object_paths_to_uses[result])
 
     def get_references(self, path: str, /) -> typing.Optional[collections.Sequence[str]]:
         """Get the tracked references for a type by its absolute path.
@@ -612,10 +612,11 @@ class ReferenceIndex:
         typing.Optional[collections.Sequence[str]]
             The references to the type if found else `None`.
         """
+        if result := self._object_paths_to_uses.get(path):
+            return result
+
         if alias := self._aliases.get(path):
             return self._object_paths_to_uses[alias]
-
-        return self._object_paths_to_uses.get(path)
 
 
 reference_group = tanjun.slash_command_group("references", "Find the references for a type in a library")
