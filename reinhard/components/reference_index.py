@@ -54,7 +54,8 @@ import yuyo
 from .. import utility
 
 _ReferenceIndexT = typing.TypeVar("_ReferenceIndexT", bound="ReferenceIndex")
-_SlashCommandT = typing.TypeVar("_SlashCommandT", bound=tanjun.SlashCommand)
+_MessageCommandT = typing.TypeVar("_MessageCommandT", bound=tanjun.MessageCommand[typing.Any])
+_SlashCommandT = typing.TypeVar("_SlashCommandT", bound=tanjun.SlashCommand[typing.Any])
 _LOGGER = logging.getLogger("hikari.reinhard.reference_index")
 
 
@@ -678,7 +679,16 @@ class _IndexCommand:
         component_client.set_executor(message, executor)
 
 
-def _with_index_command_options(command: _SlashCommandT, /) -> _SlashCommandT:
+def _with_index_message_options(command: _MessageCommandT) -> _MessageCommandT:
+    return command.set_parser(
+        tanjun.ShlexParser()
+        .add_argument("path")
+        .add_option("absolute", "--absolute", "-a", default=False, empty_value=True)
+        .add_option("public", "--public", "-p", default=False, empty_value=True)
+    )
+
+
+def _with_index_slash_options(command: _SlashCommandT, /) -> _SlashCommandT:
     return (
         command.add_str_option("path", "Path to the type to find references for")
         .add_bool_option("absolute", "Whether to treat path as an absolute path rather than search path", default=False)
@@ -690,8 +700,8 @@ def _with_index_command_options(command: _SlashCommandT, /) -> _SlashCommandT:
     )
 
 
-reference_group.add_command(
-    _with_index_command_options(
+hikari_command = reference_group.with_command(
+    _with_index_slash_options(
         tanjun.SlashCommand(
             _IndexCommand(
                 ReferenceIndex(track_builtins=True, track_3rd_party=True)
@@ -706,8 +716,11 @@ reference_group.add_command(
 )
 
 
-reference_group.add_command(
-    _with_index_command_options(
+hikari_command = _with_index_message_options(tanjun.MessageCommand(hikari_command.callback, "references hikari"))
+
+
+lightbulb_command = reference_group.with_command(
+    _with_index_slash_options(
         tanjun.SlashCommand(
             _IndexCommand(
                 ReferenceIndex(track_builtins=True, track_3rd_party=True)
@@ -723,8 +736,13 @@ reference_group.add_command(
 )
 
 
-reference_group.add_command(
-    _with_index_command_options(
+lightbulb_command = _with_index_message_options(
+    tanjun.MessageCommand(lightbulb_command.callback, "references lightbulb")
+)
+
+
+tanjun_command = reference_group.with_command(
+    _with_index_slash_options(
         tanjun.SlashCommand(
             _IndexCommand(
                 ReferenceIndex(track_builtins=True, track_3rd_party=True)
@@ -740,8 +758,11 @@ reference_group.add_command(
 )
 
 
-reference_group.add_command(
-    _with_index_command_options(
+tanjun_command = _with_index_message_options(tanjun.MessageCommand(lightbulb_command.callback, "references tanjun"))
+
+
+yuyo_command = reference_group.with_command(
+    _with_index_slash_options(
         tanjun.SlashCommand(
             _IndexCommand(
                 ReferenceIndex(track_builtins=True, track_3rd_party=True)
@@ -755,6 +776,8 @@ reference_group.add_command(
         )
     )
 )
+
+yuyo_command = _with_index_message_options(tanjun.MessageCommand(yuyo_command.callback, "references yuyo"))
 
 
 reference_loader = tanjun.Component(name="reference").load_from_scope().make_loader()

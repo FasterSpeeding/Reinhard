@@ -51,7 +51,8 @@ from .. import utility
 docs_group = tanjun.slash_command_group("docs", "Search relevant document sites.")
 
 _DocIndexT = typing.TypeVar("_DocIndexT", bound="DocIndex")
-_SlashCommandT = typing.TypeVar("_SlashCommandT", bound=tanjun.SlashCommand)
+_MessageCommandT = typing.TypeVar("_MessageCommandT", bound=tanjun.MessageCommand[typing.Any])
+_SlashCommandT = typing.TypeVar("_SlashCommandT", bound=tanjun.SlashCommand[typing.Any])
 HIKARI_PAGES = "https://www.hikari-py.dev"
 TANJUN_PAGES = "https://tanjun.cursed.solutions"
 YUYO_PAGES = "https://yuyo.cursed.solutions"
@@ -419,7 +420,7 @@ async def _docs_command(
     await ctx.respond("Entry not found", component=utility.delete_row(ctx))
 
 
-def _with_docs_options(command: _SlashCommandT, /) -> _SlashCommandT:
+def _with_docs_slash_options(command: _SlashCommandT, /) -> _SlashCommandT:
     return (
         command.add_str_option("path", "Optional path to query the documentation by.", default=None)
         .add_bool_option(
@@ -431,8 +432,19 @@ def _with_docs_options(command: _SlashCommandT, /) -> _SlashCommandT:
     )
 
 
+def _with_docs_message_options(command: _MessageCommandT, /) -> _MessageCommandT:
+    return command.set_parser(
+        tanjun.ShlexParser()
+        .add_argument("path", default=None)
+        .add_option("public", "-p", "--public", default=False, empty_value=True)
+        .add_option("simple", "-s", "--simple", default=False, empty_value=True)
+    )
+
+
+@_with_docs_message_options
+@tanjun.as_message_command("docs hikari")
 @docs_group.with_command
-@_with_docs_options
+@_with_docs_slash_options
 @tanjun.as_slash_command("hikari", "Search Hikari's documentation")
 def docs_hikari_command(
     ctx: tanjun.abc.Context,
@@ -464,8 +476,10 @@ def docs_hikari_command(
     )
 
 
+@_with_docs_message_options
+@tanjun.as_message_command("docs tanjun")
 @docs_group.with_command
-@_with_docs_options
+@_with_docs_slash_options
 @tanjun.as_slash_command("tanjun", "Search Tanjun's documentation")
 def tanjun_docs_command(
     ctx: tanjun.abc.Context,
@@ -483,8 +497,10 @@ def tanjun_docs_command(
     )
 
 
+@_with_docs_message_options
+@tanjun.as_message_command("docs yuyo")
 @docs_group.with_command
-@_with_docs_options
+@_with_docs_slash_options
 @tanjun.as_slash_command("yuyo", "Search Yuyo's documentation")
 def yuyo_docs_command(
     ctx: tanjun.abc.Context,
@@ -502,4 +518,4 @@ def yuyo_docs_command(
     )
 
 
-docs_loader = tanjun.Component(name="docs", strict=True).load_from_scope().make_loader()
+docs_loader = tanjun.Component(name="docs").load_from_scope().make_loader()

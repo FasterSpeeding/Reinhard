@@ -184,6 +184,8 @@ class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
         return (self._buffer.pop(0)["external_urls"]["spotify"], hikari.UNDEFINED)
 
 
+@tanjun.with_argument("query")
+@tanjun.as_message_command("lyrics")
 @tanjun.with_str_slash_option("query", "Query string (e.g. name) to search a song by.")
 @tanjun.as_slash_command("lyrics", "Get a song's lyrics.")
 async def lyrics_command(
@@ -260,16 +262,37 @@ async def lyrics_command(
     component_client.set_executor(message, executor)
 
 
+_T = typing.TypeVar("_T")
+
+
+def _assert_in_choices(choices: typing.Collection[_T]) -> typing.Callable[[_T], _T]:
+    def verify(value: _T) -> _T:
+        if value in choices:
+            return value
+
+        raise tanjun.CommandError(f"`{value}` is not a valid choice, must be one of " + ", ".join(map(str, choices)))
+
+    return verify
+
+
+_ORDER_CHOICES = ("relevance", "date", "title", "videoCount", "viewCount")
+_YT_RESOURCES = ("video", "channel", "playlist")
+
+
+@tanjun.with_option("safe_search", "-sf", "--safe-search", converters=bool, default=None, empty_value=True)
+@tanjun.with_option("order", "-o", "--order", converters=_assert_in_choices(_ORDER_CHOICES), default=_ORDER_CHOICES[0])
+@tanjun.with_option("language", "-l", default=None)
+@tanjun.with_option("type", "-t", "--type", converters=_assert_in_choices(_YT_RESOURCES), default=_YT_RESOURCES[0])
+@tanjun.with_option("region", "-r", "--region", default=None)
+@tanjun.with_argument("query")
+@tanjun.as_message_command("youtube", "yt")
 @tanjun.with_bool_slash_option(
     "safe_search",
     "Whether safe search should be enabled or not. The default for this is based on the current channel.",
     default=None,
 )
 @tanjun.with_str_slash_option(
-    "order",
-    "The order to return results in. Defaults to relevance.",
-    choices=("date", "relevance", "title", "videoCount", "viewCount"),
-    default="relevance",
+    "order", "The order to return results in. Defaults to relevance.", choices=_ORDER_CHOICES, default=_ORDER_CHOICES[0]
 )
 @tanjun.with_str_slash_option(
     "language", "The ISO 639-1 two letter identifier of the language to limit search to.", default=None
@@ -277,17 +300,13 @@ async def lyrics_command(
 @tanjun.with_str_slash_option("region", "The ISO 3166-1 code of the region to search for results in.", default=None)
 # TODO: should different resource types be split between different sub commands?
 @tanjun.with_str_slash_option(
-    "resource_type",
-    "The type of resource to search for. Defaults to video.",
-    choices=("channel", "playlist", "video"),
-    default="video",
+    "type", "The type of resource to search for. Defaults to video.", choices=_YT_RESOURCES, default=_YT_RESOURCES[0]
 )
 @tanjun.with_str_slash_option("query", "Query string to search for a resource by.")
 @tanjun.as_slash_command("youtube", "Search for a resource on youtube.")
 async def youtube_command(
     ctx: tanjun.abc.Context,
     query: str,
-    resource_type: str,
     region: str | None,
     language: str | None,
     order: str,
@@ -295,6 +314,7 @@ async def youtube_command(
     session: aiohttp.ClientSession = tanjun.inject(type=aiohttp.ClientSession),
     tokens: config_.Tokens = tanjun.inject(type=config_.Tokens),
     component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
+    **kwargs: str,
 ) -> None:
     """Search for a resource on youtube.
 
@@ -309,9 +329,10 @@ async def youtube_command(
             This can be one of "date", "relevance", "title", "videoCount" or "viewCount" and defaults to "relevance".
         * language (-l, --language): The ISO 639-1 two letter identifier of the language to limit search to.
         * region (-r, --region): The ISO 3166-1 code of the region to search for results in.
-        * resource type (--type, -t): The type of resource to search for.
+        * type (--type, -t): The type of resource to search for.
             This can be one of "channel", "playlist" or "video" and defaults to "video".
     """
+    resource_type = kwargs["type"]
     assert tokens.google is not None
     if safe_search is not False:
         channel: hikari.PartialChannel | None
@@ -463,22 +484,25 @@ def _build_spotify_auth(
     )
 
 
+_SPOTIFY_TYPES = ("track", "album", "artist", "playlist")
+
+
+@tanjun.with_option("type", "--type", "-t", default="track", converters=_assert_in_choices(_SPOTIFY_TYPES))
+@tanjun.with_argument("query")
+@tanjun.as_message_command("spotify")
 # TODO: add valid options for Options maybe?
 @tanjun.with_str_slash_option(
-    "resource_type",
-    "Type of resource to search for. Defaults to track.",
-    choices=("track", "album", "artist", "playlist"),
-    default="track",
+    "type", "Type of resource to search for. Defaults to track.", choices=_SPOTIFY_TYPES, default=_SPOTIFY_TYPES[0]
 )
 @tanjun.with_str_slash_option("query", "The string query to search by.")
 @tanjun.as_slash_command("spotify", "Search for a resource on spotify.")
 async def spotify_command(
     ctx: tanjun.abc.Context,
     query: str,
-    resource_type: str,
     session: aiohttp.ClientSession = tanjun.inject(type=aiohttp.ClientSession),
     component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
     spotify_auth: utility.ClientCredentialsOauth2 = tanjun.cached_inject(_build_spotify_auth),
+    **kwargs: str,
 ) -> None:
     """Search for a resource on spotify.
 
@@ -486,11 +510,11 @@ async def spotify_command(
         * query: The greedy string query to search by.
 
     Options:
-        * resource_type:
+        * type:
             Type of resource to search for. This can be one of "track", "album", "artist" or "playlist" and defaults
             to track.
     """
-    resource_type = resource_type.lower()
+    resource_type = kwargs["type"].lower()
     if resource_type not in SPOTIFY_RESOURCE_TYPES:
         raise tanjun.CommandError(f"{resource_type!r} is not a valid resource type")  # TODO: delete row
 
@@ -570,6 +594,8 @@ def _parse_hashes(data: typing.Any) -> list[str]:
     raise ValueError("Got response of type {}, expected a list of strings", type(data))
 
 
+@tanjun.with_argument("url", converters=urllib.parse.urlparse)
+@tanjun.as_message_command("check_domain", "check domain")
 @tanjun.with_str_slash_option("url", "The domain to check", converters=urllib.parse.urlparse)
 @tanjun.as_slash_command("check_domain", 'Check whether a domain is on Discord\'s "bad" domain list')
 async def check_domain(
@@ -588,4 +614,4 @@ async def check_domain(
         await ctx.respond(content="Domain is not on the bad domains list.", component=utility.delete_row(ctx))
 
 
-external_loader = tanjun.Component(name="external", strict=True).load_from_scope().make_loader()
+external_loader = tanjun.Component(name="external").load_from_scope().make_loader()

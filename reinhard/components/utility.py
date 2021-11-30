@@ -301,6 +301,9 @@ def _format_char_line(char: str, to_file: bool) -> str:
     return f"`\\U{code:08x}`/`{char}`: {name} <http://www.fileformat.info/info/unicode/char/{code:x}>"
 
 
+@tanjun.with_option("file", "--file", "-f", default=False, empty_value=True)
+@tanjun.with_argument("characters")
+@tanjun.as_message_command("char")
 @tanjun.with_bool_slash_option(
     "file", "Whether this should send a file response regardless of response length", default=False
 )

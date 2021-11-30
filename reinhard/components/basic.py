@@ -47,6 +47,7 @@ from hikari import snowflakes
 from .. import utility
 
 
+@tanjun.as_message_command("about")
 @tanjun.as_slash_command("about", "Get basic information about the current bot instance.")
 async def about_command(
     ctx: tanjun.abc.Context,
@@ -93,6 +94,7 @@ async def help_command(ctx: tanjun.abc.Context) -> None:
     await ctx.respond("See the slash command menu")
 
 
+@tanjun.as_message_command("ping")
 @tanjun.as_slash_command("ping", "Get the bot's current delay.")
 async def ping_command(ctx: tanjun.abc.Context, /) -> None:
     """Get the bot's current delay."""
@@ -179,6 +181,7 @@ def _(ctx: tanjun.abc.Context) -> bool:
     raise tanjun.CommandError("Client is cache-less")
 
 
+@tanjun.as_message_command("invite")
 @tanjun.as_slash_command("invite", "Invite the bot to your server(s)")
 async def invite_command(ctx: tanjun.abc.Context, me: hikari.OwnUser = tanjun.inject_lc(hikari.OwnUser)) -> None:
     await ctx.respond(
