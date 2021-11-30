@@ -714,8 +714,6 @@ hikari_command = reference_group.with_command(
         )
     )
 )
-
-
 hikari_command = _with_index_message_options(tanjun.MessageCommand(hikari_command.callback, "references hikari"))
 
 
@@ -734,8 +732,6 @@ lightbulb_command = reference_group.with_command(
         )
     )
 )
-
-
 lightbulb_command = _with_index_message_options(
     tanjun.MessageCommand(lightbulb_command.callback, "references lightbulb")
 )
@@ -756,8 +752,6 @@ tanjun_command = reference_group.with_command(
         )
     )
 )
-
-
 tanjun_command = _with_index_message_options(tanjun.MessageCommand(lightbulb_command.callback, "references tanjun"))
 
 
@@ -776,7 +770,6 @@ yuyo_command = reference_group.with_command(
         )
     )
 )
-
 yuyo_command = _with_index_message_options(tanjun.MessageCommand(yuyo_command.callback, "references yuyo"))
 
 
