@@ -165,7 +165,6 @@ class ReferenceIndex:
     )
 
     def __init__(self, *, track_builtins: bool = False, track_3rd_party: bool = False) -> None:
-        # TODO: alias resolution?
         self._aliases: dict[str, str] = {}
         self._alias_search_tree: dict[str, typing.Any] = {}
         self._is_tracking_3rd_party = track_3rd_party
@@ -351,7 +350,7 @@ class ReferenceIndex:
 
     def _recurse_module(
         self,
-        obj: typing.Union[types.MethodType, types.FunctionType, type[typing.Any]],
+        obj: typing.Union[types.MethodType, types.FunctionType, type[typing.Any], classmethod[typing.Any], property],
         /,
         *,
         path: typing.Optional[str] = None,
@@ -519,8 +518,17 @@ class ReferenceIndex:
             The module to scan for type references.
         """
         module_members = dict[str, typing.Any](filter(_is_public_key, inspect.getmembers(module)))
-        for _, obj in module_members.items():
-            if isinstance(obj, (types.MethodType, types.FunctionType, type)):
+        for name, obj in module_members.items():
+            if isinstance(obj, (types.FunctionType, types.MethodType, type, classmethod)):
+                if obj.__module__ != module.__name__:
+                    self._add_alias(f"{module.__name__}.{name}", f"{obj.__module__}.{obj.__qualname__}")
+
+                self._recurse_module(obj)
+
+            elif isinstance(obj, property) and obj.fget:
+                if obj.fget.__module__ != module.__name__:
+                    self._add_alias(f"{module.__name__}.{name}", f"{obj.fget.__module__}.{obj.fget.__qualname__}")
+
                 self._recurse_module(obj)
 
         if recursive:

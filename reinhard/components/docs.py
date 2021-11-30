@@ -125,7 +125,7 @@ class DocIndex(abc.ABC):
 
         for name, entry in data["documentStore"]["docs"].items():
             if process_doc:
-                doc: str = markdownify.markdownify(entry["doc"]).strip("\n").strip()
+                doc = typing.cast(str, markdownify.markdownify(entry["doc"])).strip("\n").strip()
             else:
                 doc = entry["doc"]
             self._metadata[name] = DocEntry.from_entry(entry, doc)
