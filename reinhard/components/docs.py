@@ -328,11 +328,11 @@ class PdocIndex(DocIndex):
         return base_url + "/".join(entry.module_name.split(".")) + fragment
 
 
-def _form_description(metadata: DocEntry, *, description_splitter: str = "\n") -> str:
+def _form_description(metadata: DocEntry, *, desc_splitter: str = "\n") -> str:
     if metadata.doc:
-        summary = metadata.doc.split(description_splitter, 1)[0]
-        if description_splitter != "\n":
-            summary += description_splitter
+        summary = metadata.doc.split(desc_splitter, 1)[0]
+        if desc_splitter != "\n":
+            summary += desc_splitter
     else:
         summary = "NONE"
     if metadata.func_def:
@@ -345,15 +345,15 @@ def _form_description(metadata: DocEntry, *, description_splitter: str = "\n") -
 
 async def _docs_command(
     ctx: tanjun.abc.Context,
-    path: str | None,
     component_client: yuyo.ComponentClient,
     index: DocIndex,
-    public: bool,
-    simple: bool,
     base_url: str,
     docs_url: str,
     name: str,
-    description_splitter: str = "\n",
+    path: str | None,
+    public: bool,
+    simple: bool,
+    desc_splitter: str = "\n",
 ) -> None:
     if not path:
         await ctx.respond(base_url, component=utility.delete_row(ctx))
@@ -390,7 +390,7 @@ async def _docs_command(
             (
                 hikari.UNDEFINED,
                 hikari.Embed(
-                    description=_form_description(metadata, description_splitter=description_splitter),
+                    description=_form_description(metadata, desc_splitter=desc_splitter),
                     color=utility.embed_colour(),
                     title=metadata.fullname,
                     url=index.make_link(docs_url, metadata),
@@ -448,14 +448,12 @@ def _with_docs_message_options(command: _MessageCommandT, /) -> _MessageCommandT
 @tanjun.as_slash_command("hikari", "Search Hikari's documentation")
 def docs_hikari_command(
     ctx: tanjun.abc.Context,
-    path: str | None,
-    public: bool,
-    simple: bool,
     index: HikariIndex = tanjun.cached_inject(
         utility.FetchedResource(HIKARI_PAGES + "/hikari/index.json", HikariIndex.from_json),
         expire_after=datetime.timedelta(hours=12),
     ),
     component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
+    **kwargs: typing.Any,
 ) -> collections.Awaitable[None]:
     """Search Hikari's documentation.
 
@@ -463,16 +461,7 @@ def docs_hikari_command(
         * path: Optional argument to query Hikari's documentation by.
     """
     return _docs_command(
-        ctx,
-        path,
-        component_client,
-        index,
-        public,
-        simple,
-        HIKARI_PAGES,
-        HIKARI_PAGES + "/hikari/",
-        "Hikari",
-        description_splitter=".",
+        ctx, component_client, index, HIKARI_PAGES, HIKARI_PAGES + "/hikari/", "Hikari", desc_splitter=".", **kwargs
     )
 
 
@@ -483,18 +472,14 @@ def docs_hikari_command(
 @tanjun.as_slash_command("tanjun", "Search Tanjun's documentation")
 def tanjun_docs_command(
     ctx: tanjun.abc.Context,
-    path: str | None,
-    public: bool,
-    simple: bool,
     component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
     index: DocIndex = tanjun.cached_inject(
         utility.FetchedResource(TANJUN_PAGES + "/release/search.json", PdocIndex.from_json),
         expire_after=datetime.timedelta(hours=12),
     ),
+    **kwargs: typing.Any,
 ) -> collections.Awaitable[None]:
-    return _docs_command(
-        ctx, path, component_client, index, public, simple, TANJUN_PAGES, TANJUN_PAGES + "/release/", "Tanjun"
-    )
+    return _docs_command(ctx, component_client, index, TANJUN_PAGES, TANJUN_PAGES + "/release/", "Tanjun", **kwargs)
 
 
 @_with_docs_message_options
@@ -504,18 +489,14 @@ def tanjun_docs_command(
 @tanjun.as_slash_command("yuyo", "Search Yuyo's documentation")
 def yuyo_docs_command(
     ctx: tanjun.abc.Context,
-    path: str | None,
-    public: bool,
-    simple: bool,
     component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
     index: DocIndex = tanjun.cached_inject(
         utility.FetchedResource(YUYO_PAGES + "/release/search.json", PdocIndex.from_json),
         expire_after=datetime.timedelta(hours=12),
     ),
+    **kwargs: typing.Any,
 ) -> collections.Awaitable[None]:
-    return _docs_command(
-        ctx, path, component_client, index, public, simple, YUYO_PAGES, YUYO_PAGES + "/release/", "Tanjun"
-    )
+    return _docs_command(ctx, component_client, index, YUYO_PAGES, YUYO_PAGES + "/release/", "Tanjun", **kwargs)
 
 
 docs_loader = tanjun.Component(name="docs").load_from_scope().make_loader()
