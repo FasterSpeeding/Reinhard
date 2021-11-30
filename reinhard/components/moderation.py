@@ -439,4 +439,4 @@ async def ban_authors_command(
     await ctx.create_followup(content, attachment=attachment, component=utility.delete_row(ctx))
 
 
-moderation_loader = tanjun.Component(name="moderation", strict=True).load_from_scope().make_loader()
+moderation_loader = tanjun.Component(name="moderation").load_from_scope().make_loader()
