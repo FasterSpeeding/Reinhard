@@ -76,9 +76,40 @@ _BUILTIN_TYPES = set(filter(_is_public, __builtins__.keys()))
 _END_KEY = "_link"
 
 
+def _add_search_entry(index: dict[str, typing.Any], path: str) -> None:
+    for char in path.rsplit(".", 1)[-1].lower():
+        if char not in index:
+            index[char] = index = {}
+
+        else:
+            index = index[char]
+
+    if links := index.get(_END_KEY):
+        if path not in links:
+            links.append(path)
+
+    else:
+        index[_END_KEY] = [path]
+
+
+def _search_tree(index: dict[str, typing.Any], path: str) -> typing.Optional[str]:
+    for char in path.rsplit(".", 1)[-1].lower():
+        if new_position := index.get(char):
+            index = new_position
+            continue
+
+        return None
+
+    if end := index.get(_END_KEY):
+        key: str
+        for key in end:
+            if key.endswith(path):
+                return key
+
+
 def _combine_imports(part_1: str, part_2: str) -> str:
     # If this is a relative import then adding a dot in would break it.
-    if part_1.startswith("."):
+    if part_1.endswith("."):
         return f"{part_1}{part_2}"
 
     return f"{part_1}.{part_2}"
@@ -122,7 +153,8 @@ class ReferenceIndex:
     """
 
     __slots__ = (
-        # "_aliases",
+        "_aliases",
+        "_alias_search_tree",
         "_is_tracking_3rd_party",
         "_is_tracking_builtins",
         "_indexed_modules",
@@ -134,7 +166,8 @@ class ReferenceIndex:
 
     def __init__(self, *, track_builtins: bool = False, track_3rd_party: bool = False) -> None:
         # TODO: alias resolution?
-        # self._aliases: dict[str, str] = {}
+        self._aliases: dict[str, str] = {}
+        self._alias_search_tree: dict[str, typing.Any] = {}
         self._is_tracking_3rd_party = track_3rd_party
         self._is_tracking_builtins = track_builtins
         self._indexed_modules: dict[str, types.ModuleType] = {}
@@ -143,6 +176,12 @@ class ReferenceIndex:
         self._object_search_tree: dict[str, typing.Any] = {}
         self._top_level_modules: set[str] = set()
 
+    def _add_alias(self, alias: str, target: str) -> None:
+        if alias not in self._aliases:
+            _add_search_entry(self._alias_search_tree, alias)
+
+        self._aliases[alias] = target
+
     def _add_use(self, path: str, use: str) -> None:
         if uses := self._object_paths_to_uses.get(path):
             if use not in uses:
@@ -150,6 +189,7 @@ class ReferenceIndex:
 
         else:
             self._object_paths_to_uses[path] = [use]
+            _add_search_entry(self._object_search_tree, path)
 
     def _get_or_parse_module_imports(self, module_name: str) -> dict[str, str]:
         imports: typing.Optional[dict[str, str]]
@@ -248,23 +288,25 @@ class ReferenceIndex:
             # regardless of where the type-variable was defined.
             return path_to
 
-        # typing and collection std generic types will never link back to
-        # where the type variable was defined andm to avoid accidentally linking
-        # to said modules when targeting a type variable, we only resolve links
-        # if the value was defined within library it was found in.
+        # If the resolved path is private then we shouldn't use it.
+        if not all(map(_is_public, resolved_path.split("."))):
+            return path_to
+
+        # typing and collection std generic types will never link back to where
+        # the type variable was defined. To avoid accidentally linking to the
+        # wrong module when targeting a type variable, we only resolve links if
+        # the value was defined within an "indexed" module or the current module.
         library = resolved_path.split(".", 1)[0]
-        if path_to.startswith(library) or library in self._top_level_modules:
-            # If the resolved path is private then we shouldn't use it.
-            if all(map(_is_public, resolved_path.split("."))):
-                # TODO: alias resolution?
-                # if resolved_path != path_to:
-                #     self._aliases[path_to] = resolved_path
+        if library in self._top_level_modules:
+            if resolved_path != path_to:
+                self._add_alias(path_to, resolved_path)
 
-                return resolved_path
+            return resolved_path
 
-        else:
-            pass  # TODO: can we special case generic types here to capture their inner-values?
+        elif path_to.startswith(library):
+            return resolved_path
 
+        # TODO: can we special case generic types here to capture their inner-values?
         return path_to
 
     def _handle_annotation(self, module_name: str, path: str, annotation: typing.Union[type[typing.Any], str]) -> None:
@@ -359,33 +401,6 @@ class ReferenceIndex:
             return True
 
         return False
-
-    def build_search_tree(self: _ReferenceIndexT) -> _ReferenceIndexT:
-        """Build the internal search tree to enable searching for types.
-
-        .. warning::
-            If this isn't called then `search` and `get_references` will always return
-            `None`.
-        """
-        for full_path in self._object_paths_to_uses.keys():
-            _, name = full_path.rsplit(".", 1)
-
-            position = self._object_search_tree
-            for char in name.lower():
-                if char not in position:
-                    position[char] = position = {}
-
-                else:
-                    position = position[char]
-
-            if links := position.get(_END_KEY):
-                if full_path not in links:
-                    links.append(full_path)
-
-            else:
-                links = position[_END_KEY] = [full_path]
-
-        return self
 
     def index_module(
         self: _ReferenceIndexT, module: types.ModuleType, /, *, recursive: bool = False
@@ -572,26 +587,12 @@ class ReferenceIndex:
 
             If the type was not found then `None` is returned.
         """
-        split = path.rsplit(".", 1)
-        if len(split) > 1:
-            name = split[1]
+        if result := _search_tree(self._alias_search_tree, path):
+            result = self._aliases[result]
+            return result, self._object_paths_to_uses[result]
 
-        else:
-            name = path
-
-        position = self._object_search_tree
-        for char in name.lower():
-            if new_position := position.get(char):
-                position = new_position
-                continue
-
-            return None
-
-        if end := position.get(_END_KEY):
-            key: str
-            for key in end:
-                if key.endswith(path):
-                    return (key, self._object_paths_to_uses[key])
+        if result := _search_tree(self._object_search_tree, path):
+            return (result, self._object_paths_to_uses[result])
 
     def get_references(self, path: str, /) -> typing.Optional[collections.Sequence[str]]:
         """Get the tracked references for a type by its absolute path.
@@ -608,6 +609,9 @@ class ReferenceIndex:
         typing.Optional[collections.Sequence[str]]
             The references to the type if found else `None`.
         """
+        if alias := self._aliases.get(path):
+            return self._object_paths_to_uses[alias]
+
         return self._object_paths_to_uses.get(path)
 
 
@@ -688,8 +692,7 @@ reference_group.add_command(
             _IndexCommand(
                 ReferenceIndex(track_builtins=True, track_3rd_party=True)
                 .index_module(hikari, recursive=True)
-                .scan_indexed_modules()
-                .build_search_tree(),
+                .scan_indexed_modules(),
                 f"Hikari v{hikari.__version__}",
             ),
             "hikari",
@@ -706,8 +709,7 @@ reference_group.add_command(
                 ReferenceIndex(track_builtins=True, track_3rd_party=True)
                 .index_module(lightbulb, recursive=True)
                 .index_module(hikari, recursive=True)
-                .scan_module(lightbulb, recursive=True)
-                .build_search_tree(),
+                .scan_module(lightbulb, recursive=True),
                 f"Lightbulb v{lightbulb.__version__}",
             ),
             "lightbulb",
@@ -724,8 +726,7 @@ reference_group.add_command(
                 ReferenceIndex(track_builtins=True, track_3rd_party=True)
                 .index_module(tanjun, recursive=True)
                 .index_module(hikari, recursive=True)
-                .scan_module(tanjun, recursive=True)
-                .build_search_tree(),
+                .scan_module(tanjun, recursive=True),
                 f"Tanjun v{tanjun.__version__}",
             ),
             "tanjun",
@@ -742,8 +743,7 @@ reference_group.add_command(
                 ReferenceIndex(track_builtins=True, track_3rd_party=True)
                 .index_module(yuyo, recursive=True)
                 .index_module(hikari, recursive=True)
-                .scan_module(yuyo, recursive=True)
-                .build_search_tree(),
+                .scan_module(yuyo, recursive=True),
                 f"Yuyo v{yuyo.__version__}",
             ),
             "yuyo",
