@@ -610,9 +610,15 @@ async def check_domain(
     domain = url.netloc or url.path
     domain_hash = hashlib.sha256(domain.encode("utf-8")).hexdigest()
     if domain_hash in bad_domains:
-        await ctx.respond(content="Domain is on the bad domains list.", component=utility.delete_row(ctx))
+        await ctx.respond(
+            content="\N{LARGE RED SQUARE} Domain is on the bad domains list.",
+            component=utility.delete_row(ctx),
+        )
     else:
-        await ctx.respond(content="Domain is not on the bad domains list.", component=utility.delete_row(ctx))
+        await ctx.respond(
+            content="\N{LARGE GREEN SQUARE} Domain is not on the bad domains list.",
+            component=utility.delete_row(ctx),
+        )
 
 
 external_loader = tanjun.Component(name="external").load_from_scope().make_loader()
