@@ -616,7 +616,7 @@ async def check_domain(
         )
     else:
         await ctx.respond(
-            content="\N{LARGE GREEN SQUARE} Domain is not on the bad domains list.",
+            content="\N{LARGE YELLOW SQUARE} Domain is not on the bad domains list.",
             component=utility.delete_row(ctx),
         )
 
