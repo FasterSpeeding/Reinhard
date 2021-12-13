@@ -3,7 +3,7 @@ python-dotenv~=0.19
 hikari[speedups]~=2.0.0.dev104
 hikari-tanjun~=2.2.1a1
 hikari-yuyo~=1.0.4a1
-markdownify~=0.10.0
+markdownify~=0.10.1
 psutil~=5.8
 uvloop~=0.16; platform_system != "Windows"
 uvicorn~=0.16
