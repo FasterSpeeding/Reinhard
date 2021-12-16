@@ -384,7 +384,10 @@ class _MultiBanner:
 )
 @tanjun.as_slash_command("members", "Ban one or more members")
 async def multi_ban_command(
-    ctx: tanjun.abc.SlashContext, users: set[hikari.Snowflake], clear_message_days: int, members_only: bool
+    ctx: tanjun.abc.SlashContext | tanjun.abc.MessageContext,
+    users: set[hikari.Snowflake],
+    clear_message_days: int,
+    members_only: bool,
 ) -> None:
     """Ban multiple users from using the bot.
 
@@ -393,14 +396,18 @@ async def multi_ban_command(
     """
     banner = await _MultiBanner.build(
         ctx,
-        reason=f"Bulk ban triggered by {ctx.author.username} ({ctx.author.id})",
+        reason=f"Bulk ban triggered by {ctx.author.username}#{ctx.author.discriminator} ({ctx.author.id})",
         delete_message_days=clear_message_days,
         members_only=members_only,
     )
     await ctx.respond("Starting bans \N{THUMBS UP SIGN}", component=utility.delete_row(ctx), delete_after=2)
     await asyncio.gather(*(banner.try_ban(target=user) for user in users))
     content, attachment = banner.make_response()
-    await ctx.create_followup(content, attachment=attachment, component=utility.delete_row(ctx))
+    # Remove once abc.Context has attachments support
+    if isinstance(ctx, tanjun.abc.SlashContext):
+        await ctx.create_followup(content, attachment=attachment, component=utility.delete_row(ctx))
+    else:
+        await ctx.respond(content, attachment=attachment, component=utility.delete_row(ctx))
 
 
 @tanjun.with_author_permission_check(hikari.Permissions.BAN_MEMBERS)
@@ -415,12 +422,15 @@ async def multi_ban_command(
 @_with_filter_slash_options
 @tanjun.as_slash_command("authors", "Ban the authors of recent messages.")
 async def ban_authors_command(
-    ctx: tanjun.abc.SlashContext, clear_message_days: int, members_only: bool, **kwargs: typing.Any
+    ctx: tanjun.abc.SlashContext | tanjun.abc.MessageContext,
+    clear_message_days: int,
+    members_only: bool,
+    **kwargs: typing.Any,
 ) -> None:
     found_authors = set[hikari.Snowflake]()
     banner = await _MultiBanner.build(
         ctx,
-        reason=f"Bulk ban triggered by {ctx.author.username} ({ctx.author.id})",
+        reason=f"Bulk ban triggered by {ctx.author.username}#{ctx.author.discriminator} ({ctx.author.id})",
         delete_message_days=clear_message_days,
         members_only=members_only,
     )
@@ -436,7 +446,11 @@ async def ban_authors_command(
         await banner.try_ban(author)
 
     content, attachment = banner.make_response()
-    await ctx.create_followup(content, attachment=attachment, component=utility.delete_row(ctx))
+    # Remove once abc.Context has attachments support
+    if isinstance(ctx, tanjun.abc.SlashContext):
+        await ctx.create_followup(content, attachment=attachment, component=utility.delete_row(ctx))
+    else:
+        await ctx.respond(content, attachment=attachment, component=utility.delete_row(ctx))
 
 
 moderation_loader = tanjun.Component(name="moderation").load_from_scope().make_loader()
