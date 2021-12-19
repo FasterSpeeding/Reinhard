@@ -352,14 +352,14 @@ async def _docs_command(
     name: str,
     path: str | None,
     public: bool,
-    simple: bool,
     desc_splitter: str = "\n",
+    **kwargs: typing.Any,
 ) -> None:
     if not path:
         await ctx.respond(base_url, component=utility.delete_row(ctx))
         return
 
-    if simple:
+    if kwargs["list"]:
         iterator = utility.embed_iterator(
             utility.chunk((f"[{m.fullname}]({index.make_link(docs_url, m)})" for m in index.search(path)), 10),
             lambda entries: "\n".join(entries),
@@ -428,7 +428,7 @@ def _with_docs_slash_options(command: _SlashCommandT, /) -> _SlashCommandT:
             "Whether other people should be able to interact with the response. Defaults to False",
             default=False,
         )
-        .add_bool_option("simple", "Whether this should only list links. Defaults to False.", default=False)
+        .add_bool_option("list", "Whether this should return alist of links. Defaults to False.", default=False)
     )
 
 
@@ -437,7 +437,7 @@ def _with_docs_message_options(command: _MessageCommandT, /) -> _MessageCommandT
         tanjun.ShlexParser()
         .add_argument("path", default=None)
         .add_option("public", "-p", "--public", converters=tanjun.to_bool, default=False, empty_value=True)
-        .add_option("simple", "-s", "--simple", converters=tanjun.to_bool, default=False, empty_value=True)
+        .add_option("list", "-l", "--list", converters=tanjun.to_bool, default=False, empty_value=True)
     )
 
 
