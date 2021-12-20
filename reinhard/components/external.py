@@ -32,7 +32,7 @@
 """Commands used to interact with external APIs."""
 from __future__ import annotations
 
-__all__: list[str] = ["external_loader"]
+__all__: list[str] = ["load_external"]
 
 import collections.abc as collections
 import datetime
@@ -621,4 +621,4 @@ async def check_domain(
         )
 
 
-external_loader = tanjun.Component(name="external").load_from_scope().make_loader()
+load_external = tanjun.Component(name="external").load_from_scope().make_loader()

@@ -31,7 +31,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["sudo_loader"]
+__all__: list[str] = ["load_sudo"]
 
 import ast
 import asyncio
@@ -243,6 +243,6 @@ async def eval_command(
     component_client.set_executor(message, executor)
 
 
-sudo_loader = (
+load_sudo = (
     tanjun.Component(name="sudo", strict=True).add_check(tanjun.checks.OwnerCheck()).load_from_scope().make_loader()
 )

@@ -32,24 +32,24 @@
 from __future__ import annotations
 
 __all__ = [
-    "basic_loader",
-    "docs_loader",
-    "external_loader",
-    "moderation_loader",
-    "reference_loader",
-    "sudo_loader",
-    # "tags_loader",
-    # "roles_loader",
-    "utility_loader",
+    "load_basic",
+    "load_docs",
+    "load_external",
+    "load_moderation",
+    "load_reference",
+    "load_sudo",
+    # "load_tags",
+    # "load_roles",
+    "load_utility",
 ]
 
-from .basic import basic_loader
-from .docs import docs_loader
-from .external import external_loader
-from .moderation import moderation_loader
-from .reference_index import reference_loader
-from .sudo import sudo_loader
+from .basic import load_basic
+from .docs import load_docs
+from .external import load_external
+from .moderation import load_moderation
+from .reference_index import load_reference
+from .sudo import load_sudo
 
-# from .tags import tags_loader
-# from .roles import roles_loader
-from .utility import utility_loader
+# from .tags import load_tags
+# from .roles import load_roles
+from .utility import load_utility

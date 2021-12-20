@@ -32,7 +32,7 @@
 """Commands used to find the references for a type in Hikari and Tanjun."""
 from __future__ import annotations
 
-__slots__: list[str] = ["reference_loader"]
+__slots__: list[str] = ["load_reference"]
 
 import dataclasses
 import datetime
@@ -773,4 +773,4 @@ yuyo_command = reference_group.with_command(
 yuyo_command = _with_index_message_options(tanjun.MessageCommand(yuyo_command.callback, "references yuyo"))
 
 
-reference_loader = tanjun.Component(name="reference").load_from_scope().make_loader()
+load_reference = tanjun.Component(name="reference").load_from_scope().make_loader()

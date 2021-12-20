@@ -31,7 +31,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["utility_loader"]
+__all__: list[str] = ["load_utility"]
 
 import unicodedata
 
@@ -354,4 +354,4 @@ async def char_command(ctx: tanjun.abc.Context, characters: str, file: bool = Fa
         await ctx.edit_last_response(content=None, attachment=response_file)
 
 
-utility_loader = tanjun.Component(name="utility", strict=True).load_from_scope().make_loader()
+load_utility = tanjun.Component(name="utility", strict=True).load_from_scope().make_loader()

@@ -31,7 +31,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["moderation_loader"]
+__all__: list[str] = ["load_moderation"]
 
 import asyncio
 import dataclasses
@@ -453,4 +453,4 @@ async def ban_authors_command(
         await ctx.respond(content, attachment=attachment, component=utility.delete_row(ctx))
 
 
-moderation_loader = tanjun.Component(name="moderation").load_from_scope().make_loader()
+load_moderation = tanjun.Component(name="moderation").load_from_scope().make_loader()

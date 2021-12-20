@@ -32,7 +32,7 @@
 """Commands used to search Hikari and Tanjun's docs."""
 from __future__ import annotations
 
-__all__: list[str] = ["docs_loader"]
+__all__: list[str] = ["load_docs"]
 
 import abc
 import collections.abc as collections
@@ -499,4 +499,4 @@ def yuyo_docs_command(
     return _docs_command(ctx, component_client, index, YUYO_PAGES, YUYO_PAGES + "/release/", "Tanjun", **kwargs)
 
 
-docs_loader = tanjun.Component(name="docs").load_from_scope().make_loader()
+load_docs = tanjun.Component(name="docs").load_from_scope().make_loader()

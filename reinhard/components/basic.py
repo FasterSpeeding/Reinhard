@@ -31,7 +31,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["basic_loader"]
+__all__: list[str] = ["load_basic"]
 
 import collections.abc as collections
 import datetime
@@ -192,4 +192,4 @@ async def invite_command(ctx: tanjun.abc.Context, me: hikari.OwnUser = tanjun.in
     )
 
 
-basic_loader = tanjun.Component(name="basic", strict=True).load_from_scope().make_loader()
+load_basic = tanjun.Component(name="basic", strict=True).load_from_scope().make_loader()
