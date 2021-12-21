@@ -48,6 +48,18 @@ if typing.TYPE_CHECKING:
 
 
 def build_gateway_bot(*, config: config_.FullConfig | None = None) -> tuple[hikari.impl.GatewayBot, tanjun.Client]:
+    """Build a gateway bot with a bound Reinhard client.
+
+    Other Parameters
+    ----------------
+    config: reinhard.config.FullConfig
+        The configuration to use.
+
+    Returns
+    -------
+    tuple[hikari.impl.GatewayBot, tanjun.Client]
+        The gateway bot and Reinhard client.
+    """
     if config is None:
         config = config_.FullConfig.from_env()
 
@@ -63,6 +75,18 @@ def build_gateway_bot(*, config: config_.FullConfig | None = None) -> tuple[hika
 
 
 def build_rest_bot(*, config: config_.FullConfig | None = None) -> tuple[hikari.impl.RESTBot, tanjun.Client]:
+    """Build a REST bot with a bound Reinhard client.
+
+    Other Parameters
+    ----------------
+    config: reinhard.config.FullConfig
+        The configuration to use.
+
+    Returns
+    -------
+    tuple[hikari.impl.RESTBot, tanjun.Client]
+        The REST bot and Reinhard client.
+    """
     if config is None:
         config = config_.FullConfig.from_env()
 
@@ -95,6 +119,23 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> tanjun.Client:
 def build_from_gateway_bot(
     bot: hikari_traits.GatewayBotAware, /, *, config: config_.FullConfig | None = None
 ) -> tanjun.Client:
+    """Build a Reinhard client from a gateway bot.
+
+    Parameters
+    ----------
+    bot: hikari.impl.GatewayBot
+        The gateway bot to use.
+
+    Other Parameters
+    ----------------
+    config: reinhard.config.FullConfig
+        The configuration to use.
+
+    Returns
+    -------
+    tanjun.Client
+        The Reinhard client.
+    """
     if config is None:
         config = config_.FullConfig.from_env()
 
@@ -121,6 +162,23 @@ def build_from_gateway_bot(
 def build_from_rest_bot(
     bot: hikari_traits.RESTBotAware, /, *, config: config_.FullConfig | None = None
 ) -> tanjun.Client:
+    """Build a Reinhard client from a REST bot.
+
+    Parameters
+    ----------
+    bot: hikari.impl.RESTBot
+        The REST bot to use.
+
+    Other Parameters
+    ----------------
+    config: reinhard.config.FullConfig
+        The configuration to use.
+
+    Returns
+    -------
+    tanjun.Client
+        The Reinhard client.
+    """
     if config is None:
         config = config_.FullConfig.from_env()
 
@@ -138,6 +196,13 @@ def build_from_rest_bot(
 
 
 def run_gateway_bot(*, config: config_.FullConfig | None = None) -> None:
+    """Run a Reinhard gateway bot.
+
+    Other Parameters
+    ----------------
+    config: reinhard.config.FullConfig
+        The configuration to use.
+    """
     bot, _ = build_gateway_bot(config=config)
     bot.run()
 
@@ -151,30 +216,36 @@ async def _run_rest(*, config: config_.FullConfig | None = None) -> None:
 
 
 def run_rest_bot(*, config: config_.FullConfig | None = None) -> None:
+    """Run a Reinhard RESTBot locally.
+
+    Other Parameters
+    ----------------
+    config: reinhard.config.FullConfig
+        The configuration to use.
+    """
     asyncio.run(_run_rest(config=config))
 
 
-def make_asgi_app(*, config: config_.FullConfig | None = None) -> yuyo.asgi.AsgiAdapter:
+def make_asgi_app(*, config: config_.FullConfig | None = None) -> yuyo.AsgiBot:
+    """Make an ASGI app for the bot.
+
+    Other Parameters
+    ----------------
+    config: reinhard.config.FullConfig
+        The configuration to use.
+
+    Returns
+    -------
+    yuyo.AsgiBot
+        The ASGI app which can be run using ASGI frameworks
+        such as uvicorn or as a FastAPI sub-app.
+    """
+
     if config is None:
         config = config_.FullConfig.from_env()
 
-    rest = hikari.impl.RESTApp().acquire(config.tokens.bot, "Bot")
-    interaction_server = hikari.impl.InteractionServer(entity_factory=rest.entity_factory, rest_client=rest)
-    component_client = yuyo.ComponentClient(server=interaction_server).set_constant_id(
-        utility.DELETE_CUSTOM_ID, utility.delete_button_callback, prefix_match=True
-    )
-    client = _build(
-        tanjun.Client(rest, server=interaction_server, declare_global_commands=config.declare_global_commands)
-        .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open)
-        .add_client_callback(tanjun.ClientCallbackNames.CLOSING, component_client.close)
-        .set_type_dependency(yuyo.ComponentClient, component_client),
-        config,
-    )
+    bot = yuyo.AsgiBot(config.tokens.bot, hikari.TokenType.BOT)
+    client = build_from_rest_bot(bot, config=config)
+    bot.add_startup_callback(client.open).add_shutdown_callback(client.close)
 
-    return (
-        yuyo.asgi.AsgiAdapter(interaction_server)
-        .add_startup_callback(rest.start)
-        .add_shutdown_callback(rest.close)
-        .add_startup_callback(client.open)
-        .add_shutdown_callback(client.close)
-    )
+    return bot
