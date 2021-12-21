@@ -68,7 +68,7 @@ def build_gateway_bot(*, config: config_.FullConfig | None = None) -> tuple[hika
         logs=config.log_level,
         intents=config.intents,
         cache_settings=hikari.CacheSettings(components=config.cache),
-        rest_url="https://canary.discord.com/api/v8"
+        # rest_url="https://canary.discord.com/api/v8"
         # rest_url="https://staging.discord.co/api/v8"
     )
     return bot, build_from_gateway_bot(bot, config=config)
@@ -238,9 +238,8 @@ def make_asgi_app(*, config: config_.FullConfig | None = None) -> yuyo.AsgiBot:
     -------
     yuyo.AsgiBot
         The ASGI app which can be run using ASGI frameworks
-        such as uvicorn or as a FastAPI sub-app.
+        such as uvicorn (or as a FastAPI sub-app).
     """
-
     if config is None:
         config = config_.FullConfig.from_env()
 
