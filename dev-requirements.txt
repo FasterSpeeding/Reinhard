@@ -2,6 +2,6 @@ black==21.12b0
 codespell==2.1.0
 flake8==4.0.1
 isort==5.10.1
-mypy==0.910
+mypy==0.921
 pyright==0.0.13
 pytest==6.2.5
