@@ -124,27 +124,32 @@ async def eval_python_code(
 ) -> tuple[io.StringIO, io.StringIO, int, bool]:
     stdout = io.StringIO()
     stderr = io.StringIO()
-    # contextlib.redirect_xxxxx doesn't work properly with contextlib.ExitStack
-    with contextlib.redirect_stdout(stdout):
-        with contextlib.redirect_stderr(stderr):
-            start_time = time.perf_counter()
-            try:
-                await eval_python_code_no_capture(ctx, component, code)
-                failed = False
-            except Exception:
-                traceback.print_exc()
-                failed = True
-            finally:
-                exec_time = round((time.perf_counter() - start_time) * 1000)
+
+    stack = contextlib.ExitStack()
+    stack.enter_context(contextlib.redirect_stdout(stdout))
+    stack.enter_context(contextlib.redirect_stderr(stderr))
+
+    with stack:
+        start_time = time.perf_counter()
+        try:
+            await eval_python_code_no_capture(ctx, component, "<string>", code)
+            failed = False
+        except Exception:
+            traceback.print_exc(file=stderr)
+            failed = True
+        finally:
+            exec_time = round((time.perf_counter() - start_time) * 1000)
 
     stdout.seek(0)
     stderr.seek(0)
     return stdout, stderr, exec_time, failed
 
 
-async def eval_python_code_no_capture(ctx: tanjun.abc.Context, component: tanjun.abc.Component, code: str) -> None:
+async def eval_python_code_no_capture(
+    ctx: tanjun.abc.Context, component: tanjun.abc.Component, file_name: str, code: str
+) -> None:
     globals_ = build_eval_globals(ctx, component)
-    compiled_code = compile(code, "", "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
+    compiled_code = compile(code, file_name, "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
     if compiled_code.co_flags & inspect.CO_COROUTINE:
         await eval(compiled_code, globals_)
 
@@ -192,7 +197,7 @@ async def eval_command(
         raise tanjun.CommandError("Expected a python code block.")
 
     if suppress_response:
-        await eval_python_code_no_capture(ctx, component, code[0])
+        await eval_python_code_no_capture(ctx, component, "<string>", code[0])
         return
 
     stdout, stderr, exec_time, failed = await eval_python_code(ctx, component, code[0])
