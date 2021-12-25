@@ -143,7 +143,7 @@ def build_from_gateway_bot(
         utility.DELETE_CUSTOM_ID, utility.delete_button_callback, prefix_match=True
     )
     reaction_client = yuyo.ReactionClient.from_gateway_bot(bot, event_managed=False)
-    client = _build(
+    return _build(
         tanjun.Client.from_gateway_bot(
             bot, mention_prefix=config.mention_prefix, declare_global_commands=config.declare_global_commands
         )
@@ -155,8 +155,6 @@ def build_from_gateway_bot(
         .set_type_dependency(yuyo.ComponentClient, component_client),
         config,
     )
-
-    return client
 
 
 def build_from_rest_bot(

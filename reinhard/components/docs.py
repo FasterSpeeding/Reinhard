@@ -54,6 +54,7 @@ _DocIndexT = typing.TypeVar("_DocIndexT", bound="DocIndex")
 _MessageCommandT = typing.TypeVar("_MessageCommandT", bound=tanjun.MessageCommand[typing.Any])
 _SlashCommandT = typing.TypeVar("_SlashCommandT", bound=tanjun.SlashCommand[typing.Any])
 HIKARI_PAGES = "https://www.hikari-py.dev"
+SAKE_PAGES = "https://sake.cursed.solutions"
 TANJUN_PAGES = "https://tanjun.cursed.solutions"
 YUYO_PAGES = "https://yuyo.cursed.solutions"
 SPECIAL_KEYS: frozenset[str] = frozenset(("df", "tf", "docs"))
@@ -466,6 +467,23 @@ def docs_hikari_command(
 
 
 @_with_docs_message_options
+@tanjun.as_message_command("docs sake")
+@docs_group.with_command
+@_with_docs_slash_options
+@tanjun.as_slash_command("sake", "Search Sake's documentation")
+def sake_docs_command(
+    ctx: tanjun.abc.Context,
+    component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
+    index: DocIndex = tanjun.cached_inject(
+        utility.FetchedResource(SAKE_PAGES + "/release/search.json", PdocIndex.from_json),
+        expire_after=datetime.timedelta(hours=12),
+    ),
+    **kwargs: typing.Any,
+) -> collections.Awaitable[None]:
+    return _docs_command(ctx, component_client, index, SAKE_PAGES, SAKE_PAGES + "/release/", "Sake", **kwargs)
+
+
+@_with_docs_message_options
 @tanjun.as_message_command("docs tanjun")
 @docs_group.with_command
 @_with_docs_slash_options
@@ -496,7 +514,7 @@ def yuyo_docs_command(
     ),
     **kwargs: typing.Any,
 ) -> collections.Awaitable[None]:
-    return _docs_command(ctx, component_client, index, YUYO_PAGES, YUYO_PAGES + "/release/", "Tanjun", **kwargs)
+    return _docs_command(ctx, component_client, index, YUYO_PAGES, YUYO_PAGES + "/release/", "Yuyo", **kwargs)
 
 
 load_docs = tanjun.Component(name="docs").load_from_scope().make_loader()

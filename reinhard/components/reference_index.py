@@ -48,6 +48,7 @@ import hikari
 import hikari.events
 import hikari.interactions
 import lightbulb
+import sake
 import tanjun
 import yuyo
 
@@ -735,6 +736,23 @@ lightbulb_command = reference_group.with_command(
 lightbulb_command = _with_index_message_options(
     tanjun.MessageCommand(lightbulb_command.callback, "references lightbulb")
 )
+
+sake_command = reference_group.with_command(
+    _with_index_slash_options(
+        tanjun.SlashCommand(
+            _IndexCommand(
+                ReferenceIndex(track_builtins=True, track_3rd_party=True)
+                .index_module(sake, recursive=True)
+                .index_module(hikari, recursive=True)
+                .scan_module(sake, recursive=True),
+                f"Sake v{sake.__version__}",
+            ),
+            "sake",
+            "Find the references for types in Sake",
+        )
+    )
+)
+sake_command = _with_index_message_options(tanjun.MessageCommand(sake_command.callback, "references sake"))
 
 
 tanjun_command = reference_group.with_command(
