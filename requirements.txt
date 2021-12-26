@@ -8,7 +8,7 @@ markdownify~=0.10.1
 psutil~=5.8
 uvloop~=0.16; platform_system != "Windows"
 uvicorn~=0.16
-youtube_dl~=2021.6.6
+youtube_dl~=2021.12.17
 # Since this is for the find references feature, 
 # don't care about versioning like at all.
 hikari-lightbulb
