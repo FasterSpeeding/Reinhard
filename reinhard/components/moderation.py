@@ -371,7 +371,7 @@ class _MultiBanner:
 @tanjun.with_own_permission_check(hikari.Permissions.BAN_MEMBERS)
 @tanjun.with_option("members_only", "--members-only", "-m", converters=tanjun.to_bool, default=False, empty_value=True)
 @tanjun.with_option("clear_message_days", "--clear", "-c", converters=int, default=0)
-@tanjun.with_multi_argument("members", converters=tanjun.parse_user_id)
+@tanjun.with_multi_argument("users", converters=tanjun.parse_user_id)
 @tanjun.as_message_command("ban members")
 @ban_group.with_command
 @tanjun.with_bool_slash_option("members_only", "Only ban users who are currently in the guild.", default=False)

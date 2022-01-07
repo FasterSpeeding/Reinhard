@@ -98,7 +98,10 @@ async def colour_command(ctx: tanjun.abc.Context, color: hikari.Colour | None, r
     default=None,
 )
 @tanjun.as_slash_command("member", "Get information about a member in the current guild.")
-async def member_command(ctx: tanjun.abc.SlashContext, member: hikari.InteractionMember | None) -> None:
+async def member_command(
+    ctx: tanjun.abc.Context,
+    member: hikari.Member | hikari.InteractionMember | None,
+) -> None:
     """Get information about a member in the current guild.
 
     Arguments:
@@ -112,8 +115,9 @@ async def member_command(ctx: tanjun.abc.SlashContext, member: hikari.Interactio
 
     # TODO: might want to try cache first at one point even if it cursifies the whole thing.
     guild = await ctx.rest.fetch_guild(guild=ctx.guild_id)
+    roles = {role.id: role for role in map(guild.roles.get, member.role_ids) if role}
     ordered_roles = sorted(
-        ((role.position, role) for role in map(guild.roles.get, member.role_ids) if role), reverse=True
+        ((role.position, role) for role in roles.values()), reverse=True
     )
 
     roles_repr = "\n".join(map("{0[1].name}: {0[1].id}".format, ordered_roles))
@@ -125,7 +129,13 @@ async def member_command(ctx: tanjun.abc.SlashContext, member: hikari.Interactio
     else:
         colour = hikari.Colour(0)
 
-    permissions_grid = utility.basic_name_grid(member.permissions) or "None"
+    if isinstance(member, hikari.InteractionMember):
+        permissions = member.permissions
+
+    else:
+        permissions =  tanjun.utilities.calculate_permissions(member, guild, roles)
+
+    permissions_grid = utility.basic_name_grid(permissions) or "None"
     member_information = [
         f"Color: {colour}",
         f"Joined Discord: {tanjun.from_datetime(member.user.created_at)}",
