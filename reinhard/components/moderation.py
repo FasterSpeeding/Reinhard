@@ -166,7 +166,7 @@ _CLEAR_PERMS = (
 
 @tanjun.with_own_permission_check(_CLEAR_PERMS)
 @tanjun.with_author_permission_check(_CLEAR_PERMS)
-@tanjun.with_multi_option("users", "--user", "-u", converters=tanjun.parse_user_id, default=())
+@tanjun.with_multi_option("users", "--user", "-u", converters=tanjun.conversion.parse_user_id, default=())
 @_with_filter_message_options
 @tanjun.as_message_command("clear")
 @tanjun.with_own_permission_check(_CLEAR_PERMS)
@@ -228,9 +228,9 @@ async def clear_command(
 
 ban_group = (
     tanjun.slash_command_group("ban", "Ban commands")
-    .add_check(tanjun.GuildCheck())
-    .add_check(tanjun.AuthorPermissionCheck(hikari.Permissions.BAN_MEMBERS))
-    .add_check(tanjun.OwnPermissionCheck(hikari.Permissions.BAN_MEMBERS))
+    .add_check(tanjun.checks.GuildCheck())
+    .add_check(tanjun.checks.AuthorPermissionCheck(hikari.Permissions.BAN_MEMBERS))
+    .add_check(tanjun.checks.OwnPermissionCheck(hikari.Permissions.BAN_MEMBERS))
 )
 
 
@@ -367,16 +367,25 @@ class _MultiBanner:
             return "No members were banned", hikari.UNDEFINED
 
 
+def _assert_days_range(value_: str, /) -> int:
+    value = int(value_)
+    if 7 < value < 0:
+        raise ValueError("Delete message days must be between 0 and 7")
+
+    return value
+
+
 @tanjun.with_author_permission_check(hikari.Permissions.BAN_MEMBERS)
 @tanjun.with_own_permission_check(hikari.Permissions.BAN_MEMBERS)
 @tanjun.with_option("members_only", "--members-only", "-m", converters=tanjun.to_bool, default=False, empty_value=True)
-@tanjun.with_option("clear_message_days", "--clear", "-c", converters=int, default=0)
-@tanjun.with_multi_argument("users", converters=tanjun.parse_user_id)
+@tanjun.with_option("clear_message_days", "--clear", "-c", converters=_assert_days_range, default=0)
+@tanjun.with_multi_argument("users", converters=tanjun.conversion.parse_user_id)
 @tanjun.as_message_command("ban members")
 @ban_group.with_command
 @tanjun.with_bool_slash_option("members_only", "Only ban users who are currently in the guild.", default=False)
-# TODO: max, min
-@tanjun.with_int_slash_option("clear_message_days", "Number of days to clear their recent messages for.", default=0)
+@tanjun.with_int_slash_option(
+    "clear_message_days", "Number of days to clear their recent messages for.", default=0, min_value=0, max_value=7
+)
 @tanjun.with_str_slash_option(
     "users",
     "Space separated sequence of users to ban",
@@ -413,12 +422,14 @@ async def multi_ban_command(
 @tanjun.with_author_permission_check(hikari.Permissions.BAN_MEMBERS)
 @tanjun.with_own_permission_check(hikari.Permissions.BAN_MEMBERS)
 @tanjun.with_option("members_only", "--members-only", "-m", converters=tanjun.to_bool, default=False, empty_value=True)
-@tanjun.with_option("clear_message_days", "--clear", "-c", converters=int, default=0)
+@tanjun.with_option("clear_message_days", "--clear", "-c", converters=_assert_days_range, default=0)
 @_with_filter_message_options
 @tanjun.as_message_command("ban authors")
 @ban_group.with_command
 @tanjun.with_bool_slash_option("members_only", "Only ban users who are currently in the guild.", default=False)
-@tanjun.with_int_slash_option("clear_message_days", "Number of days to clear their recent messages for.", default=0)
+@tanjun.with_int_slash_option(
+    "clear_message_days", "Number of days to clear their recent messages for.", default=0, min_value=0, max_value=7
+)
 @_with_filter_slash_options
 @tanjun.as_slash_command("authors", "Ban the authors of recent messages.")
 async def ban_authors_command(

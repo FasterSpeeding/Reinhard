@@ -116,9 +116,7 @@ async def member_command(
     # TODO: might want to try cache first at one point even if it cursifies the whole thing.
     guild = await ctx.rest.fetch_guild(guild=ctx.guild_id)
     roles = {role.id: role for role in map(guild.roles.get, member.role_ids) if role}
-    ordered_roles = sorted(
-        ((role.position, role) for role in roles.values()), reverse=True
-    )
+    ordered_roles = sorted(((role.position, role) for role in roles.values()), reverse=True)
 
     roles_repr = "\n".join(map("{0[1].name}: {0[1].id}".format, ordered_roles))
 
@@ -133,20 +131,20 @@ async def member_command(
         permissions = member.permissions
 
     else:
-        permissions =  tanjun.utilities.calculate_permissions(member, guild, roles)
+        permissions = tanjun.utilities.calculate_permissions(member, guild, roles)
 
     permissions_grid = utility.basic_name_grid(permissions) or "None"
     member_information = [
         f"Color: {colour}",
-        f"Joined Discord: {tanjun.from_datetime(member.user.created_at)}",
-        f"Joined Server: {tanjun.from_datetime(member.joined_at)}",
+        f"Joined Discord: {tanjun.conversion.from_datetime(member.user.created_at)}",
+        f"Joined Server: {tanjun.conversion.from_datetime(member.joined_at)}",
     ]
 
     if member.nickname:
         member_information.append(f"Nickname: {member.nickname}")
 
     if member.premium_since:
-        member_information.append(f"Boosting since: {tanjun.from_datetime(member.premium_since)}")
+        member_information.append(f"Boosting since: {tanjun.conversion.from_datetime(member.premium_since)}")
 
     if member.user.is_bot:
         member_information.append("System bot" if member.user.is_system else "Bot")
@@ -185,7 +183,7 @@ async def role_command(ctx: tanjun.abc.Context, role: hikari.Role) -> None:
         raise tanjun.CommandError("Role not found")
 
     permissions = utility.basic_name_grid(role.permissions) or "None"
-    role_information = [f"Created: {tanjun.from_datetime(role.created_at)}", f"Position: {role.position}"]
+    role_information = [f"Created: {tanjun.conversion.from_datetime(role.created_at)}", f"Position: {role.position}"]
 
     if role.colour:
         role_information.append(f"Color: `{role.colour}`")
@@ -229,7 +227,7 @@ async def user_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> Non
             colour=utility.embed_colour(),
             description=(
                 f"Bot: {user.is_bot}\nSystem bot: {user.is_system}\n"
-                f"Joined Discord: {tanjun.from_datetime(user.created_at)}\n\nFlags: {int(user.flags)}\n{flags}"
+                f"Joined Discord: {tanjun.conversion.from_datetime(user.created_at)}\n\nFlags: {int(user.flags)}\n{flags}"
             ),
             title=f"{user.username}#{user.discriminator}",
             url=f"https://discord.com/users/{user.id}",
@@ -261,7 +259,7 @@ async def avatar_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> N
     await ctx.respond(embed=embed, component=utility.delete_row(ctx))
 
 
-@tanjun.with_option("channel", "-c", "--channel", converters=tanjun.parse_channel_id, default=None)
+@tanjun.with_option("channel", "-c", "--channel", converters=tanjun.conversion.parse_channel_id, default=None)
 @tanjun.with_argument("message", converters=tanjun.to_snowflake)
 @tanjun.as_message_command("mentions")
 # TODO: check if the user can access the provided channel
