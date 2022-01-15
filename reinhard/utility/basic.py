@@ -110,11 +110,11 @@ def prettify_date(date: datetime.datetime) -> str:
 def prettify_index(index: int, max_digit_count: int) -> str:
     name = str(index).zfill(max_digit_count)
     match index % 10:
-        case 1 if index % 100 == 11:
+        case 1 if index % 100 != 11:
             return f"{name}st"
-        case 2 if index % 100 == 12:
+        case 2 if index % 100 != 12:
             return f"{name}nd"
-        case 3 if index % 100 == 13:
+        case 3 if index % 100 != 13:
             return f"{name}rd"
         case _:
             return f"{name}th"

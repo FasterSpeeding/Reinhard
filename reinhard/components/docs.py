@@ -88,8 +88,17 @@ class DocEntry:
     qualname: str
     """The entry's qualified name."""
 
-    parameters: list[str] | None
+    signature: list[str] | None
     """A list of the entry's parameter names if this is a function."""
+
+    bases: str | None
+    """The classes a class inherits from."""
+
+    default_value: str | None
+    """The value assigned to the initial annotated declaration of a variable."""
+
+    annotation: str | None
+    """Annotation of a variable."""
 
     @classmethod
     def from_entry(cls, data: dict[str, typing.Any], doc: str, /) -> DocEntry:
@@ -99,22 +108,27 @@ class DocEntry:
             data.get("funcdef"),
             data["fullname"],
             data["modulename"],
-            data["qualname"],
-            data.get("parameters"),
+            # qualname isn't included for modules on 8.3.0 so we can use fullname
+            # or modulename as a default here
+            data.get("qualname") or data["fullname"],
+            data.get("signature"),
+            data.get("bases") or None,
+            data.get("default_value"),
+            data.get("annotation"),
         )
 
 
-def _collect_pdoc_paths(data: dict[str, typing.Any], path_filter: str = "") -> collections.Iterator[str]:
+def _collect_pdoc_paths(data: dict[str, typing.Any], /, *, target: str = "") -> collections.Iterator[str]:
     if docs := data.get("docs"):
-        if path_filter:
-            yield from (key for key in docs.keys() if key.rsplit(".", 1)[0].lower().endswith(path_filter))
+        if target:
+            yield from (key for key in docs.keys() if target in key.lower())
 
         else:
             yield from docs.keys()
 
     for key, value in data.items():
         if key not in SPECIAL_KEYS:
-            yield from _collect_pdoc_paths(value, path_filter=path_filter)
+            yield from _collect_pdoc_paths(value, target=target)
 
 
 class DocIndex(abc.ABC):
@@ -200,10 +214,9 @@ class DocIndex(abc.ABC):
             return
 
         try:
-            path, name = search_path.rsplit(".", 1)
+            _, name = search_path.rsplit(".", 1)[-1].rsplit("_", 1)
         except ValueError:
-            path = ""
-            name = search_path
+            name = search_path.rsplit(".", 1)[-1]
 
         position: dict[str, typing.Any] = self._search_index["root"]
         for char in name:
@@ -220,7 +233,7 @@ class DocIndex(abc.ABC):
 
         # Since this is recursive we need to check for duplicated entries.
         already_yielded = set[str]()
-        for path in _collect_pdoc_paths(position, path_filter=path):
+        for path in _collect_pdoc_paths(position, target=search_path):
             if path not in already_yielded:
                 already_yielded.add(path)
                 yield self._metadata[path]
@@ -280,9 +293,10 @@ def process_hikari_index(data: dict[str, typing.Any]) -> dict[str, typing.Any]:
             "fullname": fullpath,
             "modulename": path[:last_dot],
             "qualname": fullpath.removeprefix(path[:last_dot] + "."),
-            "parameters": [PLACEHOLDER],
+            "signature": PLACEHOLDER,
+            "bases": [PLACEHOLDER],
         }
-        for node in map(str.lower, path.split(".")):
+        for node in map(str.lower, path.rsplit(".")[-1].split("_")):
             position: dict[str, typing.Any] = index_store
             for char in node:
                 try:
@@ -336,12 +350,18 @@ def _form_description(metadata: DocEntry, *, desc_splitter: str = "\n") -> str:
             summary += desc_splitter
     else:
         summary = "NONE"
-    if metadata.func_def:
-        type_line = "Type: Async function" if metadata.func_def == "async def" else "Type: Sync function"
-        params = ", ".join(metadata.parameters or "")
-        return f"{type_line}\n\nSummary:\n```md\n{summary}\n```\nParameters:\n`{params}`"
 
-    return f"Type: {metadata.type.capitalize()}\n\nSummary\n```md\n{summary}\n```"
+    match metadata.type:
+        case "function":
+            type_line = "Type: Async function" if metadata.func_def == "async def" else "Type: Sync function"
+            return f"{type_line}\n\nSummary:\n```{summary}```\nSignature:\n```py\n{metadata.signature}```"
+        case "variable":
+            annotation = (metadata.annotation or "NONE").removeprefix(":").lstrip()
+            return f"Type: Variable\n\nSummary\n```{summary}```\nAnnotation: `{annotation}`"
+        case "class":
+            return f"Type: Class\n\nSummary\n```{summary}```\nBases: `({metadata.bases})`"
+        case _:
+            return f"Type: {metadata.type.capitalize()}\n\nSummary\n```{summary}```"
 
 
 async def _docs_command(
@@ -475,12 +495,12 @@ def sake_docs_command(
     ctx: tanjun.abc.Context,
     component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
     index: DocIndex = tanjun.cached_inject(
-        utility.FetchedResource(SAKE_PAGES + "/release/search.json", PdocIndex.from_json),
+        utility.FetchedResource(SAKE_PAGES + "/master/search.json", PdocIndex.from_json),
         expire_after=datetime.timedelta(hours=12),
     ),
     **kwargs: typing.Any,
 ) -> collections.Awaitable[None]:
-    return _docs_command(ctx, component_client, index, SAKE_PAGES, SAKE_PAGES + "/release/", "Sake", **kwargs)
+    return _docs_command(ctx, component_client, index, SAKE_PAGES, SAKE_PAGES + "/master/", "Sake", **kwargs)
 
 
 @_with_docs_message_options
@@ -492,12 +512,12 @@ def tanjun_docs_command(
     ctx: tanjun.abc.Context,
     component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
     index: DocIndex = tanjun.cached_inject(
-        utility.FetchedResource(TANJUN_PAGES + "/release/search.json", PdocIndex.from_json),
+        utility.FetchedResource(TANJUN_PAGES + "/master/search.json", PdocIndex.from_json),
         expire_after=datetime.timedelta(hours=12),
     ),
     **kwargs: typing.Any,
 ) -> collections.Awaitable[None]:
-    return _docs_command(ctx, component_client, index, TANJUN_PAGES, TANJUN_PAGES + "/release/", "Tanjun", **kwargs)
+    return _docs_command(ctx, component_client, index, TANJUN_PAGES, TANJUN_PAGES + "/master/", "Tanjun", **kwargs)
 
 
 @_with_docs_message_options
@@ -509,12 +529,12 @@ def yuyo_docs_command(
     ctx: tanjun.abc.Context,
     component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
     index: DocIndex = tanjun.cached_inject(
-        utility.FetchedResource(YUYO_PAGES + "/release/search.json", PdocIndex.from_json),
+        utility.FetchedResource(YUYO_PAGES + "/master/search.json", PdocIndex.from_json),
         expire_after=datetime.timedelta(hours=12),
     ),
     **kwargs: typing.Any,
 ) -> collections.Awaitable[None]:
-    return _docs_command(ctx, component_client, index, YUYO_PAGES, YUYO_PAGES + "/release/", "Yuyo", **kwargs)
+    return _docs_command(ctx, component_client, index, YUYO_PAGES, YUYO_PAGES + "/master/", "Yuyo", **kwargs)
 
 
 load_docs = tanjun.Component(name="docs").load_from_scope().make_loader()
