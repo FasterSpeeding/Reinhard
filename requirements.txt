@@ -7,7 +7,7 @@ hikari-yuyo~=1.0.5a1.post1
 markdownify~=0.10.2
 psutil~=5.9
 uvloop~=0.16; platform_system != "Windows"
-uvicorn~=0.16
+uvicorn~=0.17
 youtube_dl~=2021.12.17
 # Since this is for the find references feature, 
 # don't care about versioning like at all.
