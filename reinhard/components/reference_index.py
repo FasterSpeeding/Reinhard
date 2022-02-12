@@ -94,7 +94,7 @@ def _add_search_entry(index: dict[str, typing.Any], path: str) -> None:
         index[_END_KEY] = [path]
 
 
-def _search_tree(index: dict[str, typing.Any], path: str) -> typing.Optional[str]:
+def _search_tree(index: dict[str, typing.Any], path: str, partial_search: bool = False) -> collections.Iterator[str]:
     for char in path.rsplit(".", 1)[-1].lower():
         if new_position := index.get(char):
             index = new_position
@@ -105,8 +105,8 @@ def _search_tree(index: dict[str, typing.Any], path: str) -> typing.Optional[str
     if end := index.get(_END_KEY):
         key: str
         for key in end:
-            if key.endswith(path):
-                return key
+            if partial_search or key.endswith(path):
+                yield key
 
 
 def _combine_imports(part_1: str, part_2: str) -> str:
@@ -125,7 +125,7 @@ def _process_relative_import(import_link: str, current_module: str) -> str:
     return current_module.rsplit(".", dot_count)[0] + import_link[dot_count - 1 :]
 
 
-def _split_by_tl_commas(string: str) -> typing.Iterator[str]:
+def _split_by_tl_commas(string: str) -> collections.Iterator[str]:
     depth = 0
     last_comma = 0
     for index, char in enumerate(string):
@@ -309,7 +309,7 @@ class ReferenceIndex:
         # TODO: can we special case generic types here to capture their inner-values?
         return path_to
 
-    def _handle_annotation(self, module_name: str, path: str, annotation: typing.Union[type[typing.Any], str]) -> None:
+    def _handle_annotation(self, module_name: str, path: str, annotation: type[typing.Any] | str) -> None:
         if not isinstance(annotation, str):
             return
 
@@ -351,7 +351,7 @@ class ReferenceIndex:
 
     def _recurse_module(
         self,
-        obj: typing.Union[types.MethodType, types.FunctionType, type[typing.Any], classmethod[typing.Any], property],
+        obj: types.MethodType | types.FunctionType | type[typing.Any] | classmethod[typing.Any] | property,
         /,
         *,
         path: typing.Optional[str] = None,
@@ -592,12 +592,16 @@ class ReferenceIndex:
 
             If the type was not found then `None` is returned.
         """
-        if result := _search_tree(self._object_search_tree, path):
+        if result := next(_search_tree(self._object_search_tree, path), None):
             return (result, self._object_paths_to_uses[result])
 
-        if result := _search_tree(self._alias_search_tree, path):
+        if result := next(_search_tree(self._alias_search_tree, path), None):
             result = self._aliases[result]
             return result, self._object_paths_to_uses[result]
+
+    def search_paths(self, path: str, /, partial_search: bool = False) -> collections.Iterator[str]:
+        yield from _search_tree(self._object_search_tree, path, True)
+        yield from _search_tree(self._alias_search_tree, path, True)
 
     def get_references(self, path: str, /) -> typing.Optional[collections.Sequence[str]]:
         """Get the tracked references for a type by its absolute path.
@@ -680,6 +684,14 @@ class _IndexCommand:
         component_client.set_executor(message, executor)
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class _IndexAutocomplete:
+    index: ReferenceIndex
+
+    async def __call__(self, ctx: tanjun.abc.AutocompleteContext, value: str) -> None:
+        await ctx.set_choices({entry: entry for entry, _ in zip(self.index.search_paths(value), range(25))})
+
+
 def _with_index_message_options(command: _MessageCommandT) -> _MessageCommandT:
     return command.set_parser(
         tanjun.ShlexParser()
@@ -689,9 +701,11 @@ def _with_index_message_options(command: _MessageCommandT) -> _MessageCommandT:
     )
 
 
-def _with_index_slash_options(command: _SlashCommandT, /) -> _SlashCommandT:
+def _with_index_slash_options(command: _SlashCommandT, index: ReferenceIndex, /) -> _SlashCommandT:
     return (
-        command.add_str_option("path", "Path to the type to find references for")
+        command.add_str_option(
+            "path", "Path to the type to find references for", autocomplete=_IndexAutocomplete(index)
+        )
         .add_bool_option("absolute", "Whether to treat path as an absolute path rather than search path", default=False)
         .add_bool_option(
             "public",
@@ -701,91 +715,108 @@ def _with_index_slash_options(command: _SlashCommandT, /) -> _SlashCommandT:
     )
 
 
+hikari_index = (
+    ReferenceIndex(track_builtins=True, track_3rd_party=True)
+    .index_module(hikari, recursive=True)
+    .scan_indexed_modules()
+)
 hikari_command = reference_group.with_command(
     _with_index_slash_options(
         tanjun.SlashCommand(
-            _IndexCommand(
-                ReferenceIndex(track_builtins=True, track_3rd_party=True)
-                .index_module(hikari, recursive=True)
-                .scan_indexed_modules(),
-                f"Hikari v{hikari.__version__}",
-            ),
+            _IndexCommand(hikari_index, f"Hikari v{hikari.__version__}"),
             "hikari",
             "Find the references for types in hikari",
-        )
+        ),
+        hikari_index,
     )
 )
 hikari_command = _with_index_message_options(tanjun.MessageCommand(hikari_command.callback, "references hikari"))
 
 
+lightbulb_index = (
+    ReferenceIndex(track_builtins=True, track_3rd_party=True)
+    .index_module(lightbulb, recursive=True)
+    .index_module(hikari, recursive=True)
+    .scan_module(lightbulb, recursive=True)
+)
 lightbulb_command = reference_group.with_command(
     _with_index_slash_options(
         tanjun.SlashCommand(
             _IndexCommand(
-                ReferenceIndex(track_builtins=True, track_3rd_party=True)
-                .index_module(lightbulb, recursive=True)
-                .index_module(hikari, recursive=True)
-                .scan_module(lightbulb, recursive=True),
+                lightbulb_index,
                 f"Lightbulb v{lightbulb.__version__}",
             ),
             "lightbulb",
             "Find the references for types in lightbulb",
-        )
+        ),
+        lightbulb_index,
     )
 )
 lightbulb_command = _with_index_message_options(
     tanjun.MessageCommand(lightbulb_command.callback, "references lightbulb")
 )
 
+sake_index = (
+    ReferenceIndex(track_builtins=True, track_3rd_party=True)
+    .index_module(sake, recursive=True)
+    .index_module(hikari, recursive=True)
+    .scan_module(sake, recursive=True)
+)
 sake_command = reference_group.with_command(
     _with_index_slash_options(
         tanjun.SlashCommand(
             _IndexCommand(
-                ReferenceIndex(track_builtins=True, track_3rd_party=True)
-                .index_module(sake, recursive=True)
-                .index_module(hikari, recursive=True)
-                .scan_module(sake, recursive=True),
+                sake_index,
                 f"Sake v{sake.__version__}",
             ),
             "sake",
             "Find the references for types in Sake",
-        )
+        ),
+        sake_index,
     )
 )
 sake_command = _with_index_message_options(tanjun.MessageCommand(sake_command.callback, "references sake"))
 
 
+tanjun_index = (
+    ReferenceIndex(track_builtins=True, track_3rd_party=True)
+    .index_module(tanjun, recursive=True)
+    .index_module(hikari, recursive=True)
+    .scan_module(tanjun, recursive=True)
+)
 tanjun_command = reference_group.with_command(
     _with_index_slash_options(
         tanjun.SlashCommand(
             _IndexCommand(
-                ReferenceIndex(track_builtins=True, track_3rd_party=True)
-                .index_module(tanjun, recursive=True)
-                .index_module(hikari, recursive=True)
-                .scan_module(tanjun, recursive=True),
+                tanjun_index,
                 f"Tanjun v{tanjun.__version__}",
             ),
             "tanjun",
             "Find the references for types in Tanjun",
-        )
+        ),
+        tanjun_index,
     )
 )
 tanjun_command = _with_index_message_options(tanjun.MessageCommand(tanjun_command.callback, "references tanjun"))
 
 
+yuyo_index = (
+    ReferenceIndex(track_builtins=True, track_3rd_party=True)
+    .index_module(yuyo, recursive=True)
+    .index_module(hikari, recursive=True)
+    .scan_module(yuyo, recursive=True)
+)
 yuyo_command = reference_group.with_command(
     _with_index_slash_options(
         tanjun.SlashCommand(
             _IndexCommand(
-                ReferenceIndex(track_builtins=True, track_3rd_party=True)
-                .index_module(yuyo, recursive=True)
-                .index_module(hikari, recursive=True)
-                .scan_module(yuyo, recursive=True),
+                yuyo_index,
                 f"Yuyo v{yuyo.__version__}",
             ),
             "yuyo",
             "Find the references for a Yuyo type in Yuyo",
-        )
+        ),
+        yuyo_index,
     )
 )
 yuyo_command = _with_index_message_options(tanjun.MessageCommand(yuyo_command.callback, "references yuyo"))

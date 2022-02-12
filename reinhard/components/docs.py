@@ -441,16 +441,43 @@ async def _docs_command(
     await ctx.respond("Entry not found", component=utility.delete_row(ctx))
 
 
-def _with_docs_slash_options(command: _SlashCommandT, /) -> _SlashCommandT:
-    return (
-        command.add_str_option("path", "Optional path to query the documentation by.", default=None)
-        .add_bool_option(
-            "public",
-            "Whether other people should be able to interact with the response. Defaults to False",
-            default=False,
+def make_autocomplete(
+    get_index: collections.Callable[..., collections.Awaitable[_DocIndexT]]
+) -> tanjun.abc.AutocompleteCallbackSig:
+    async def _autocomplete(
+        ctx: tanjun.abc.AutocompleteContext,
+        value: str,
+        index: _DocIndexT = tanjun.inject(callback=get_index),
+    ) -> None:
+        """Autocomplete strategy."""
+        if not value:
+            return
+
+        await ctx.set_choices({entry.qualname: entry.qualname for entry, _ in zip(index.search(value), range(25))})
+
+    return _autocomplete
+
+
+def _with_docs_slash_options(
+    get_index: collections.Callable[..., collections.Awaitable[_DocIndexT]], /
+) -> collections.Callable[[_SlashCommandT], _SlashCommandT]:
+    def decorator(command: _SlashCommandT, /) -> _SlashCommandT:
+        return (
+            command.add_str_option(
+                "path",
+                "Optional path to query the documentation by.",
+                default=None,
+                autocomplete=make_autocomplete(get_index),
+            )
+            .add_bool_option(
+                "public",
+                "Whether other people should be able to interact with the response. Defaults to False",
+                default=False,
+            )
+            .add_bool_option("list", "Whether this should return alist of links. Defaults to False.", default=False)
         )
-        .add_bool_option("list", "Whether this should return alist of links. Defaults to False.", default=False)
-    )
+
+    return decorator
 
 
 def _with_docs_message_options(command: _MessageCommandT, /) -> _MessageCommandT:
@@ -462,17 +489,20 @@ def _with_docs_message_options(command: _MessageCommandT, /) -> _MessageCommandT
     )
 
 
+hikari_index = tanjun.dependencies.data.cache_callback(
+    utility.FetchedResource(HIKARI_PAGES + "/hikari/index.json", HikariIndex.from_json),
+    expire_after=datetime.timedelta(hours=12),
+)
+
+
 @_with_docs_message_options
 @tanjun.as_message_command("docs hikari")
 @docs_group.with_command
-@_with_docs_slash_options
+@_with_docs_slash_options(hikari_index)
 @tanjun.as_slash_command("hikari", "Search Hikari's documentation")
 def docs_hikari_command(
     ctx: tanjun.abc.Context,
-    index: HikariIndex = tanjun.cached_inject(
-        utility.FetchedResource(HIKARI_PAGES + "/hikari/index.json", HikariIndex.from_json),
-        expire_after=datetime.timedelta(hours=12),
-    ),
+    index: HikariIndex = tanjun.inject(callback=hikari_index),
     component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
     **kwargs: typing.Any,
 ) -> collections.Awaitable[None]:
@@ -486,52 +516,61 @@ def docs_hikari_command(
     )
 
 
+sake_index = tanjun.dependencies.data.cache_callback(
+    utility.FetchedResource(SAKE_PAGES + "/master/search.json", PdocIndex.from_json),
+    expire_after=datetime.timedelta(hours=12),
+)
+
+
 @_with_docs_message_options
 @tanjun.as_message_command("docs sake")
 @docs_group.with_command
-@_with_docs_slash_options
+@_with_docs_slash_options(sake_index)
 @tanjun.as_slash_command("sake", "Search Sake's documentation")
 def sake_docs_command(
     ctx: tanjun.abc.Context,
     component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
-    index: DocIndex = tanjun.cached_inject(
-        utility.FetchedResource(SAKE_PAGES + "/master/search.json", PdocIndex.from_json),
-        expire_after=datetime.timedelta(hours=12),
-    ),
+    index: DocIndex = tanjun.inject(callback=sake_index),
     **kwargs: typing.Any,
 ) -> collections.Awaitable[None]:
     return _docs_command(ctx, component_client, index, SAKE_PAGES, SAKE_PAGES + "/master/", "Sake", **kwargs)
 
 
+tanjun_index = tanjun.dependencies.data.cache_callback(
+    utility.FetchedResource(TANJUN_PAGES + "/master/search.json", PdocIndex.from_json),
+    expire_after=datetime.timedelta(hours=12),
+)
+
+
 @_with_docs_message_options
 @tanjun.as_message_command("docs tanjun")
 @docs_group.with_command
-@_with_docs_slash_options
+@_with_docs_slash_options(tanjun_index)
 @tanjun.as_slash_command("tanjun", "Search Tanjun's documentation")
 def tanjun_docs_command(
     ctx: tanjun.abc.Context,
     component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
-    index: DocIndex = tanjun.cached_inject(
-        utility.FetchedResource(TANJUN_PAGES + "/master/search.json", PdocIndex.from_json),
-        expire_after=datetime.timedelta(hours=12),
-    ),
+    index: DocIndex = tanjun.inject(callback=tanjun_index),
     **kwargs: typing.Any,
 ) -> collections.Awaitable[None]:
     return _docs_command(ctx, component_client, index, TANJUN_PAGES, TANJUN_PAGES + "/master/", "Tanjun", **kwargs)
 
 
+yuyo_index = tanjun.dependencies.data.cache_callback(
+    utility.FetchedResource(YUYO_PAGES + "/master/search.json", PdocIndex.from_json),
+    expire_after=datetime.timedelta(hours=12),
+)
+
+
 @_with_docs_message_options
 @tanjun.as_message_command("docs yuyo")
 @docs_group.with_command
-@_with_docs_slash_options
+@_with_docs_slash_options(yuyo_index)
 @tanjun.as_slash_command("yuyo", "Search Yuyo's documentation")
 def yuyo_docs_command(
     ctx: tanjun.abc.Context,
     component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
-    index: DocIndex = tanjun.cached_inject(
-        utility.FetchedResource(YUYO_PAGES + "/master/search.json", PdocIndex.from_json),
-        expire_after=datetime.timedelta(hours=12),
-    ),
+    index: DocIndex = tanjun.inject(callback=yuyo_index),
     **kwargs: typing.Any,
 ) -> collections.Awaitable[None]:
     return _docs_command(ctx, component_client, index, YUYO_PAGES, YUYO_PAGES + "/master/", "Yuyo", **kwargs)

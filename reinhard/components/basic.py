@@ -56,7 +56,7 @@ async def about_command(
     """Get basic information about the current bot instance."""
     start_date = datetime.datetime.fromtimestamp(process.create_time())
     uptime = datetime.datetime.now() - start_date
-    memory_usage: float = process.memory_full_info().uss / 1024 ** 2
+    memory_usage: float = process.memory_full_info().uss / 1024**2
     cpu_usage: float = process.cpu_percent() / psutil.cpu_count()
     memory_percent: float = process.memory_percent()
 
@@ -143,7 +143,7 @@ async def cache_command(
     """Get general information about this bot."""
     start_date = datetime.datetime.fromtimestamp(process.create_time())
     uptime = datetime.datetime.now() - start_date
-    memory_usage: float = process.memory_full_info().uss / 1024 ** 2
+    memory_usage: float = process.memory_full_info().uss / 1024**2
     cpu_usage: float = process.cpu_percent() / psutil.cpu_count()
     memory_percent: float = process.memory_percent()
 

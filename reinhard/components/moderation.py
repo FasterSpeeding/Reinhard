@@ -252,6 +252,7 @@ class _MultiBanner:
     author_is_guild_owner: bool
     guild: hikari.Guild
     delete_message_days: int
+    # joined_after:
     members_only: bool
     roles: collections.Mapping[hikari.Snowflake, hikari.Role]
     passed: set[hikari.Snowflake] = dataclasses.field(default_factory=set)
