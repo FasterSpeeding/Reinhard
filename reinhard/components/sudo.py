@@ -108,8 +108,8 @@ def _yields_results(*args: io.StringIO) -> collections.Iterator[str]:
 
 def build_eval_globals(ctx: tanjun.abc.Context, component: tanjun.abc.Component, /) -> dict[str, typing.Any]:
     return {
-        "asyncio": asyncio,
         "app": ctx.shards,
+        "asyncio": asyncio,
         "bot": ctx.shards,
         "client": ctx.client,
         "component": component,
@@ -129,16 +129,17 @@ async def eval_python_code(
     stack.enter_context(contextlib.redirect_stdout(stdout))
     stack.enter_context(contextlib.redirect_stderr(stderr))
 
-    with stack:
-        start_time = time.perf_counter()
-        try:
+    start_time = time.perf_counter()
+    try:
+        with stack:
             await eval_python_code_no_capture(ctx, component, "<string>", code)
-            failed = False
-        except Exception:
-            traceback.print_exc(file=stderr)
-            failed = True
-        finally:
-            exec_time = round((time.perf_counter() - start_time) * 1000)
+
+        failed = False
+    except Exception:
+        traceback.print_exc(file=stderr)
+        failed = True
+    finally:
+        exec_time = round((time.perf_counter() - start_time) * 1000)
 
     stdout.seek(0)
     stderr.seek(0)
