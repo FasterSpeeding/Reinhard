@@ -106,19 +106,6 @@ def _yields_results(*args: io.StringIO) -> collections.Iterator[str]:
             yield from (line[:-1] for line in lines)
 
 
-def build_eval_globals(ctx: tanjun.abc.Context, component: tanjun.abc.Component, /) -> dict[str, typing.Any]:
-    return {
-        "app": ctx.shards,
-        "asyncio": asyncio,
-        "bot": ctx.shards,
-        "client": ctx.client,
-        "component": component,
-        "ctx": ctx,
-        "hikari": hikari,
-        "tanjun": tanjun,
-    }
-
-
 async def eval_python_code(
     ctx: tanjun.abc.Context, component: tanjun.abc.Component, code: str
 ) -> tuple[io.StringIO, io.StringIO, int, bool]:
@@ -149,7 +136,16 @@ async def eval_python_code(
 async def eval_python_code_no_capture(
     ctx: tanjun.abc.Context, component: tanjun.abc.Component, file_name: str, code: str
 ) -> None:
-    globals_ = build_eval_globals(ctx, component)
+    globals_ = {
+        "app": ctx.shards,
+        "asyncio": asyncio,
+        "bot": ctx.shards,
+        "client": ctx.client,
+        "component": component,
+        "ctx": ctx,
+        "hikari": hikari,
+        "tanjun": tanjun,
+    }
     compiled_code = compile(code, file_name, "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
     if compiled_code.co_flags & inspect.CO_COROUTINE:
         await eval(compiled_code, globals_)
