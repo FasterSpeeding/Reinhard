@@ -38,7 +38,9 @@ import datetime
 import math
 import platform
 import time
+import typing
 
+import alluka
 import hikari
 import psutil
 import tanjun
@@ -51,7 +53,7 @@ from .. import utility
 @tanjun.as_slash_command("about", "Get basic information about the current bot instance.")
 async def about_command(
     ctx: tanjun.abc.Context,
-    process: psutil.Process = tanjun.cached_inject(psutil.Process),
+    process: alluka.Injected[psutil.Process],
 ) -> None:
     """Get basic information about the current bot instance."""
     start_date = datetime.datetime.fromtimestamp(process.create_time())
@@ -136,9 +138,9 @@ def cache_check(ctx: tanjun.abc.Context) -> bool:
 @tanjun.as_slash_command("cache", "Get general information about this bot's cache.")
 async def cache_command(
     ctx: tanjun.abc.Context,
-    process: psutil.Process = tanjun.cached_inject(psutil.Process),
-    cache: hikari.api.Cache = tanjun.inject(type=hikari.api.Cache),
-    me: hikari.OwnUser = tanjun.inject_lc(hikari.OwnUser),
+    cache: alluka.Injected[hikari.api.Cache],
+    me: typing.Annotated[hikari.OwnUser, tanjun.inject_lc(hikari.OwnUser)],
+    process: typing.Annotated[psutil.Process, tanjun.cached_inject(psutil.Process)],
 ) -> None:
     """Get general information about this bot."""
     start_date = datetime.datetime.fromtimestamp(process.create_time())
@@ -185,7 +187,9 @@ async def cache_command(
 
 @tanjun.as_message_command("invite")
 @tanjun.as_slash_command("invite", "Invite the bot to your server(s)")
-async def invite_command(ctx: tanjun.abc.Context, me: hikari.OwnUser = tanjun.inject_lc(hikari.OwnUser)) -> None:
+async def invite_command(
+    ctx: tanjun.abc.Context, me: typing.Annotated[hikari.OwnUser, tanjun.inject_lc(hikari.OwnUser)]
+) -> None:
     await ctx.respond(
         f"https://discord.com/oauth2/authorize?client_id={me.id}&scope=bot%20applications.commands&permissions=8",
         component=utility.delete_row(ctx),

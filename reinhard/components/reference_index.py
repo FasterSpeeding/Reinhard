@@ -44,6 +44,7 @@ import types
 import typing
 from collections import abc as collections
 
+import alluka
 import hikari
 import hikari.events
 import hikari.interactions
@@ -639,7 +640,7 @@ class _IndexCommand:
         path: str,
         absolute: bool,
         public: bool,
-        component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
+        component_client: alluka.Injected[yuyo.ComponentClient],
     ) -> None:
         if absolute:
             if not (result := self.index.get_references(path)):

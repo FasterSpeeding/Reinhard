@@ -41,6 +41,7 @@ import datetime
 import json
 import typing
 
+import alluka
 import hikari
 import markdownify  # pyright: reportMissingTypeStubs=warning
 import tanjun
@@ -50,6 +51,8 @@ from .. import utility
 
 docs_group = tanjun.slash_command_group("docs", "Search relevant document sites.")
 
+_T = typing.TypeVar("_T")
+_CoroT = typing.Coroutine[typing.Any, typing.Any, _T]
 _DocIndexT = typing.TypeVar("_DocIndexT", bound="DocIndex")
 _MessageCommandT = typing.TypeVar("_MessageCommandT", bound=tanjun.MessageCommand[typing.Any])
 _SlashCommandT = typing.TypeVar("_SlashCommandT", bound=tanjun.SlashCommand[typing.Any])
@@ -441,13 +444,12 @@ async def _docs_command(
     await ctx.respond("Entry not found", component=utility.delete_row(ctx))
 
 
-def make_autocomplete(
-    get_index: collections.Callable[..., collections.Awaitable[_DocIndexT]]
-) -> tanjun.abc.AutocompleteCallbackSig:
+def make_autocomplete(get_index: collections.Callable[..., _CoroT[_DocIndexT]]) -> tanjun.abc.AutocompleteCallbackSig:
     async def _autocomplete(
         ctx: tanjun.abc.AutocompleteContext,
         value: str,
-        index: _DocIndexT = tanjun.inject(callback=get_index),
+        # Annotated can't be used here cause forward annotations
+        index: _DocIndexT = alluka.inject(callback=get_index),
     ) -> None:
         """Autocomplete strategy."""
         if not value:
@@ -459,7 +461,7 @@ def make_autocomplete(
 
 
 def _with_docs_slash_options(
-    get_index: collections.Callable[..., collections.Awaitable[_DocIndexT]], /
+    get_index: collections.Callable[..., _CoroT[_DocIndexT]], /
 ) -> collections.Callable[[_SlashCommandT], _SlashCommandT]:
     def decorator(command: _SlashCommandT, /) -> _SlashCommandT:
         return (
@@ -502,10 +504,10 @@ hikari_index = tanjun.dependencies.data.cache_callback(
 @tanjun.as_slash_command("hikari", "Search Hikari's documentation")
 def docs_hikari_command(
     ctx: tanjun.abc.Context,
-    index: HikariIndex = tanjun.inject(callback=hikari_index),
-    component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
+    component_client: alluka.Injected[yuyo.ComponentClient],
+    index: typing.Annotated[HikariIndex, alluka.inject(callback=hikari_index)],
     **kwargs: typing.Any,
-) -> collections.Awaitable[None]:
+) -> _CoroT[None]:
     """Search Hikari's documentation.
 
     Arguments
@@ -529,10 +531,10 @@ sake_index = tanjun.dependencies.data.cache_callback(
 @tanjun.as_slash_command("sake", "Search Sake's documentation")
 def sake_docs_command(
     ctx: tanjun.abc.Context,
-    component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
-    index: DocIndex = tanjun.inject(callback=sake_index),
+    component_client: alluka.Injected[yuyo.ComponentClient],
+    index: typing.Annotated[DocIndex, alluka.inject(callback=sake_index)],
     **kwargs: typing.Any,
-) -> collections.Awaitable[None]:
+) -> _CoroT[None]:
     return _docs_command(ctx, component_client, index, SAKE_PAGES, SAKE_PAGES + "/master/", "Sake", **kwargs)
 
 
@@ -549,10 +551,10 @@ tanjun_index = tanjun.dependencies.data.cache_callback(
 @tanjun.as_slash_command("tanjun", "Search Tanjun's documentation")
 def tanjun_docs_command(
     ctx: tanjun.abc.Context,
-    component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
-    index: DocIndex = tanjun.inject(callback=tanjun_index),
+    component_client: alluka.Injected[yuyo.ComponentClient],
+    index: typing.Annotated[DocIndex, alluka.inject(callback=tanjun_index)],
     **kwargs: typing.Any,
-) -> collections.Awaitable[None]:
+) -> _CoroT[None]:
     return _docs_command(ctx, component_client, index, TANJUN_PAGES, TANJUN_PAGES + "/master/", "Tanjun", **kwargs)
 
 
@@ -569,10 +571,10 @@ yuyo_index = tanjun.dependencies.data.cache_callback(
 @tanjun.as_slash_command("yuyo", "Search Yuyo's documentation")
 def yuyo_docs_command(
     ctx: tanjun.abc.Context,
-    component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
-    index: DocIndex = tanjun.inject(callback=yuyo_index),
+    component_client: alluka.Injected[yuyo.ComponentClient],
+    index: typing.Annotated[DocIndex, alluka.inject(callback=yuyo_index)],
     **kwargs: typing.Any,
-) -> collections.Awaitable[None]:
+) -> _CoroT[None]:
     return _docs_command(ctx, component_client, index, YUYO_PAGES, YUYO_PAGES + "/master/", "Yuyo", **kwargs)
 
 

@@ -46,6 +46,7 @@ import traceback
 import typing
 from collections import abc as collections
 
+import alluka
 import hikari
 import tanjun
 import yuyo
@@ -70,7 +71,7 @@ async def echo_command(
     ctx: tanjun.abc.Context,
     content: hikari.UndefinedOr[str],
     raw_embed: hikari.UndefinedOr[dict[str, typing.Any]],
-    entity_factory: traits.EntityFactoryAware = tanjun.inject(type=traits.EntityFactoryAware),
+    entity_factory: alluka.Injected[traits.EntityFactoryAware],
 ) -> None:
     """Command used for getting the bot to mirror a response.
 
@@ -173,11 +174,11 @@ def _bytes_from_io(
 @tanjun.as_message_command("eval", "exec")
 async def eval_command(
     ctx: tanjun.abc.MessageContext,
+    component: alluka.Injected[tanjun.abc.Component],
+    component_client: alluka.Injected[yuyo.ComponentClient],
     file_output: bool = False,
     # ephemeral_response: bool = False,
     suppress_response: bool = False,
-    component: tanjun.abc.Component = tanjun.inject(type=tanjun.abc.Component),
-    component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
 ) -> None:
     """Dynamically evaluate a script in the bot's environment.
 

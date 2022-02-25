@@ -38,6 +38,7 @@ import logging
 import typing
 
 import aiohttp
+import alluka
 import tanjun
 
 if typing.TYPE_CHECKING:
@@ -75,7 +76,7 @@ class SessionManager:
         )
 
     # TODO: switch over to tanjun.InjectorClient
-    def open(self, client: tanjun.Client = tanjun.inject(type=tanjun.Client)) -> None:
+    def open(self, client: alluka.Injected[tanjun.Client]) -> None:
         """Start the session.
 
         This will normally be called by a client callback.
@@ -99,7 +100,7 @@ class SessionManager:
         client.set_type_dependency(aiohttp.ClientSession, self._session)
         _LOGGER.debug("acquired new aiohttp client session")
 
-    async def close(self, client: tanjun.Client = tanjun.inject(type=tanjun.Client)) -> None:
+    async def close(self, client: alluka.Injected[tanjun.Client]) -> None:
         if not self._session:
             raise RuntimeError("Session not running")
 

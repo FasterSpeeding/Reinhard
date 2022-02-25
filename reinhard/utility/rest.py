@@ -39,6 +39,7 @@ import typing
 from collections import abc as collections
 
 import aiohttp
+import alluka
 import tanjun
 from yuyo import backoff
 
@@ -100,7 +101,7 @@ class AIOHTTPStatusHandler(backoff.ErrorManager):
 
 
 class FetchedResource(typing.Generic[_ValueT]):
-    __slots__ = ("_authorization", "_headers", "_parse_data", "_path")
+    __slots__ = ("_authorization", "_headers", "_parse_data", "_path", "__weakref__")
 
     def __init__(
         self,
@@ -115,7 +116,7 @@ class FetchedResource(typing.Generic[_ValueT]):
         self._parse_data = parse_data
         self._path = path
 
-    async def __call__(self, session: aiohttp.ClientSession = tanjun.inject(type=aiohttp.ClientSession)) -> _ValueT:
+    async def __call__(self, session: alluka.Injected[aiohttp.ClientSession]) -> _ValueT:
         response = await session.get(self._path)
         # TODO: better handling
         response.raise_for_status()

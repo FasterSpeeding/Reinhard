@@ -44,6 +44,7 @@ import typing
 import urllib.parse
 
 import aiohttp
+import alluka
 import hikari
 import tanjun
 import yuyo
@@ -191,8 +192,8 @@ class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
 async def lyrics_command(
     ctx: tanjun.abc.Context,
     query: str,
-    session: aiohttp.ClientSession = tanjun.inject(type=aiohttp.ClientSession),
-    component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
+    session: alluka.Injected[aiohttp.ClientSession],
+    component_client: alluka.Injected[yuyo.ComponentClient],
 ) -> None:
     """Get a song's lyrics.
 
@@ -279,7 +280,7 @@ _ORDER_CHOICES = ("relevance", "date", "title", "videoCount", "viewCount")
 _YT_RESOURCES = ("video", "channel", "playlist")
 
 
-def yt_check(_: tanjun.abc.Context, tokens: config_.Tokens = tanjun.inject(type=config_.Tokens)) -> bool:
+def yt_check(_: tanjun.abc.Context, tokens: alluka.Injected[config_.Tokens]) -> bool:
     return tokens.google is not None
 
 
@@ -317,9 +318,9 @@ async def youtube_command(
     language: str | None,
     order: str,
     safe_search: bool | None,
-    session: aiohttp.ClientSession = tanjun.inject(type=aiohttp.ClientSession),
-    tokens: config_.Tokens = tanjun.inject(type=config_.Tokens),
-    component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
+    session: alluka.Injected[aiohttp.ClientSession],
+    tokens: alluka.Injected[config_.Tokens],
+    component_client: alluka.Injected[yuyo.ComponentClient],
     **kwargs: str,
 ) -> None:
     """Search for a resource on youtube.
@@ -402,8 +403,8 @@ async def youtube_command(
 # @tanjun.as_message_command("moe")  # TODO: https://lewd.bowsette.pictures/api/request
 async def moe_command(
     ctx: tanjun.abc.Context,
+    session: alluka.Injected[aiohttp.ClientSession],
     source: str | None = None,
-    session: aiohttp.ClientSession = tanjun.inject(type=aiohttp.ClientSession),
 ) -> None:
     params = {}
     if source is not None:
@@ -436,7 +437,7 @@ async def moe_command(
 async def query_nekos_life(
     endpoint: str,
     response_key: str,
-    session: aiohttp.ClientSession = tanjun.inject(type=aiohttp.ClientSession),
+    session: alluka.Injected[aiohttp.ClientSession],
 ) -> str:
     # TODO: retries
     response = await session.get(url="https://nekos.life/api/v2" + endpoint)
@@ -475,10 +476,10 @@ async def query_nekos_life(
 
 
 def _build_spotify_auth(
-    config: config_.Tokens = tanjun.inject(type=config_.Tokens),
+    config: alluka.Injected[config_.Tokens],
 ) -> utility.ClientCredentialsOauth2:
     if not config.spotify_id or not config.spotify_secret:
-        raise tanjun.MissingDependencyError("Missing spotify secret and/or client id")
+        raise tanjun.MissingDependencyError("Missing spotify secret and/or client id", None)
 
     return utility.ClientCredentialsOauth2(
         "https://accounts.spotify.com/api/token", config.spotify_id, config.spotify_secret
@@ -500,9 +501,9 @@ _SPOTIFY_TYPES = ("track", "album", "artist", "playlist")
 async def spotify_command(
     ctx: tanjun.abc.Context,
     query: str,
-    session: aiohttp.ClientSession = tanjun.inject(type=aiohttp.ClientSession),
-    component_client: yuyo.ComponentClient = tanjun.inject(type=yuyo.ComponentClient),
-    spotify_auth: utility.ClientCredentialsOauth2 = tanjun.cached_inject(_build_spotify_auth),
+    session: alluka.Injected[aiohttp.ClientSession],
+    component_client: alluka.Injected[yuyo.ComponentClient],
+    spotify_auth: typing.Annotated[utility.ClientCredentialsOauth2, tanjun.cached_inject(_build_spotify_auth)],
     **kwargs: str,
 ) -> None:
     """Search for a resource on spotify.
@@ -549,9 +550,9 @@ async def spotify_command(
 async def ytdl_command(
     ctx: tanjun.abc.Context,
     url: urllib.parse.ParseResult,
-    session: aiohttp.ClientSession = tanjun.inject(type=aiohttp.ClientSession),
-    config: config_.PTFConfig = tanjun.inject(type=config_.PTFConfig),
-    ytdl_client: utility.YoutubeDownloader = tanjun.cached_inject(utility.YoutubeDownloader.spawn),
+    session: alluka.Injected[aiohttp.ClientSession],
+    config: alluka.Injected[config_.PTFConfig],
+    ytdl_client: typing.Annotated[utility.YoutubeDownloader, tanjun.cached_inject(utility.YoutubeDownloader.spawn)],
 ) -> None:
     auth = aiohttp.BasicAuth(config.username, config.password)
 
@@ -595,6 +596,12 @@ def _parse_hashes(data: typing.Any) -> list[str]:
     raise ValueError("Got response of type {}, expected a list of strings", type(data))
 
 
+domain_hashes = tanjun.cached_inject(
+    utility.FetchedResource("https://cdn.discordapp.com/bad-domains/hashes.json", _parse_hashes),
+    expire_after=datetime.timedelta(hours=12),
+)
+
+
 @tanjun.with_argument("url", converters=urllib.parse.urlparse)
 @tanjun.as_message_command("check_domain", "check domain")
 @tanjun.with_str_slash_option("url", "The domain to check", converters=urllib.parse.urlparse)
@@ -602,10 +609,7 @@ def _parse_hashes(data: typing.Any) -> list[str]:
 async def check_domain(
     ctx: tanjun.abc.Context,
     url: urllib.parse.ParseResult,
-    bad_domains: list[str] = tanjun.cached_inject(
-        utility.FetchedResource("https://cdn.discordapp.com/bad-domains/hashes.json", _parse_hashes),
-        expire_after=datetime.timedelta(hours=12),
-    ),
+    bad_domains: typing.Annotated[list[str], domain_hashes],
 ) -> None:
     domain = url.netloc or url.path
     domain_hash = hashlib.sha256(domain.encode("utf-8")).hexdigest()
