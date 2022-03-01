@@ -629,8 +629,10 @@ class ReferenceIndex:
 reference_group = tanjun.slash_command_group("references", "Find the references for a type in a library")
 
 
-@dataclasses.dataclass(frozen=True, slots=True)
+@dataclasses.dataclass(eq=False, slots=True)
 class _IndexCommand:
+    __weakref__: typing.Any = dataclasses.field(init=False)
+
     index: ReferenceIndex
     library_repr: str
 
@@ -685,8 +687,10 @@ class _IndexCommand:
         component_client.set_executor(message, executor)
 
 
-@dataclasses.dataclass(frozen=True, slots=True)
+@dataclasses.dataclass(eq=False, slots=True)
 class _IndexAutocomplete:
+    __weakref__: typing.Any = dataclasses.field(init=False)
+
     index: ReferenceIndex
 
     async def __call__(self, ctx: tanjun.abc.AutocompleteContext, value: str) -> None:
