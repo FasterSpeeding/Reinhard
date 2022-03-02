@@ -268,7 +268,7 @@ async def avatar_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> N
 @tanjun.as_slash_command("mentions", "Get a list of the users who were pinged by a message.")
 async def mentions_command(
     ctx: tanjun.abc.Context,
-    message_id: hikari.Snowflake,
+    message: hikari.Snowflake,
     channel: hikari.SnowflakeishOr[hikari.PartialChannel] | None,
 ) -> None:
     """Get a list of the users who were pinged by a message.
@@ -281,11 +281,14 @@ async def mentions_command(
             If this isn't provided then the command will assume the message is in the current channel.
     """
     channel_id = hikari.Snowflake(channel) if channel else ctx.channel_id
-    message = await ctx.rest.fetch_message(channel_id, message_id)
+    try:
+        message_ = await ctx.rest.fetch_message(channel_id, message)
+    except hikari.NotFoundError:
+        raise tanjun.CommandError("Message not found")
+
     mentions: str | None = None
-    if message.mentions.users:
-        assert not isinstance(message.mentions.users, hikari.UndefinedType)
-        mentions = ", ".join(map(str, message.mentions.users.values()))
+    if message_.mentions.users:
+        mentions = ", ".join(map(str, message_.mentions.users.values()))
 
     await ctx.respond(
         content=f"Pinging mentions: {mentions}" if mentions else "No pinging mentions.",
