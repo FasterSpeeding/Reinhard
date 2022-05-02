@@ -1,7 +1,6 @@
 asyncpg~=0.25.0
 python-dotenv~=0.20
-# hikari[speedups]~=2.0.0.dev105
-git+https://github.com/hikari-py/hikari.git@b9cd8fad1d791681dc3816f873950baa23cf8b95#egg=hikari[speedups]
+hikari[speedups]~=2.0.0.dev108
 hikari-sake~=1.0.2a1
 hikari-tanjun~=2.5.0a1
 hikari-yuyo~=1.0.5a1.post1
