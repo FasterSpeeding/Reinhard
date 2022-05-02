@@ -53,7 +53,7 @@ from .. import utility
 @tanjun.as_slash_command("about", "Get basic information about the current bot instance.")
 async def about_command(
     ctx: tanjun.abc.Context,
-    process: alluka.Injected[psutil.Process],
+    process: typing.Annotated[psutil.Process, tanjun.cached_inject(psutil.Process)],
 ) -> None:
     """Get basic information about the current bot instance."""
     start_date = datetime.datetime.fromtimestamp(process.create_time())
