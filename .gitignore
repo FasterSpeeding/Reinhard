@@ -131,3 +131,8 @@ dmypy.json
 **/*config.yaml
 
 data/
+
+# Nuitka
+main.build
+main.cmd
+main.exe
