@@ -347,14 +347,13 @@ async def char_command(ctx: tanjun.abc.Context, characters: str, file: bool = Fa
     if len(characters) > 20:
         file = True
 
-    content: hikari.UndefinedOr[str]
+    content: hikari.UndefinedOr[str] = hikari.UNDEFINED
     content = "\n".join(_format_char_line(char, file) for char in characters)
     response_file: hikari.UndefinedOr[hikari.Bytes] = hikari.UNDEFINED
 
     # highly doubt this'll ever be over 1990 when file is False but better safe than sorry.
     if file or len(content) >= 1990:
         response_file = hikari.Bytes(content.encode(), "character-info.md", mimetype="text/markdown; charset=UTF-8")
-        content = hikari.UNDEFINED
 
     else:
         content = content

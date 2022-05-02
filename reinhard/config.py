@@ -164,10 +164,10 @@ class Tokens(Config):
         )
 
 
-DEFAULT_CACHE: typing.Final[hikari.CacheComponents] = (
-    hikari.CacheComponents.GUILDS
-    | hikari.CacheComponents.GUILD_CHANNELS
-    | hikari.CacheComponents.ROLES
+DEFAULT_CACHE: typing.Final[hikari.api.CacheComponents] = (
+    hikari.api.CacheComponents.GUILDS
+    | hikari.api.CacheComponents.GUILD_CHANNELS
+    | hikari.api.CacheComponents.ROLES
     # | hikari.CacheComponents.ME
 )
 
@@ -178,7 +178,7 @@ DEFAULT_INTENTS: typing.Final[hikari.Intents] = hikari.Intents.GUILDS | hikari.I
 class FullConfig(Config):
     database: DatabaseConfig
     tokens: Tokens
-    cache: hikari.CacheComponents = DEFAULT_CACHE
+    cache: hikari.api.CacheComponents = DEFAULT_CACHE
     emoji_guild: hikari.Snowflake | None = None
     intents: hikari.Intents = DEFAULT_INTENTS
     log_level: int | str | dict[str, typing.Any] | None = logging.INFO
@@ -193,7 +193,7 @@ class FullConfig(Config):
         dotenv.load_dotenv()
 
         return cls(
-            cache=_cast_or_else(os.environ, "cache", hikari.CacheComponents, DEFAULT_CACHE),
+            cache=_cast_or_else(os.environ, "cache", hikari.api.CacheComponents, DEFAULT_CACHE),
             database=DatabaseConfig.from_env(),
             emoji_guild=_cast_or_else(os.environ, "emoji_guild", hikari.Snowflake, None),
             intents=_cast_or_else(os.environ, "intents", hikari.Intents, DEFAULT_INTENTS),
@@ -222,7 +222,7 @@ class FullConfig(Config):
             declare_global_commands = hikari.Snowflake(declare_global_commands)
 
         return cls(
-            cache=_cast_or_else(mapping, "cache", hikari.CacheComponents, DEFAULT_CACHE),
+            cache=_cast_or_else(mapping, "cache", hikari.api.CacheComponents, DEFAULT_CACHE),
             database=DatabaseConfig.from_mapping(mapping["database"]),
             emoji_guild=_cast_or_else(mapping, "emoji_guild", hikari.Snowflake, None),
             intents=_cast_or_else(mapping, "intents", hikari.Intents, DEFAULT_INTENTS),

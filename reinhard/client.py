@@ -67,7 +67,7 @@ def build_gateway_bot(*, config: config_.FullConfig | None = None) -> tuple[hika
         config.tokens.bot,
         logs=config.log_level,
         intents=config.intents,
-        cache_settings=hikari.CacheSettings(components=config.cache),
+        cache_settings=hikari.impl.CacheSettings(components=config.cache),
         # rest_url="https://canary.discord.com/api/v8"
         # rest_url="https://staging.discord.co/api/v8"
     )
