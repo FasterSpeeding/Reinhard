@@ -174,6 +174,29 @@ DEFAULT_CACHE: typing.Final[hikari.api.CacheComponents] = (
 DEFAULT_INTENTS: typing.Final[hikari.Intents] = hikari.Intents.GUILDS | hikari.Intents.ALL_MESSAGES
 
 
+@typing.overload
+def _str_to_bool(value: str, /) -> bool:
+    ...
+
+
+@typing.overload
+def _str_to_bool(value: str, /, *, default: ValueT) -> bool | ValueT:
+    ...
+
+
+def _str_to_bool(value: str, /, *, default: ValueT = ...) -> bool | ValueT:
+    if value in ("true", "True", "1"):
+        return True
+
+    if value in ("false", "False", "0"):
+        return False
+
+    if default is not ...:
+        return default
+
+    raise ValueError(f"{value!r} is not a valid boolean")
+
+
 @dataclasses.dataclass(kw_only=True, repr=False, slots=True)
 class FullConfig(Config):
     database: DatabaseConfig
@@ -198,13 +221,16 @@ class FullConfig(Config):
             emoji_guild=_cast_or_else(os.environ, "emoji_guild", hikari.Snowflake, None),
             intents=_cast_or_else(os.environ, "intents", hikari.Intents, DEFAULT_INTENTS),
             log_level=_cast_or_else(os.environ, "log_level", lambda v: int(v) if v.isdigit() else v, logging.INFO),
-            mention_prefix=_cast_or_else(os.environ, "mention_prefix", bool, True),
-            owner_only=_cast_or_else(os.environ, "owner_only", bool, False),
+            mention_prefix=_cast_or_else(os.environ, "mention_prefix", _str_to_bool, True),
+            owner_only=_cast_or_else(os.environ, "owner_only", _str_to_bool, False),
             prefixes=_cast_or_else(os.environ, "prefixes", lambda v: frozenset(map(str, v)), frozenset[str]()),
             ptf=PTFConfig.from_env() if os.getenv("ptf_username") else None,
             tokens=Tokens.from_env(),
             declare_global_commands=_cast_or_else(
-                os.environ, "declare_global_commands", lambda v: v if isinstance(v, bool) else hikari.Snowflake(v), True
+                os.environ,
+                "declare_global_commands",
+                lambda v: nv if (nv := _str_to_bool(v, default=None)) is not None else hikari.Snowflake(v),
+                True,
             ),
         )
 
