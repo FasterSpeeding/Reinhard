@@ -48,12 +48,25 @@ from hikari import snowflakes
 
 from .. import utility
 
+try:
+    import alluka_rust  # type: ignore
+
+except ImportError:
+    alluka_rust = None
+
+try:
+    import rukari  # type: ignore
+
+except ImportError:
+    rukari = None
+
 
 @tanjun.as_message_command("about")
 @tanjun.as_slash_command("about", "Get basic information about the current bot instance.")
 async def about_command(
     ctx: tanjun.abc.Context,
     process: typing.Annotated[psutil.Process, tanjun.cached_inject(psutil.Process)],
+    bot: alluka.Injected[hikari.ShardAware | None],
 ) -> None:
     """Get basic information about the current bot instance."""
     start_date = datetime.datetime.fromtimestamp(process.create_time())
@@ -69,6 +82,18 @@ async def about_command(
     else:
         name = "Reinhard: REST Server"
 
+    if alluka_rust and isinstance(ctx.injection_client, alluka_rust.Client):
+        alluka_ver = f"Rust ({alluka_rust.__version__})"
+
+    else:
+        alluka_ver = f"pure-Python ({alluka.__version__})"
+
+    if bot and rukari and isinstance(bot, rukari.Bot):
+        hikari_ver = f"Rukari ({rukari.__version__})"
+
+    else:
+        hikari_ver = f"pure-Python ({hikari.__version__})"
+
     description = (
         "An experimental pythonic Hikari bot.\n "
         "The source can be found on [Github](https://github.com/FasterSpeeding/Reinhard)."
@@ -82,9 +107,11 @@ async def about_command(
             value=f"{memory_usage:.2f} MB ({memory_percent:.0f}%)\n{cpu_usage:.2f}% CPU",
             inline=True,
         )
+        .add_field(name="Hikari impl", value=hikari_ver, inline=True)
+        .add_field(name="Alluka impl", value=alluka_ver, inline=True)
         .set_footer(
             icon="http://i.imgur.com/5BFecvA.png",
-            text=f"Made with Hikari v{hikari.__version__} (python {platform.python_version()})",
+            text=f"Made with Hikari (python {platform.python_version()})",
         )
     )
 

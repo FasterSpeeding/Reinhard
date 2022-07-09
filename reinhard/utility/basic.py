@@ -79,7 +79,7 @@ def embed_iterator(
         (
             hikari.UNDEFINED,
             hikari.Embed(
-                description=description_cast(description) if description_cast else description,
+                description=description_cast(description),
                 color=constants.embed_colour() if color is None else color,
                 title=title,
                 url=url,

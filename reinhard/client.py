@@ -49,7 +49,7 @@ if typing.TYPE_CHECKING:
 
 def _rukari(config: config_.FullConfig | None) -> tuple[hikari.Runnable, tanjun.Client] | None:
     try:
-        import rukari
+        import rukari  # type: ignore
 
     except ImportError:
         return None
@@ -58,7 +58,7 @@ def _rukari(config: config_.FullConfig | None) -> tuple[hikari.Runnable, tanjun.
     if config is None:
         config = config_.FullConfig.from_env()
 
-    bot = rukari.Bot(config.tokens.bot, intents=config.intents)
+    bot: hikari.ShardAware = rukari.Bot(config.tokens.bot, intents=config.intents)
 
     import logging
 
