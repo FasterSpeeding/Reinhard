@@ -86,13 +86,13 @@ async def about_command(
         alluka_ver = f"Rust ({alluka_rust.__version__})"
 
     else:
-        alluka_ver = f"pure-Python ({alluka.__version__})"
+        alluka_ver = f"Pure-Python ({alluka.__version__})"
 
     if bot and rukari and isinstance(bot, rukari.Bot):
         hikari_ver = f"Rukari ({rukari.__version__})"
 
     else:
-        hikari_ver = f"pure-Python ({hikari.__version__})"
+        hikari_ver = f"Pure-Python ({hikari.__version__})"
 
     description = (
         "An experimental pythonic Hikari bot.\n "
