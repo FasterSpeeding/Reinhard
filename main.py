@@ -52,5 +52,16 @@ if __name__ == "__main__":
     except ImportError:
         print("Running with standard asyncio loop")
 
+    try:
+        import alluka_rust
+
+        import alluka
+        patched = alluka.Client is alluka_rust.Client
+
+    except ImportError:
+        patched = False
+
+    print(f"Running with {'Rust' if patched else 'Python'} Alluka implementation")
+
     import reinhard.cli
     reinhard.cli.main()

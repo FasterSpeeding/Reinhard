@@ -47,7 +47,47 @@ if typing.TYPE_CHECKING:
     from hikari import traits as hikari_traits
 
 
-def build_gateway_bot(*, config: config_.FullConfig | None = None) -> tuple[hikari.impl.GatewayBot, tanjun.Client]:
+def _rukari(config: config_.FullConfig | None) -> tuple[hikari.Runnable, tanjun.Client] | None:
+    try:
+        import rukari
+
+    except ImportError:
+        return None
+
+    print("Initiating with Rukari")
+    if config is None:
+        config = config_.FullConfig.from_env()
+
+    bot = rukari.Bot(config.tokens.bot, intents=config.intents)
+
+    import logging
+
+    logging.basicConfig(level=config.log_level or logging.INFO)
+
+    component_client = yuyo.ComponentClient(event_manager=bot.event_manager, event_managed=False).set_constant_id(
+        utility.DELETE_CUSTOM_ID, utility.delete_button_callback, prefix_match=True
+    )
+    reaction_client = yuyo.ReactionClient(rest=bot.rest, event_manager=bot.event_manager, event_managed=False)
+    return bot, _build(
+        tanjun.Client(
+            bot.rest,
+            events=bot.event_manager,
+            shards=bot,
+            event_managed=True,
+            mention_prefix=config.mention_prefix,
+            declare_global_commands=config.declare_global_commands,
+        )
+        .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open)
+        .add_client_callback(tanjun.ClientCallbackNames.CLOSING, component_client.close)
+        .add_client_callback(tanjun.ClientCallbackNames.STARTING, reaction_client.open)
+        .add_client_callback(tanjun.ClientCallbackNames.CLOSING, reaction_client.close)
+        .set_type_dependency(yuyo.ReactionClient, reaction_client)
+        .set_type_dependency(yuyo.ComponentClient, component_client),
+        config,
+    )
+
+
+def build_gateway_bot(*, config: config_.FullConfig | None = None) -> tuple[hikari.Runnable, tanjun.Client]:
     """Build a gateway bot with a bound Reinhard client.
 
     Other Parameters
@@ -63,6 +103,10 @@ def build_gateway_bot(*, config: config_.FullConfig | None = None) -> tuple[hika
     if config is None:
         config = config_.FullConfig.from_env()
 
+    if result := _rukari(config):
+        return result
+
+    print("Initiating with standard Hikari impl")
     bot = hikari.GatewayBot(
         config.tokens.bot,
         logs=config.log_level,

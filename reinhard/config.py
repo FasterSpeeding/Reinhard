@@ -204,7 +204,7 @@ class FullConfig(Config):
     cache: hikari.api.CacheComponents = DEFAULT_CACHE
     emoji_guild: hikari.Snowflake | None = None
     intents: hikari.Intents = DEFAULT_INTENTS
-    log_level: int | str | dict[str, typing.Any] | None = logging.INFO
+    log_level: int | str | None = logging.INFO
     mention_prefix: bool = True
     owner_only: bool = False
     prefixes: collections.Set[str] = frozenset()

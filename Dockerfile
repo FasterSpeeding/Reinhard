@@ -20,5 +20,16 @@ ENV DOCKER_DEBUG=${debug}
 RUN python -m pip install --upgrade pip wheel
 RUN python -m pip install -r requirements.txt
 # RUN python -m pip install pyjion
+ARG rukari_hash
+
+RUN if [ -n ${rukari_hash} ]; then\
+    curl https://sh.rustup.rs -sSf | bash -s -- -y; \
+    # source ~/.bashrc; \
+fi
+
+RUN if [ -n ${rukari_hash} ]; then \
+    export PATH="$HOME/.cargo/bin:$PATH" && \
+    python -m pip install git+https://github.com/FasterSpeeding/Rukari.git@${rukari_hash}; \
+fi
 
 ENTRYPOINT if ${DOCKER_DEBUG} == false; then python main.py; else python -OO main.py; fi
