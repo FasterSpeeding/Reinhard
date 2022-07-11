@@ -26,11 +26,10 @@ ARG rukari_hash
 
 RUN if [ -n ${rukari_hash} ] || [ -n ${alluka_rust_hash} ]; then \
     curl https://sh.rustup.rs -sSf | bash -s -- -y; \
-    # source ~/.bashrc; \
 fi
 
 RUN if [ -n ${alluka_rust_hash} ]; then \
-    python -m pip install git+https://github.com/fasterspeeding/tanjun.git@task/alluka_rust && \
+    python -m pip install --force-reinstall --no-deps git+https://github.com/fasterspeeding/tanjun.git@task/alluka_rust && \
     export PATH="$HOME/.cargo/bin:$PATH" && \
     python -m pip install git+https://github.com/fasterspeeding/alluka_rust.git@${alluka_rust_hash}; \
 fi
