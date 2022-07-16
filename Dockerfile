@@ -24,17 +24,17 @@ ENV ALLUKA_RUST_PATCH="true"
 ARG alluka_rust_hash
 ARG rukari_hash
 
-RUN if [ -n ${rukari_hash} ] || [ -n ${alluka_rust_hash} ]; then \
+RUN if [ -n "${rukari_hash}" ] || [ -n "${alluka_rust_hash}" ]; then \
     curl https://sh.rustup.rs -sSf | bash -s -- -y; \
 fi
 
-RUN if [ -n ${alluka_rust_hash} ]; then \
+RUN if [ -n "${alluka_rust_hash}" ]; then \
     python -m pip install --force-reinstall --no-deps git+https://github.com/fasterspeeding/tanjun.git@task/alluka_rust && \
     export PATH="$HOME/.cargo/bin:$PATH" && \
     python -m pip install git+https://github.com/fasterspeeding/alluka_rust.git@${alluka_rust_hash}; \
 fi
 
-RUN if [ -n ${rukari_hash} ]; then \
+RUN if [ -n "${rukari_hash}" ]; then \
     export PATH="$HOME/.cargo/bin:$PATH" && \
     python -m pip install git+https://github.com/FasterSpeeding/Rukari.git@${rukari_hash}; \
 fi
