@@ -34,7 +34,6 @@ from __future__ import annotations
 
 __all__: list[str] = ["load_external"]
 
-import collections.abc as collections
 import datetime
 import hashlib
 import json
@@ -42,6 +41,7 @@ import logging
 import time
 import typing
 import urllib.parse
+from collections import abc as collections
 
 import aiohttp
 import alluka

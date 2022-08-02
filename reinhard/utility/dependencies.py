@@ -42,7 +42,7 @@ import alluka
 import tanjun
 
 if typing.TYPE_CHECKING:
-    from hikari import config
+    import hikari
 
 
 _LOGGER = logging.getLogger("hikari.reinhard")
@@ -54,7 +54,7 @@ class SessionManager:
     __slots__ = ("http_settings", "proxy_settings", "_session", "user_agent")
 
     def __init__(
-        self, http_settings: config.HTTPSettings, proxy_settings: config.ProxySettings, user_agent: str
+        self, http_settings: hikari.impl.HTTPSettings, proxy_settings: hikari.impl.ProxySettings, user_agent: str
     ) -> None:
         self.http_settings = http_settings
         self.proxy_settings = proxy_settings

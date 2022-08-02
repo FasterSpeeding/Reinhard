@@ -33,12 +33,12 @@ from __future__ import annotations
 
 __all__: list[str] = ["load_basic"]
 
-import collections.abc as collections
 import datetime
 import math
 import platform
 import time
 import typing
+from collections import abc as collections
 
 import alluka
 import hikari

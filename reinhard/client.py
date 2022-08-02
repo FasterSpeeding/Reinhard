@@ -59,6 +59,9 @@ def _rukari(config: config_.FullConfig | None) -> tuple[hikari.Runnable, tanjun.
         config = config_.FullConfig.from_env()
 
     bot: hikari.ShardAware = rukari.Bot(config.tokens.bot, intents=config.intents)
+    assert isinstance(bot, hikari.RESTAware)
+    assert isinstance(bot, hikari.EventManagerAware)
+    assert isinstance(bot, hikari.Runnable)
 
     import logging
 
@@ -146,6 +149,8 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> tanjun.Client:
         .set_type_dependency(config_.Tokens, config.tokens)
         .load_modules("reinhard.components")
     )
+    assert isinstance(client.rest.http_settings, hikari.impl.HTTPSettings)
+    assert isinstance(client.rest.proxy_settings, hikari.impl.ProxySettings)
     utility.SessionManager(
         client.rest.http_settings, client.rest.proxy_settings, "Reinhard discord bot"
     ).load_into_client(client)

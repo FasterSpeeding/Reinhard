@@ -34,12 +34,12 @@ from __future__ import annotations
 __all__: list[str] = ["DatabaseConfig", "Tokens", "FullConfig"]
 
 import abc
-import collections.abc as collections
 import dataclasses
 import logging
 import os
 import pathlib
 import typing
+from collections import abc as collections
 
 import dotenv
 import hikari

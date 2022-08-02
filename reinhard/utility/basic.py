@@ -138,7 +138,11 @@ def raise_error(
 
 
 def basic_name_grid(flags: enum.IntFlag) -> str:  # TODO: actually deal with max len lol
-    names = [name for name, flag in type(flags).__members__.items() if flag != 0 and (flag & flags) == flag]
+    names = [
+        name
+        for name, flag in type(flags).__members__.items()
+        if flag != 0 and (flag & flags) == flag  # pyright: ignore [reportUnnecessaryComparison]
+    ]
     names.sort()
     if not names:
         return ""

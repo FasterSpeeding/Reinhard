@@ -35,15 +35,15 @@ from __future__ import annotations
 __all__: list[str] = ["load_docs"]
 
 import abc
-import collections.abc as collections
 import dataclasses
 import datetime
 import json
 import typing
+from collections import abc as collections
 
 import alluka
 import hikari
-import markdownify  # pyright: reportMissingTypeStubs=warning
+import markdownify  # type: ignore
 import tanjun
 import yuyo
 

@@ -40,7 +40,7 @@ import pathlib
 import threading
 import typing
 
-import youtube_dl  # pyright: reportMissingTypeStubs=warning
+import youtube_dl  # type: ignore
 
 _CLIENT_ATTRIBUTE = "REINHARD_YTDL_CLIENT"
 _OUT_DIR = str(pathlib.Path("videos/%(title)s-%(id)s.%(ext)s").absolute())
