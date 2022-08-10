@@ -39,9 +39,11 @@ import datetime
 import re
 import typing
 from collections import abc as collections
+from typing import Annotated
 
 import hikari
 import tanjun
+from tanjun.annotations import Bool, Flag, Ranged, with_annotated_args
 
 from .. import utility
 
@@ -368,25 +370,12 @@ class _MultiBanner:
             return "No members were banned", hikari.UNDEFINED
 
 
-def _assert_days_range(value_: str, /) -> int:
-    value = int(value_)
-    if 7 < value < 0:
-        raise ValueError("Delete message days must be between 0 and 7")
-
-    return value
-
-
+@with_annotated_args(follow_wrapped=True)
 @tanjun.with_author_permission_check(hikari.Permissions.BAN_MEMBERS)
 @tanjun.with_own_permission_check(hikari.Permissions.BAN_MEMBERS)
-@tanjun.with_option("members_only", "--members-only", "-m", converters=tanjun.to_bool, default=False, empty_value=True)
-@tanjun.with_option("clear_message_days", "--clear", "-c", converters=_assert_days_range, default=0)
 @tanjun.with_multi_argument("users", converters=tanjun.conversion.parse_user_id)
 @tanjun.as_message_command("ban members")
 @ban_group.with_command
-@tanjun.with_bool_slash_option("members_only", "Only ban users who are currently in the guild.", default=False)
-@tanjun.with_int_slash_option(
-    "clear_message_days", "Number of days to clear their recent messages for.", default=0, min_value=0, max_value=7
-)
 @tanjun.with_str_slash_option(
     "users",
     "Space separated sequence of users to ban",
@@ -396,8 +385,16 @@ def _assert_days_range(value_: str, /) -> int:
 async def multi_ban_command(
     ctx: tanjun.abc.SlashContext | tanjun.abc.MessageContext,
     users: set[hikari.Snowflake],
-    clear_message_days: int,
-    members_only: bool,
+    clear_message_days: Annotated[
+        Ranged[0, 7],
+        Flag(aliases=("--clear", "-c")),
+        "Number of days to clear their recent messages for.",
+    ] = 0,
+    members_only: Annotated[
+        Bool,
+        Flag(empty_value=True, aliases=("-m",)),
+        "Only ban users who are currently in the guild.",
+    ] = False,
 ) -> None:
     """Ban multiple users from using the bot.
 
@@ -420,23 +417,24 @@ async def multi_ban_command(
         await ctx.respond(content, attachment=attachment, component=utility.delete_row(ctx))
 
 
+@with_annotated_args(follow_wrapped=True)
 @tanjun.with_author_permission_check(hikari.Permissions.BAN_MEMBERS)
 @tanjun.with_own_permission_check(hikari.Permissions.BAN_MEMBERS)
-@tanjun.with_option("members_only", "--members-only", "-m", converters=tanjun.to_bool, default=False, empty_value=True)
-@tanjun.with_option("clear_message_days", "--clear", "-c", converters=_assert_days_range, default=0)
 @_with_filter_message_options
 @tanjun.as_message_command("ban authors")
 @ban_group.with_command
-@tanjun.with_bool_slash_option("members_only", "Only ban users who are currently in the guild.", default=False)
-@tanjun.with_int_slash_option(
-    "clear_message_days", "Number of days to clear their recent messages for.", default=0, min_value=0, max_value=7
-)
 @_with_filter_slash_options
 @tanjun.as_slash_command("authors", "Ban the authors of recent messages.")
 async def ban_authors_command(
     ctx: tanjun.abc.SlashContext | tanjun.abc.MessageContext,
-    clear_message_days: int,
-    members_only: bool,
+    clear_message_days: Annotated[
+        Ranged[0, 7], Flag(aliases=("--clear", "-c")), "Number of days to clear their recent messages for."
+    ] = 0,
+    members_only: Annotated[
+        Bool,
+        Flag(empty_value=True, aliases=("--members-only", "-m")),
+        "Only ban users who are currently in the guild.",
+    ] = False,
     **kwargs: typing.Any,
 ) -> None:
     found_authors = set[hikari.Snowflake]()

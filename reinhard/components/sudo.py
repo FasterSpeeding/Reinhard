@@ -45,12 +45,14 @@ import time
 import traceback
 import typing
 from collections import abc as collections
+from typing import Annotated
 
 import alluka
 import hikari
 import tanjun
 import yuyo
 from hikari import traits
+from tanjun.annotations import Bool, Converted, Flag, Greedy, Str, with_annotated_args
 
 from .. import utility
 
@@ -63,15 +65,13 @@ async def error_message_command(_: tanjun.abc.Context) -> None:
     raise Exception("This is an exception, get used to it.")
 
 
-@tanjun.with_option("raw_embed", "--embed", "-e", converters=json.loads, default=hikari.UNDEFINED)
-@tanjun.with_greedy_argument("content", default=hikari.UNDEFINED)
-@tanjun.with_parser
+@with_annotated_args
 @tanjun.as_message_command("echo")
 async def echo_command(
     ctx: tanjun.abc.Context,
-    content: hikari.UndefinedOr[str],
-    raw_embed: hikari.UndefinedOr[dict[str, typing.Any]],
     entity_factory: alluka.Injected[traits.EntityFactoryAware],
+    content: Annotated[hikari.UndefinedOr[Str], Greedy()] = hikari.UNDEFINED,
+    raw_embed: Annotated[hikari.UndefinedOr[dict[str, typing.Any]], Converted(json.loads)] = hikari.UNDEFINED,
 ) -> None:
     """Command used for getting the bot to mirror a response.
 
@@ -165,20 +165,16 @@ def _bytes_from_io(
     return hikari.Bytes(data, name, mimetype=mimetype)
 
 
+@with_annotated_args
 # @tanjun.with_option("ephemeral_response", "-e", "--ephemeral", converters=tanjun.to_bool, default=False, empty_value=True)
-@tanjun.with_option("suppress_response", "-s", "--suppress", converters=tanjun.to_bool, default=False, empty_value=True)
-@tanjun.with_option(
-    "file_output", "-f", "--file-out", "--file", converters=tanjun.to_bool, default=False, empty_value=True
-)
-@tanjun.with_parser
 @tanjun.as_message_command("eval", "exec")
 async def eval_command(
     ctx: tanjun.abc.MessageContext,
     component: alluka.Injected[tanjun.abc.Component],
     component_client: alluka.Injected[yuyo.ComponentClient],
-    file_output: bool = False,
+    file_output: Annotated[Bool, Flag(empty_value=True, aliases=("-f", "--file-out", "--file"))] = False,
     # ephemeral_response: bool = False,
-    suppress_response: bool = False,
+    suppress_response: Annotated[Bool, Flag(empty_value=True, aliases=("-s", "--suppress"))] = False,
 ) -> None:
     """Dynamically evaluate a script in the bot's environment.
 

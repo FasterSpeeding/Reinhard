@@ -34,22 +34,26 @@ from __future__ import annotations
 __all__: list[str] = ["load_utility"]
 
 import unicodedata
+from typing import Annotated
 
 import hikari
 import tanjun
+from tanjun.annotations import Bool, Channel, Color, Flag, Greedy, Member, Role
+from tanjun.annotations import Snowflake, SnowflakeOr, Str, User, with_annotated_args
 
 from .. import utility
 
 
-@tanjun.with_option("role", "--role", "-r", converters=tanjun.to_role, default=None)
-@tanjun.with_argument("color", converters=tanjun.to_color, default=None)
+@with_annotated_args(follow_wrapped=True)
 @tanjun.as_message_command("color", "colour")
-@tanjun.with_role_slash_option("role", "A role to get the colour for.", default=None)
-@tanjun.with_str_slash_option(
-    "color", "the hex/int literal representation of a colour to show", converters=tanjun.to_colour, default=None
-)
 @tanjun.as_slash_command("color", "Get a visual representation of a color or role's color.")
-async def colour_command(ctx: tanjun.abc.Context, color: hikari.Colour | None, role: hikari.Role | None) -> None:
+async def colour_command(
+    ctx: tanjun.abc.Context,
+    color: Annotated[
+        Color | None, Flag(aliases=("-r",)), "the hex/int literal representation of a colour to show"
+    ] = None,
+    role: Annotated[Role | None, "A role to get the colour for."] = None,
+) -> None:
     """Get a visual representation of a color or role's color.
 
     Argument:
@@ -88,19 +92,17 @@ async def colour_command(ctx: tanjun.abc.Context, color: hikari.Colour | None, r
 #         ...  # TODO: Implement this to allow getting the embeds from a suppressed message.
 
 
+@with_annotated_args(follow_wrapped=True)
 @tanjun.with_guild_check
-@tanjun.with_argument("member", converters=tanjun.to_member, default=None)
 @tanjun.as_message_command("member")
 @tanjun.with_guild_check
-@tanjun.with_member_slash_option(
-    "member",
-    "The member to get information about. If not provided then this will default to the command's author",
-    default=None,
-)
 @tanjun.as_slash_command("member", "Get information about a member in the current guild.")
 async def member_command(
     ctx: tanjun.abc.Context,
-    member: hikari.Member | hikari.InteractionMember | None,
+    member: Annotated[
+        Member | None,
+        "The member to get information about. If not provided then this will default to the command's author",
+    ] = None,
 ) -> None:
     """Get information about a member in the current guild.
 
@@ -166,14 +168,13 @@ async def member_command(
     await ctx.respond(embed=embed, component=utility.delete_row(ctx))
 
 
+@with_annotated_args(follow_wrapped=True)
 @tanjun.with_guild_check
-@tanjun.with_argument("role", converters=tanjun.to_role)
 @tanjun.as_message_command("role")
 # TODO: the normal role converter is limited to the current guild right?
-@tanjun.with_role_slash_option("role", "The role to get information about.")
 @tanjun.with_guild_check
 @tanjun.as_slash_command("role", "Get information about a role in the current guild.")
-async def role_command(ctx: tanjun.abc.Context, role: hikari.Role) -> None:
+async def role_command(ctx: tanjun.abc.Context, role: Annotated[Role, "The role to get information about."]) -> None:
     """Get information about a role in the current guild.
 
     Arguments:
@@ -205,13 +206,15 @@ async def role_command(ctx: tanjun.abc.Context, role: hikari.Role) -> None:
     await ctx.respond(embed=embed, component=utility.delete_row(ctx))
 
 
-@tanjun.with_argument("user", converters=tanjun.to_user)
+@with_annotated_args(follow_wrapped=True)
 @tanjun.as_message_command("user")
-@tanjun.with_user_slash_option(
-    "user", "The user to target. If left as None then this will target the command's author.", default=None
-)
 @tanjun.as_slash_command("user", "Get information about a Discord user.")
-async def user_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> None:
+async def user_command(
+    ctx: tanjun.abc.Context,
+    user: Annotated[
+        User | None, "The user to target. If left as None then this will target the command's author."
+    ] = None,
+) -> None:
     """Get information about a Discord user.
 
     Arguments:
@@ -238,13 +241,15 @@ async def user_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> Non
     await ctx.respond(embed=embed, component=utility.delete_row(ctx))
 
 
-@tanjun.with_argument("user", converters=tanjun.to_user, default=None)
+@with_annotated_args(follow_wrapped=True)
 @tanjun.as_message_command("avatar")
-@tanjun.with_user_slash_option(
-    "user", "User to get the avatar for. If not provided then this returns the current user's avatar.", default=None
-)
 @tanjun.as_slash_command("avatar", "Get a user's avatar.")
-async def avatar_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> None:
+async def avatar_command(
+    ctx: tanjun.abc.Context,
+    user: Annotated[
+        User | None, "User to get the avatar for. If not provided then this returns the current user's avatar."
+    ] = None,
+) -> None:
     """Get a user's avatar.
 
     Arguments:
@@ -259,17 +264,14 @@ async def avatar_command(ctx: tanjun.abc.Context, user: hikari.User | None) -> N
     await ctx.respond(embed=embed, component=utility.delete_row(ctx))
 
 
-@tanjun.with_option("channel", "-c", "--channel", converters=tanjun.conversion.parse_channel_id, default=None)
-@tanjun.with_argument("message", converters=tanjun.to_snowflake)
+@with_annotated_args(follow_wrapped=True)
 @tanjun.as_message_command("mentions")
 # TODO: check if the user can access the provided channel
-@tanjun.with_channel_slash_option("channel", "The channel the message is in.", default=None)
-@tanjun.with_str_slash_option("message", "ID of the message to get the ping list for.", converters=tanjun.to_snowflake)
 @tanjun.as_slash_command("mentions", "Get a list of the users who were pinged by a message.")
 async def mentions_command(
     ctx: tanjun.abc.Context,
-    message: hikari.Snowflake,
-    channel: hikari.SnowflakeishOr[hikari.PartialChannel] | None,
+    message: Annotated[Snowflake, "ID of the message to get the ping list for."],
+    channel: Annotated[SnowflakeOr[Channel | None], Flag(aliases=("-c",)), "The channel the message is in."] = None,
 ) -> None:
     """Get a list of the users who were pinged by a message.
 
@@ -296,13 +298,14 @@ async def mentions_command(
     )
 
 
+@with_annotated_args(follow_wrapped=True)
 @tanjun.with_guild_check
-@tanjun.with_argument("name")
 @tanjun.as_message_command("members")
 @tanjun.with_guild_check
-@tanjun.with_str_slash_option("name", "Greedy argument of the name to search for.")
 @tanjun.as_slash_command("members", "Search for a member in the current guild.")
-async def members_command(ctx: tanjun.abc.Context, name: str) -> None:
+async def members_command(
+    ctx: tanjun.abc.Context, name: Annotated[Str, "Greedy argument of the name to search for.", Greedy()]
+) -> None:
     """Search for a member in the current guild.
 
     Arguments
@@ -331,15 +334,18 @@ def _format_char_line(char: str, to_file: bool) -> str:
     return f"`\\U{code:08x}`/`{char}`: {name} <http://www.fileformat.info/info/unicode/char/{code:x}>"
 
 
-@tanjun.with_option("file", "--file", "-f", converters=tanjun.to_bool, default=False, empty_value=True)
-@tanjun.with_argument("characters")
+@with_annotated_args(follow_wrapped=True)
 @tanjun.as_message_command("char")
-@tanjun.with_bool_slash_option(
-    "file", "Whether this should send a file response regardless of response length", default=False
-)
-@tanjun.with_str_slash_option("characters", "The UTF-8 characters to get information about")
 @tanjun.as_slash_command("char", "Get information about the UTF-8 characters in the executing message.")
-async def char_command(ctx: tanjun.abc.Context, characters: str, file: bool = False) -> None:
+async def char_command(
+    ctx: tanjun.abc.Context,
+    characters: Annotated[Str, "The UTF-8 characters to get information about", Greedy()],
+    file: Annotated[
+        Bool,
+        Flag(aliases=("-f",), empty_value=True),
+        "Whether this should send a file response regardless of response length",
+    ] = False,
+) -> None:
     """Get information about the UTF-8 characters in the executing message.
 
     Running `char file...` will ensure that the output is always sent as a markdown file.

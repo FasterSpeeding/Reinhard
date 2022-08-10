@@ -35,6 +35,7 @@ from __future__ import annotations
 __all__: list[str] = ["load_external"]
 
 import datetime
+import enum
 import hashlib
 import json
 import logging
@@ -42,12 +43,15 @@ import time
 import typing
 import urllib.parse
 from collections import abc as collections
+from typing import Annotated
 
 import aiohttp
 import alluka
 import hikari
 import tanjun
 import yuyo
+from tanjun.annotations import Bool, Choices, Converted, Flag, Greedy, Name, Str
+from tanjun.annotations import with_annotated_args
 
 from .. import config as config_
 from .. import utility
@@ -185,65 +189,57 @@ class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
         return (self._buffer.pop(0)["external_urls"]["spotify"], hikari.UNDEFINED)
 
 
-_T = typing.TypeVar("_T")
+class YtOrder(str, enum.Enum):
+    Relevance = "relevance"
+    Date = "date"
+    Title = "title"
+    Video_count = "videoCount"
+    View_count = "viewCount"
 
 
-def _assert_in_choices(choices: typing.Collection[_T]) -> typing.Callable[[_T], _T]:
-    def verify(value: _T) -> _T:
-        if value in choices:
-            return value
-
-        raise tanjun.CommandError(f"`{value}` is not a valid choice, must be one of " + ", ".join(map(str, choices)))
-
-    return verify
-
-
-_ORDER_CHOICES = ("relevance", "date", "title", "videoCount", "viewCount")
-_YT_RESOURCES = ("video", "channel", "playlist")
+class YtResource(str, enum.Enum):
+    Video = "video"
+    Channel = "channel"
+    Playlist = "playlist"
 
 
 def yt_check(_: tanjun.abc.Context, tokens: alluka.Injected[config_.Tokens]) -> bool:
     return tokens.google is not None
 
 
+# TODO: should different resource types be split between different sub commands?
+@with_annotated_args(follow_wrapped=True)
 @tanjun.with_check(yt_check)
-@tanjun.with_option("safe_search", "-sf", "--safe-search", converters=tanjun.to_bool, default=None, empty_value=True)
-@tanjun.with_option("order", "-o", "--order", converters=_assert_in_choices(_ORDER_CHOICES), default=_ORDER_CHOICES[0])
-@tanjun.with_option("language", "-l", default=None)
-@tanjun.with_option("type", "-t", "--type", converters=_assert_in_choices(_YT_RESOURCES), default=_YT_RESOURCES[0])
-@tanjun.with_option("region", "-r", "--region", default=None)
-@tanjun.with_argument("query")
 @tanjun.as_message_command("youtube", "yt")
 @tanjun.with_check(yt_check)
-@tanjun.with_bool_slash_option(
-    "safe_search",
-    "Whether safe search should be enabled or not. The default for this is based on the current channel.",
-    default=None,
-)
-@tanjun.with_str_slash_option(
-    "order", "The order to return results in. Defaults to relevance.", choices=_ORDER_CHOICES, default=_ORDER_CHOICES[0]
-)
-@tanjun.with_str_slash_option(
-    "language", "The ISO 639-1 two letter identifier of the language to limit search to.", default=None
-)
-@tanjun.with_str_slash_option("region", "The ISO 3166-1 code of the region to search for results in.", default=None)
-# TODO: should different resource types be split between different sub commands?
-@tanjun.with_str_slash_option(
-    "type", "The type of resource to search for. Defaults to video.", choices=_YT_RESOURCES, default=_YT_RESOURCES[0]
-)
-@tanjun.with_str_slash_option("query", "Query string to search for a resource by.")
 @tanjun.as_slash_command("youtube", "Search for a resource on youtube.")
 async def youtube_command(
     ctx: tanjun.abc.Context,
-    query: str,
-    region: str | None,
-    language: str | None,
-    order: str,
-    safe_search: bool | None,
     session: alluka.Injected[aiohttp.ClientSession],
     tokens: alluka.Injected[config_.Tokens],
     component_client: alluka.Injected[yuyo.ComponentClient],
-    **kwargs: str,
+    query: Annotated[Greedy[Str], "Query string to search for a resource by."],
+    resource_type: Annotated[
+        Choices[YtResource],
+        Name("type"),
+        Flag(aliases=("-t",)),
+        "The type of resource to search for. Defaults to video.",
+    ] = YtResource.Video,
+    region: Annotated[
+        Str | None, "The ISO 3166-1 code of the region to search for results in.", Flag(aliases=("-r",))
+    ] = None,
+    language: Annotated[
+        Str | None,
+        "The ISO 639-1 two letter identifier of the language to limit search to.",
+        Flag(aliases=("-l",)),
+    ] = None,
+    order: Annotated[
+        Choices[YtOrder], "The order to return results in. Defaults to relevance."
+    ] = YtOrder.Relevance,
+    safe_search: Annotated[
+        Bool | None,
+        "Whether safe search should be enabled or not. The default for this is based on the current channel.",
+    ] = None,
 ) -> None:
     """Search for a resource on youtube.
 
@@ -261,7 +257,6 @@ async def youtube_command(
         * type (--type, -t): The type of resource to search for.
             This can be one of "channel", "playlist" or "video" and defaults to "video".
     """
-    resource_type = kwargs["type"]
     assert tokens.google is not None
     if safe_search is not False:
         channel: hikari.PartialChannel | None
@@ -321,7 +316,6 @@ async def youtube_command(
 # @utility.with_parameter_doc("--source | -s", "The optional argument of a show's title.")
 # @utility.with_command_doc("Get a random cute anime image.")
 # @tanjun.with_option("source", "--source", "-s", default=None)
-# @tanjun.with_parser
 # @tanjun.as_message_command("moe")  # TODO: https://lewd.bowsette.pictures/api/request
 async def moe_command(
     ctx: tanjun.abc.Context,
@@ -408,25 +402,29 @@ def _build_spotify_auth(
     )
 
 
-_SPOTIFY_TYPES = ("track", "album", "artist", "playlist")
+class SpotifyType(str, enum.Enum):
+    Track = "track"
+    Album = "album"
+    Artist = "artist"
+    Playlist = "playlist"
 
 
-@tanjun.with_option("type", "--type", "-t", default="track", converters=_assert_in_choices(_SPOTIFY_TYPES))
-@tanjun.with_argument("query")
+@with_annotated_args(follow_wrapped=True)
 @tanjun.as_message_command("spotify")
-# TODO: add valid options for Options maybe?
-@tanjun.with_str_slash_option(
-    "type", "Type of resource to search for. Defaults to track.", choices=_SPOTIFY_TYPES, default=_SPOTIFY_TYPES[0]
-)
-@tanjun.with_str_slash_option("query", "The string query to search by.")
 @tanjun.as_slash_command("spotify", "Search for a resource on spotify.")
 async def spotify_command(
     ctx: tanjun.abc.Context,
-    query: str,
+    *,
+    query: Annotated[Str, "The string query to search by."],
     session: alluka.Injected[aiohttp.ClientSession],
     component_client: alluka.Injected[yuyo.ComponentClient],
-    spotify_auth: typing.Annotated[utility.ClientCredentialsOauth2, tanjun.cached_inject(_build_spotify_auth)],
-    **kwargs: str,
+    spotify_auth: Annotated[utility.ClientCredentialsOauth2, tanjun.cached_inject(_build_spotify_auth)],
+    resource_type: Annotated[
+        Choices[SpotifyType],
+        Name("type"),
+        Flag(aliases=("-t",)),
+        "Type of resource to search for. Defaults to track.",
+    ] = SpotifyType.Track,
 ) -> None:
     """Search for a resource on spotify.
 
@@ -438,10 +436,6 @@ async def spotify_command(
             Type of resource to search for. This can be one of "track", "album", "artist" or "playlist" and defaults
             to track.
     """
-    resource_type = kwargs["type"].lower()
-    if resource_type not in SPOTIFY_RESOURCE_TYPES:
-        raise tanjun.CommandError(f"{resource_type!r} is not a valid resource type")  # TODO: delete row
-
     paginator = yuyo.ComponentPaginator(
         SpotifyPaginator(spotify_auth.acquire_token, session, {"query": query, "type": resource_type}),
         authors=[ctx.author.id],
@@ -465,16 +459,15 @@ async def spotify_command(
         component_client.set_executor(message, paginator)
 
 
+@with_annotated_args
 @tanjun.with_owner_check
-@tanjun.with_argument("url", converters=urllib.parse.ParseResult)
-@tanjun.with_parser
 @tanjun.as_message_command("ytdl")
 async def ytdl_command(
     ctx: tanjun.abc.Context,
-    url: urllib.parse.ParseResult,
+    url: Converted[tanjun.conversion.parse_url],
     session: alluka.Injected[aiohttp.ClientSession],
     config: alluka.Injected[config_.PTFConfig],
-    ytdl_client: typing.Annotated[utility.YoutubeDownloader, tanjun.cached_inject(utility.YoutubeDownloader.spawn)],
+    ytdl_client: Annotated[utility.YoutubeDownloader, tanjun.cached_inject(utility.YoutubeDownloader.spawn)],
 ) -> None:
     auth = aiohttp.BasicAuth(config.username, config.password)
 
@@ -524,14 +517,13 @@ domain_hashes = tanjun.cached_inject(
 )
 
 
-@tanjun.with_argument("url", converters=urllib.parse.urlparse)
+@with_annotated_args(follow_wrapped=True)
 @tanjun.as_message_command("check_domain", "check domain")
-@tanjun.with_str_slash_option("url", "The domain to check", converters=urllib.parse.urlparse)
 @tanjun.as_slash_command("check_domain", 'Check whether a domain is on Discord\'s "bad" domain list')
 async def check_domain(
     ctx: tanjun.abc.Context,
-    url: urllib.parse.ParseResult,
-    bad_domains: typing.Annotated[list[str], domain_hashes],
+    url: Annotated[Converted[urllib.parse.urlparse], "The domain to check"],
+    bad_domains: Annotated[list[str], domain_hashes],
 ) -> None:
     domain = url.netloc or url.path
     domain_hash = hashlib.sha256(domain.encode("utf-8")).hexdigest()

@@ -40,6 +40,7 @@ import datetime
 import json
 import typing
 from collections import abc as collections
+from typing import Annotated
 
 import alluka
 import hikari
@@ -505,7 +506,7 @@ hikari_index = tanjun.dependencies.data.cache_callback(
 def docs_hikari_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
-    index: typing.Annotated[HikariIndex, alluka.inject(callback=hikari_index)],
+    index: Annotated[HikariIndex, alluka.inject(callback=hikari_index)],
     **kwargs: typing.Any,
 ) -> _CoroT[None]:
     """Search Hikari's documentation.
@@ -532,7 +533,7 @@ sake_index = tanjun.dependencies.data.cache_callback(
 def sake_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
-    index: typing.Annotated[DocIndex, alluka.inject(callback=sake_index)],
+    index: Annotated[DocIndex, alluka.inject(callback=sake_index)],
     **kwargs: typing.Any,
 ) -> _CoroT[None]:
     return _docs_command(ctx, component_client, index, SAKE_PAGES, SAKE_PAGES + "/master/", "Sake", **kwargs)
@@ -552,7 +553,7 @@ tanjun_index = tanjun.dependencies.data.cache_callback(
 def tanjun_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
-    index: typing.Annotated[DocIndex, alluka.inject(callback=tanjun_index)],
+    index: Annotated[DocIndex, alluka.inject(callback=tanjun_index)],
     **kwargs: typing.Any,
 ) -> _CoroT[None]:
     return _docs_command(ctx, component_client, index, TANJUN_PAGES, TANJUN_PAGES + "/master/", "Tanjun", **kwargs)
@@ -572,7 +573,7 @@ yuyo_index = tanjun.dependencies.data.cache_callback(
 def yuyo_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
-    index: typing.Annotated[DocIndex, alluka.inject(callback=yuyo_index)],
+    index: Annotated[DocIndex, alluka.inject(callback=yuyo_index)],
     **kwargs: typing.Any,
 ) -> _CoroT[None]:
     return _docs_command(ctx, component_client, index, YUYO_PAGES, YUYO_PAGES + "/master/", "Yuyo", **kwargs)

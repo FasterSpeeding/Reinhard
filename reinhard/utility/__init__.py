@@ -72,12 +72,7 @@ __all__: list[str] = [
     "YoutubeDownloader",
 ]
 
-from . import basic
-from . import command_hooks
-from . import constants
-from . import dependencies
-from . import rest
-from . import ytdl
+from . import basic, command_hooks, constants, dependencies, rest, ytdl
 from .basic import *
 from .command_hooks import *
 from .constants import *
