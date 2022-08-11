@@ -233,30 +233,13 @@ async def youtube_command(
         "The ISO 639-1 two letter identifier of the language to limit search to.",
         Flag(aliases=("-l",)),
     ] = None,
-    order: Annotated[
-        Choices[YtOrder], "The order to return results in. Defaults to relevance."
-    ] = YtOrder.Relevance,
+    order: Annotated[Choices[YtOrder], "The order to return results in. Defaults to relevance."] = YtOrder.Relevance,
     safe_search: Annotated[
         Bool | None,
         "Whether safe search should be enabled or not. The default for this is based on the current channel.",
     ] = None,
 ) -> None:
-    """Search for a resource on youtube.
-
-    Arguments:
-        * query: Greedy query string to search for a resource by.
-
-    Options:
-        * safe search (--safe, -s, --safe-search): whether safe search should be enabled or not.
-            By default this will be decided based on the current channel's nsfw status and this cannot be set to
-            `false` for a channel that's not nsfw.
-        * order (-o, --order): The order to return results in.
-            This can be one of "date", "relevance", "title", "videoCount" or "viewCount" and defaults to "relevance".
-        * language (-l, --language): The ISO 639-1 two letter identifier of the language to limit search to.
-        * region (-r, --region): The ISO 3166-1 code of the region to search for results in.
-        * type (--type, -t): The type of resource to search for.
-            This can be one of "channel", "playlist" or "video" and defaults to "video".
-    """
+    """Search for a resource on youtube."""
     assert tokens.google is not None
     if safe_search is not False:
         channel: hikari.PartialChannel | None
@@ -278,11 +261,11 @@ async def youtube_command(
     parameters: dict[str, str | int] = {
         "key": tokens.google,
         "maxResults": 50,
-        "order": order,
+        "order": order.value,
         "part": "snippet",
         "q": query,
         "safeSearch": "strict" if safe_search else "none",
-        "type": resource_type,
+        "type": resource_type.value,
     }
 
     if region is not None:
@@ -426,24 +409,15 @@ async def spotify_command(
         "Type of resource to search for. Defaults to track.",
     ] = SpotifyType.Track,
 ) -> None:
-    """Search for a resource on spotify.
-
-    Arguments:
-        * query: The greedy string query to search by.
-
-    Options:
-        * type:
-            Type of resource to search for. This can be one of "track", "album", "artist" or "playlist" and defaults
-            to track.
-    """
+    """Search for a resource on spotify."""
     paginator = yuyo.ComponentPaginator(
-        SpotifyPaginator(spotify_auth.acquire_token, session, {"query": query, "type": resource_type}),
+        SpotifyPaginator(spotify_auth.acquire_token, session, {"query": query, "type": resource_type.value}),
         authors=[ctx.author.id],
     )
 
     try:
         if not (first_response := await paginator.get_next_entry()):
-            raise tanjun.CommandError(f"Couldn't find {resource_type}") from None  # TODO: delete row
+            raise tanjun.CommandError(f"Couldn't find {resource_type.value}") from None  # TODO: delete row
 
     except RuntimeError as exc:
         raise tanjun.CommandError(str(exc)) from None  # TODO: delete row

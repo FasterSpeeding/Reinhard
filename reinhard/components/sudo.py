@@ -73,14 +73,7 @@ async def echo_command(
     content: Annotated[hikari.UndefinedOr[Str], Greedy()] = hikari.UNDEFINED,
     raw_embed: Annotated[hikari.UndefinedOr[dict[str, typing.Any]], Converted(json.loads)] = hikari.UNDEFINED,
 ) -> None:
-    """Command used for getting the bot to mirror a response.
-
-    Arguments:
-        * content: The greedy string content the bot should send back. This must be included if `embed` is not.
-
-    Options:
-        * embed (--embed, -e): String JSON object of an embed for the bot to send.
-    """
+    """Command used for getting the bot to mirror a response."""
     embed: hikari.UndefinedOr[hikari.Embed] = hikari.UNDEFINED
     if raw_embed is not hikari.UNDEFINED:
         try:
@@ -179,11 +172,6 @@ async def eval_command(
     """Dynamically evaluate a script in the bot's environment.
 
     This can only be used by the bot's owner.
-
-    Arguments:
-        * code: Greedy multi-line string argument of the code to execute. This should be in a code block.
-        * suppress_response (-s, --suppress): Whether to suppress this command's confirmation response.
-            This defaults to false and will be set to true if no value is provided.
     """
     assert ctx.message.content is not None  # This shouldn't ever be the case in a command client.
     code = re.findall(r"```(?:[\w]*\n?)([\s\S(^\\`{3})]*?)\n*```", ctx.message.content)

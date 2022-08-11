@@ -188,19 +188,6 @@ async def clear_command(
 
     !!! note
         This can only be used on messages under 14 days old.
-
-    Arguments:
-        * count: The amount of messages to delete.
-
-    Options:
-        * users (--user): Mentions and/or IDs of the users to delete messages from.
-        * human only (--human): Whether this should only delete messages sent by actual users.
-            This defaults to false and will be set to true if provided without a value.
-        * bot only (--bot): Whether this should only delete messages sent by bots and webhooks.
-        * before  (--before): ID of a message to delete messages which were sent before.
-        * after (--after): ID of a message to delete messages which were sent after.
-        * suppress (-s, --suppress): Provided without a value to stop the bot from sending a message once the
-            command's finished.
     """
     now = _now()
     after_too_old = after and now - after.created_at >= MAX_MESSAGE_BULK_DELETE
@@ -396,11 +383,7 @@ async def multi_ban_command(
         "Only ban users who are currently in the guild.",
     ] = False,
 ) -> None:
-    """Ban multiple users from using the bot.
-
-    Arguments:
-        * users: Mentions and IDs of the users to ban.
-    """
+    """Ban multiple users from using the bot."""
     banner = await _MultiBanner.build(
         ctx,
         reason=f"Bulk ban triggered by {ctx.author.username}#{ctx.author.discriminator} ({ctx.author.id})",

@@ -509,11 +509,7 @@ def docs_hikari_command(
     index: Annotated[HikariIndex, alluka.inject(callback=hikari_index)],
     **kwargs: typing.Any,
 ) -> _CoroT[None]:
-    """Search Hikari's documentation.
-
-    Arguments
-        * path: Optional argument to query Hikari's documentation by.
-    """
+    """Search Hikari's documentation."""
     return _docs_command(
         ctx, component_client, index, HIKARI_PAGES, HIKARI_PAGES + "/hikari/", "Hikari", desc_splitter=".", **kwargs
     )
