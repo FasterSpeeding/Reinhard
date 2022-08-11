@@ -36,8 +36,7 @@ __all__ = ["on_error", "on_parser_error"]
 import hikari
 import tanjun
 
-from . import basic
-from . import constants
+from . import basic, constants
 
 
 async def on_error(ctx: tanjun.abc.Context, exception: BaseException) -> None:
