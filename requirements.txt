@@ -4,7 +4,7 @@ hikari[speedups]~=2.0.0.dev110
 hikari-sake~=1.0.3a1
 hikari-tanjun~=2.6.1a1
 hikari-yuyo~=1.1.1a1
-markdownify~=0.11.2
+markdownify~=0.11.4
 psutil~=5.9
 uvloop~=0.16; platform_system != "Windows"
 uvicorn~=0.18
