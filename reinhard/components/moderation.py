@@ -217,7 +217,9 @@ async def clear_command(
 
 
 ban_group = (
-    tanjun.slash_command_group("ban", "Ban commands", default_member_permissions=hikari.Permissions.BAN_MEMBERS)
+    tanjun.slash_command_group(
+        "ban", "Ban commands", default_member_permissions=hikari.Permissions.BAN_MEMBERS, dm_enabled=False
+    )
     .add_check(tanjun.checks.GuildCheck())
     .add_check(tanjun.checks.AuthorPermissionCheck(hikari.Permissions.BAN_MEMBERS))
     .add_check(tanjun.checks.OwnPermissionCheck(hikari.Permissions.BAN_MEMBERS))
