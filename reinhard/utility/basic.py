@@ -275,12 +275,11 @@ class FileCallback:
         self._post_components = post_components
 
     async def __call__(self, ctx: yuyo.ComponentContext) -> None:
-        await ctx.defer(hikari.ResponseType.DEFERRED_MESSAGE_CREATE)
         if self._post_components is not hikari.UNDEFINED:
-            await self._ctx.edit_initial_response(components=self._post_components)
+            await self._ctx.respond(components=self._post_components)
 
         files = self._make_files() if self._make_files else self._files
-        await ctx.edit_initial_response(attachments=files, component=delete_row_from_authors(ctx.interaction.user.id))
+        await ctx.respond(attachments=files, component=delete_row_from_authors(ctx.interaction.user.id))
 
 
 def paginator_with_to_file(

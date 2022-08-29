@@ -209,9 +209,8 @@ def yt_check(_: tanjun.abc.Context, tokens: alluka.Injected[config_.Tokens]) -> 
 
 # TODO: should different resource types be split between different sub commands?
 @with_annotated_args(follow_wrapped=True)
-@tanjun.with_check(yt_check)
+@tanjun.with_check(yt_check, follow_wrapped=True)
 @tanjun.as_message_command("youtube", "yt")
-@tanjun.with_check(yt_check)
 @tanjun.as_slash_command("youtube", "Search for a resource on youtube.")
 async def youtube_command(
     ctx: tanjun.abc.Context,

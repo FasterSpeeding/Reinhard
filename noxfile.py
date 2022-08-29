@@ -35,7 +35,7 @@ import pathlib
 
 import nox
 
-nox.options.sessions = ["reformat", "lint", "spell-check", "type-check", "test"]  # type: ignore
+nox.options.sessions = ["reformat", "flake8", "slot-check", "spell-check", "type-check", "test"]  # type: ignore
 GENERAL_TARGETS = ["./noxfile.py", "./reinhard", "./tests"]
 PYTHON_VERSIONS = ["3.9", "3.10"]  # TODO: @nox.session(python=["3.6", "3.7", "3.8"])?
 
@@ -87,9 +87,16 @@ def cleanup(session: nox.Session) -> None:
 
 
 @nox.session(reuse_venv=True)
-def lint(session: nox.Session) -> None:
+def flake8(session: nox.Session) -> None:
     install_requirements(session, include_standard=True)
     session.run("flake8", *GENERAL_TARGETS)
+
+
+@nox.session(reuse_venv=True, name="slot-check")
+def slot_check(session: nox.Session) -> None:
+    """Check this project's slotted classes for common mistakes."""
+    install_requirements(session, include_standard=True)
+    session.run("slotscheck", "-m", "tanjun")
 
 
 @nox.session(reuse_venv=True, name="spell-check")
@@ -114,6 +121,7 @@ def reformat(session: nox.Session) -> None:
     install_requirements(session)  # include_standard_requirements=False
     session.run("black", *GENERAL_TARGETS)
     session.run("isort", *GENERAL_TARGETS)
+    session.run("sort-all", *map(str, pathlib.Path("./tanjun/").glob("**/*.py")), success_codes=[0, 1])
 
 
 @nox.session(reuse_venv=True)

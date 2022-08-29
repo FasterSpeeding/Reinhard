@@ -93,10 +93,9 @@ async def colour_command(
 
 
 @with_annotated_args(follow_wrapped=True)
-@tanjun.with_guild_check
+@tanjun.with_guild_check(follow_wrapped=True)
 @tanjun.as_message_command("member")
-@tanjun.with_guild_check
-@tanjun.as_slash_command("member", "Get information about a member in the current guild.")
+@tanjun.as_slash_command("member", "Get information about a member in the current guild.", dm_enabled=False)
 async def member_command(
     ctx: tanjun.abc.Context,
     member: Annotated[
@@ -164,11 +163,10 @@ async def member_command(
 
 
 @with_annotated_args(follow_wrapped=True)
-@tanjun.with_guild_check
+@tanjun.with_guild_check(follow_wrapped=True)
 @tanjun.as_message_command("role")
 # TODO: the normal role converter is limited to the current guild right?
-@tanjun.with_guild_check
-@tanjun.as_slash_command("role", "Get information about a role in the current guild.")
+@tanjun.as_slash_command("role", "Get information about a role in the current guild.", dm_enabled=False)
 async def role_command(ctx: tanjun.abc.Context, role: Annotated[Role, "The role to get information about."]) -> None:
     """Get information about a role in the current guild."""
     if role.guild_id != ctx.guild_id:
@@ -272,10 +270,9 @@ async def mentions_command(
 
 
 @with_annotated_args(follow_wrapped=True)
-@tanjun.with_guild_check
+@tanjun.with_guild_check(follow_wrapped=True)
 @tanjun.as_message_command("members")
-@tanjun.with_guild_check
-@tanjun.as_slash_command("members", "Search for a member in the current guild.")
+@tanjun.as_slash_command("members", "Search for a member in the current guild.", dm_enabled=False)
 async def members_command(
     ctx: tanjun.abc.Context, name: Annotated[Str, "Greedy argument of the name to search for.", Greedy()]
 ) -> None:
@@ -333,10 +330,7 @@ async def char_command(
     else:
         content = content
 
-    await ctx.respond(content=content or "hi there", component=utility.delete_row(ctx))
-
-    if response_file is not hikari.UNDEFINED:
-        await ctx.edit_last_response(content=None, attachment=response_file)
+    await ctx.respond(content=content, attachment=response_file, component=utility.delete_row(ctx))
 
 
 load_utility = tanjun.Component(name="utility", strict=True).load_from_scope().make_loader()

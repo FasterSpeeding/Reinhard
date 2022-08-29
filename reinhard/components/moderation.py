@@ -166,13 +166,12 @@ _CLEAR_PERMS = (
 )
 
 
-@tanjun.with_own_permission_check(_CLEAR_PERMS)
-@tanjun.with_author_permission_check(_CLEAR_PERMS)
+@tanjun.with_guild_check(follow_wrapped=True)
+@tanjun.with_own_permission_check(_CLEAR_PERMS, follow_wrapped=True)
+@tanjun.with_author_permission_check(_CLEAR_PERMS, follow_wrapped=True)
 @tanjun.with_multi_option("users", "--user", "-u", converters=tanjun.conversion.parse_user_id, default=())
 @_with_filter_message_options
 @tanjun.as_message_command("clear")
-@tanjun.with_own_permission_check(_CLEAR_PERMS)
-@tanjun.with_author_permission_check(_CLEAR_PERMS)
 @tanjun.with_str_slash_option(
     "users",
     "Users to delete messages for",
@@ -180,7 +179,9 @@ _CLEAR_PERMS = (
     default=None,
 )
 @_with_filter_slash_options
-@tanjun.as_slash_command("clear", "Clear new messages from chat as a moderator.")
+@tanjun.as_slash_command(
+    "clear", "Clear new messages from chat as a moderator.", default_member_permissions=_CLEAR_PERMS, dm_enabled=False
+)
 async def clear_command(
     ctx: tanjun.abc.Context, after: hikari.Snowflake | None, before: hikari.Snowflake | None, **kwargs: typing.Any
 ) -> None:
@@ -216,7 +217,7 @@ async def clear_command(
 
 
 ban_group = (
-    tanjun.slash_command_group("ban", "Ban commands")
+    tanjun.slash_command_group("ban", "Ban commands", default_member_permissions=hikari.Permissions.BAN_MEMBERS)
     .add_check(tanjun.checks.GuildCheck())
     .add_check(tanjun.checks.AuthorPermissionCheck(hikari.Permissions.BAN_MEMBERS))
     .add_check(tanjun.checks.OwnPermissionCheck(hikari.Permissions.BAN_MEMBERS))
@@ -393,11 +394,7 @@ async def multi_ban_command(
     await ctx.respond("Starting bans \N{THUMBS UP SIGN}", component=utility.delete_row(ctx), delete_after=2)
     await asyncio.gather(*(banner.try_ban(target=user) for user in users))
     content, attachment = banner.make_response()
-    # Remove once abc.Context has attachments support
-    if isinstance(ctx, tanjun.abc.SlashContext):
-        await ctx.create_followup(content, attachment=attachment, component=utility.delete_row(ctx))
-    else:
-        await ctx.respond(content, attachment=attachment, component=utility.delete_row(ctx))
+    await ctx.respond(content, attachment=attachment, component=utility.delete_row(ctx))
 
 
 @with_annotated_args(follow_wrapped=True)
@@ -409,7 +406,7 @@ async def multi_ban_command(
 @_with_filter_slash_options
 @tanjun.as_slash_command("authors", "Ban the authors of recent messages.")
 async def ban_authors_command(
-    ctx: tanjun.abc.SlashContext | tanjun.abc.MessageContext,
+    ctx: tanjun.abc.Context,
     clear_message_days: Annotated[
         Ranged[0, 7], Flag(aliases=("--clear", "-c")), "Number of days to clear their recent messages for."
     ] = 0,
@@ -439,11 +436,13 @@ async def ban_authors_command(
         await banner.try_ban(author)
 
     content, attachment = banner.make_response()
-    # Remove once abc.Context has attachments support
-    if isinstance(ctx, tanjun.abc.SlashContext):
-        await ctx.create_followup(content, attachment=attachment, component=utility.delete_row(ctx))
-    else:
-        await ctx.respond(content, attachment=attachment, component=utility.delete_row(ctx))
+    await ctx.respond(content, attachment=attachment, component=utility.delete_row(ctx))
 
 
-load_moderation = tanjun.Component(name="moderation").load_from_scope().make_loader()
+load_moderation = (
+    tanjun.Component(name="moderation")
+    .set_dms_enabled_for_app_cmds(False)
+    .set_default_app_command_permissions(hikari.Permissions.ADMINISTRATOR)
+    .load_from_scope()
+    .make_loader()
+)

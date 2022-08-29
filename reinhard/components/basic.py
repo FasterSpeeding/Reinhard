@@ -159,9 +159,8 @@ def cache_check(ctx: tanjun.abc.Context) -> bool:
     raise tanjun.CommandError("Client is cache-less")
 
 
-@tanjun.with_check(cache_check)
+@tanjun.with_check(cache_check, follow_wrapped=True)
 @tanjun.as_message_command("cache")
-@tanjun.with_check(cache_check)
 @tanjun.as_slash_command("cache", "Get general information about this bot's cache.")
 async def cache_command(
     ctx: tanjun.abc.Context,
