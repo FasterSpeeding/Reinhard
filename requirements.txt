@@ -4,6 +4,7 @@ hikari[speedups]==2.0.0.dev112
 hikari-sake==1.0.4a1.post1
 hikari-tanjun==2.10.1a1
 hikari-yuyo==1.4.0a1.post1
+lunr==0.6.2
 markdownify==0.11.6
 psutil==5.9.4
 tanchan==0.1.0

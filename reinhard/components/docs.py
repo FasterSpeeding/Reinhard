@@ -29,13 +29,11 @@
 # CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-"""Commands used to search Hikari and Tanjun's docs."""
+"""Commands used to search Tanjun's docs."""
 from __future__ import annotations
 
 __all__: list[str] = ["load_docs"]
 
-import abc
-import dataclasses
 import datetime
 import json
 import typing
@@ -44,7 +42,9 @@ from typing import Annotated
 
 import alluka
 import hikari
-import markdownify  # type: ignore
+import lunr  # type: ignore
+import lunr.exceptions  # type: ignore
+import lunr.index  # type: ignore
 import tanjun
 import yuyo
 
@@ -57,130 +57,39 @@ _CoroT = collections.Coroutine[typing.Any, typing.Any, _T]
 _DocIndexT = typing.TypeVar("_DocIndexT", bound="DocIndex")
 _MessageCommandT = typing.TypeVar("_MessageCommandT", bound=tanjun.MessageCommand[typing.Any])
 _SlashCommandT = typing.TypeVar("_SlashCommandT", bound=tanjun.SlashCommand[typing.Any])
-HIKARI_PAGES = "https://www.hikari-py.dev"
 SAKE_PAGES = "https://sake.cursed.solutions"
 TANJUN_PAGES = "https://tanjun.cursed.solutions"
 YUYO_PAGES = "https://yuyo.cursed.solutions"
-SPECIAL_KEYS: frozenset[str] = frozenset(("df", "tf", "docs"))
 
 
-@dataclasses.dataclass(slots=True)
 class DocEntry:
-    """Dataclass used to represent a documentation entry."""
+    __slots__ = ("location", "text", "title")
 
-    doc: str
-    """The entry's doc string."""
-
-    type: str
-    """The type of entry this is.
-
-    This will be either "function", "class", "module" or "???".
-    """
-
-    func_def: str | None
-    """How this function was defined if this is a function.
-
-    This will be either "def", "async def" or `None`.
-    """
-
-    fullname: str
-    """The entry's fullname."""
-
-    module_name: str
-    """Name of the module this entry is in."""
-
-    qualname: str
-    """The entry's qualified name."""
-
-    signature: list[str] | None
-    """A list of the entry's parameter names if this is a function."""
-
-    bases: str | None
-    """The classes a class inherits from."""
-
-    default_value: str | None
-    """The value assigned to the initial annotated declaration of a variable."""
-
-    annotation: str | None
-    """Annotation of a variable."""
-
-    @classmethod
-    def from_entry(cls, data: dict[str, typing.Any], doc: str, /) -> DocEntry:
-        return cls(
-            doc,
-            data["type"],
-            data.get("funcdef"),
-            data["fullname"],
-            data["modulename"],
-            # qualname isn't included for modules on 8.3.0 so we can use fullname
-            # or modulename as a default here
-            data.get("qualname") or data["fullname"],
-            data.get("signature"),
-            data.get("bases") or None,
-            data.get("default_value"),
-            data.get("annotation"),
-        )
+    def __init__(self, location: str, entry: dict[str, typing.Any], /) -> None:
+        text = entry["text"]
+        title = entry["title"]
+        assert isinstance(location, str)
+        assert isinstance(text, str)
+        assert isinstance(title, str)
+        self.location = location
+        self.text = text
+        self.title = title
 
 
-def _collect_pdoc_paths(data: dict[str, typing.Any], /, *, target: str = "") -> collections.Iterator[str]:
-    if docs := data.get("docs"):
-        if target:
-            yield from (key for key in docs.keys() if target in key.lower())
-
-        else:
-            yield from docs.keys()
-
-    for key, value in data.items():
-        if key not in SPECIAL_KEYS:
-            yield from _collect_pdoc_paths(value, target=target)
-
-
-class DocIndex(abc.ABC):
+class DocIndex:
     """Abstract class of a documentation store index."""
 
-    __slots__ = ("_metadata", "_search_index")
+    __slots__ = ("_data", "_search_index")
 
-    def __init__(self, data: dict[str, typing.Any], /, *, process_doc: bool = True) -> None:
-        self._metadata: dict[str, DocEntry] = {}
-
-        for name, entry in data["documentStore"]["docs"].items():
-            if process_doc:
-                doc = typing.cast(str, markdownify.markdownify(entry["doc"])).strip("\n").strip()
-            else:
-                doc = entry["doc"]
-            self._metadata[name] = DocEntry.from_entry(entry, doc)
-
-        # Qualname doesn't seem to include modules but fullname does
-        self._search_index: dict[str, typing.Any] = data["index"]["fullname"]
+    def __init__(self, data: list[dict[str, str]], /) -> None:
+        self._search_index: lunr.index.Index = lunr.lunr("location", ("title", "location"), data)
+        self._data: dict[str, DocEntry] = {entry["location"]: DocEntry(entry["location"], entry) for entry in data}
 
     @classmethod
     def from_json(cls: type[_DocIndexT], data: str | bytes, /) -> _DocIndexT:
         """Build this index from a JSON payload."""
-        return cls(json.loads(data))
+        return cls(json.loads(data)["docs"])
 
-    def get_entry(self, path: str, /) -> DocEntry:
-        """Get an entry from the index from an absolute path.
-
-        Parameters
-        ----------
-        path
-            The absolute path to the entry.
-
-            This is matched case-sensitively.
-
-        Returns
-        -------
-        DocEntry
-            The entry.
-
-        Raises
-        ------
-        KeyError
-            If the path is not found.
-        """
-        return self._metadata[path]
-
-    @abc.abstractmethod
     def make_link(self, base_url: str, entry: DocEntry, /) -> str:
         """Make a web link to a documentation entry.
 
@@ -196,6 +105,7 @@ class DocIndex(abc.ABC):
         str
             The link.
         """
+        return f"{base_url}/{entry.location}"
 
     def search(self, search_path: str, /) -> collections.Iterator[DocEntry]:
         """Search the index for an entry.
@@ -212,75 +122,17 @@ class DocIndex(abc.ABC):
         collections.abc.Iterator[DocEntry]
             An iterator of the matching entries.
         """
-        search_path = search_path.lower()
-        if not search_path:
-            return
-
         try:
-            _, name = search_path.rsplit(".", 1)[-1].rsplit("_", 1)
-        except ValueError:
-            name = search_path.rsplit(".", 1)[-1]
-
-        position: dict[str, typing.Any] = self._search_index["root"]
-        for char in name:
-            if not (new_position := position.get(char)):
-                # Sometimes the search path ends a bit pre-maturely.
-                if docs := position.get("docs"):
-                    # Since this isn't recursive, no de-duplication is necessary.
-                    yield from (self._metadata[path] for path in docs.keys() if search_path in path.lower())
-                    return
-
-                return
-
-            position = new_position
-
-        # Since this is recursive we need to check for duplicated entries.
-        already_yielded = set[str]()
-        for path in _collect_pdoc_paths(position, target=search_path):
-            if path not in already_yielded:
-                already_yielded.add(path)
-                yield self._metadata[path]
-
-
-class PdocIndex(DocIndex):
-    """Doc index specialised for Pdoc indexes."""
-
-    __slots__ = ()
-
-    def make_link(self, base_url: str, entry: DocEntry, /) -> str:
-        fragment = ""
-        if in_module := entry.fullname.removeprefix(entry.module_name + "."):
-            fragment = "#" + in_module
-
-        return base_url + "/".join(entry.module_name.split(".")) + fragment
-
-
-def _form_description(metadata: DocEntry, *, desc_splitter: str = "\n") -> str:
-    if metadata.doc:
-        summary = metadata.doc.split(desc_splitter, 1)[0]
-        if desc_splitter != "\n":
-            summary += desc_splitter
-    else:
-        summary = "NONE"
-
-    match metadata.type:
-        case "function":
-            type_line = "Type: Async function" if metadata.func_def == "async def" else "Type: Sync function"
-            return f"{type_line}\n\nSummary:\n```{summary}```\nSignature:\n```py\n{metadata.signature}```"
-        case "variable":
-            annotation = (metadata.annotation or "NONE").removeprefix(":").lstrip()
-            return f"Type: Variable\n\nSummary\n```{summary}```\nAnnotation: `{annotation}`"
-        case "class":
-            return f"Type: Class\n\nSummary\n```{summary}```\nBases: `({metadata.bases})`"
-        case _:
-            return f"Type: {metadata.type.capitalize()}\n\nSummary\n```{summary}```"
+            results: list[dict[str, str]] = self._search_index.search(search_path)
+        except lunr.exceptions.QueryParseError as exc:
+            raise tanjun.CommandError(f"Invalid query: `{exc.args[0]}`")
+        return (self._data[entry["ref"]] for entry in results)
 
 
 async def _docs_command(
     ctx: tanjun.abc.Context,
     component_client: yuyo.ComponentClient,
     index: DocIndex,
-    base_url: str,
     docs_url: str,
     name: str,
     path: str | None,
@@ -289,12 +141,12 @@ async def _docs_command(
     **kwargs: typing.Any,
 ) -> None:
     if not path:
-        await ctx.respond(base_url, component=utility.delete_row(ctx))
+        await ctx.respond(docs_url, component=utility.delete_row(ctx))
         return
 
     if kwargs["list"]:
         iterator = utility.embed_iterator(
-            utility.chunk((f"[{m.fullname}]({index.make_link(docs_url, m)})" for m in index.search(path)), 10),
+            utility.chunk((f"[{m.title}]({index.make_link(docs_url, m)})" for m in index.search(path)), 10),
             lambda entries: "\n".join(entries),
             title=f"{name} Documentation",
             url=docs_url,
@@ -314,7 +166,7 @@ async def _docs_command(
         executor = utility.paginator_with_to_file(
             ctx,
             paginator,
-            make_files=lambda: [hikari.Bytes("\n".join(m.fullname for m in index.search(str(path))), "results.txt")],
+            make_files=lambda: [hikari.Bytes("\n".join(m.title for m in index.search(str(path))), "results.txt")],
         )
         components = executor.builders
 
@@ -323,9 +175,9 @@ async def _docs_command(
             (
                 hikari.UNDEFINED,
                 hikari.Embed(
-                    description=_form_description(metadata, desc_splitter=desc_splitter),
+                    description=metadata.text[:87] + "..." if len(metadata.text) > 90 else metadata.text,
                     color=utility.embed_colour(),
-                    title=metadata.fullname,
+                    title=metadata.title,
                     url=index.make_link(docs_url, metadata),
                 ),
             )
@@ -364,7 +216,10 @@ def make_autocomplete(get_index: collections.Callable[..., _CoroT[_DocIndexT]]) 
         if not value:
             return
 
-        await ctx.set_choices({entry.qualname: entry.qualname for entry, _ in zip(index.search(value), range(25))})
+        try:
+            await ctx.set_choices({entry.title: entry.location for entry, _ in zip(index.search(value), range(25))})
+        except tanjun.CommandError:
+            await ctx.set_choices()
 
     return _autocomplete
 
@@ -385,7 +240,7 @@ def _with_docs_slash_options(
                 "Whether other people should be able to interact with the response. Defaults to False",
                 default=False,
             )
-            .add_bool_option("list", "Whether this should return alist of links. Defaults to False.", default=False)
+            .add_bool_option("list", "Whether this should return a list of links. Defaults to False.", default=False)
         )
 
     return decorator
@@ -401,7 +256,7 @@ def _with_docs_message_options(command: _MessageCommandT, /) -> _MessageCommandT
 
 
 sake_index = tanjun.dependencies.data.cache_callback(
-    utility.FetchedResource(SAKE_PAGES + "/master/search.json", PdocIndex.from_json),
+    utility.FetchedResource(SAKE_PAGES + "/search/search_index.json", DocIndex.from_json),
     expire_after=datetime.timedelta(hours=12),
 )
 
@@ -416,11 +271,11 @@ def sake_docs_command(
     index: Annotated[DocIndex, alluka.inject(callback=sake_index)],
     **kwargs: typing.Any,
 ) -> _CoroT[None]:
-    return _docs_command(ctx, component_client, index, SAKE_PAGES, SAKE_PAGES + "/master/", "Sake", **kwargs)
+    return _docs_command(ctx, component_client, index, SAKE_PAGES, "Sake", **kwargs)
 
 
 tanjun_index = tanjun.dependencies.data.cache_callback(
-    utility.FetchedResource(TANJUN_PAGES + "/master/search.json", PdocIndex.from_json),
+    utility.FetchedResource(TANJUN_PAGES + "/search/search_index.json", DocIndex.from_json),
     expire_after=datetime.timedelta(hours=12),
 )
 
@@ -435,11 +290,11 @@ def tanjun_docs_command(
     index: Annotated[DocIndex, alluka.inject(callback=tanjun_index)],
     **kwargs: typing.Any,
 ) -> _CoroT[None]:
-    return _docs_command(ctx, component_client, index, TANJUN_PAGES, TANJUN_PAGES + "/master/", "Tanjun", **kwargs)
+    return _docs_command(ctx, component_client, index, TANJUN_PAGES, "Tanjun", **kwargs)
 
 
 yuyo_index = tanjun.dependencies.data.cache_callback(
-    utility.FetchedResource(YUYO_PAGES + "/master/search.json", PdocIndex.from_json),
+    utility.FetchedResource(YUYO_PAGES + "/search/search_index.json", DocIndex.from_json),
     expire_after=datetime.timedelta(hours=12),
 )
 
@@ -454,7 +309,7 @@ def yuyo_docs_command(
     index: Annotated[DocIndex, alluka.inject(callback=yuyo_index)],
     **kwargs: typing.Any,
 ) -> _CoroT[None]:
-    return _docs_command(ctx, component_client, index, YUYO_PAGES, YUYO_PAGES + "/master/", "Yuyo", **kwargs)
+    return _docs_command(ctx, component_client, index, YUYO_PAGES, "Yuyo", **kwargs)
 
 
 load_docs = tanjun.Component(name="docs").load_from_scope().make_loader()
