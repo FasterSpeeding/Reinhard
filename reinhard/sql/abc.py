@@ -121,7 +121,9 @@ class DatabaseCollection(typing.Protocol[_FieldT_co, _ValueT_co]):
         raise NotImplementedError
 
     # TODO: do we want to finalise here?
-    async def map(self, cast: typing.Callable[[_ValueT_co], _OtherValueT], /) -> collections.Iterator[_OtherValueT]:
+    async def map(
+        self, cast: collections.Callable[[_ValueT_co], _OtherValueT], /
+    ) -> collections.Iterator[_OtherValueT]:
         raise NotImplementedError
 
     def order_by(self: _DatabaseCollectionT, field: _FieldT_co, /, ascending: bool = True) -> _DatabaseCollectionT:

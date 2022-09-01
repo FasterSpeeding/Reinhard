@@ -35,6 +35,7 @@ from __future__ import annotations
 __all__: list[str] = ["load_docs"]
 
 import datetime
+import hashlib
 import json
 import typing
 from collections import abc as collections
@@ -57,55 +58,75 @@ _CoroT = collections.Coroutine[typing.Any, typing.Any, _T]
 _DocIndexT = typing.TypeVar("_DocIndexT", bound="DocIndex")
 _MessageCommandT = typing.TypeVar("_MessageCommandT", bound=tanjun.MessageCommand[typing.Any])
 _SlashCommandT = typing.TypeVar("_SlashCommandT", bound=tanjun.SlashCommand[typing.Any])
+HIKARI_PAGES = "https://www.hikari-py.dev"
 SAKE_PAGES = "https://sake.cursed.solutions"
 TANJUN_PAGES = "https://tanjun.cursed.solutions"
 YUYO_PAGES = "https://yuyo.cursed.solutions"
 
 
-class DocEntry:
-    __slots__ = ("location", "text", "title")
+def hash_path(value: str, /) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()
 
-    def __init__(self, location: str, entry: dict[str, typing.Any], /) -> None:
+
+class DocEntry:
+    __slots__ = ("hashed_location", "text", "title", "url")
+
+    def __init__(self, base_url: str, location: str, entry: dict[str, typing.Any], /) -> None:
         text = entry["text"]
         title = entry["title"]
         assert isinstance(location, str)
         assert isinstance(text, str)
         assert isinstance(title, str)
-        self.location = location
+        self.hashed_location = hash_path(location)
         self.text = text
         self.title = title
+        self.url = f"{base_url}/{location}"
+
+    def to_embed(self) -> hikari.Embed:
+        return hikari.Embed(
+            description=self.text[:87] + "..." if len(self.text) > 90 else self.text,
+            color=utility.embed_colour(),
+            title=self.title,
+            url=self.url,
+        )
 
 
 class DocIndex:
     """Abstract class of a documentation store index."""
 
-    __slots__ = ("_data", "_search_index")
+    __slots__ = ("_autocomplete_refs", "_data", "docs_url", "name", "_search_index")
 
-    def __init__(self, data: list[dict[str, str]], /) -> None:
+    def __init__(self, name: str, docs_url: str, data: list[dict[str, str]], /) -> None:
+        self._data: dict[str, DocEntry] = {
+            entry["location"]: DocEntry(docs_url, entry["location"], entry) for entry in data
+        }
+        self.docs_url = docs_url
+        self._autocomplete_refs: dict[str, DocEntry] = {entry.hashed_location: entry for entry in self._data.values()}
+        self.name = name
         self._search_index: lunr.index.Index = lunr.lunr("location", ("title", "location"), data)
-        self._data: dict[str, DocEntry] = {entry["location"]: DocEntry(entry["location"], entry) for entry in data}
 
     @classmethod
-    def from_json(cls: type[_DocIndexT], data: str | bytes, /) -> _DocIndexT:
+    def from_json(cls: type[_DocIndexT], name: str, url: str, /) -> collections.Callable[[str | bytes], _DocIndexT]:
         """Build this index from a JSON payload."""
-        return cls(json.loads(data)["docs"])
+        return lambda data: cls(name, url, json.loads(data)["docs"])
 
-    def make_link(self, base_url: str, entry: DocEntry, /) -> str:
-        """Make a web link to a documentation entry.
+    def get_autocomplete_result(self, path: str, /) -> DocEntry | None:
+        """Try to get the autocomplete result for a "path" option.
 
         Parameters
         ----------
-        base_url
-            The base URL of the documentation site.
-        entry
-            The entry to link to.
+        path
+            The path to look for an autocomplete for.
+
+            Autocomplete will provide a special cased hashed ID  for the path
+            value.
 
         Returns
         -------
-        str
-            The link.
+        DocEntry
+            The found doc entry if `path` is a valid special cased ID.
         """
-        return f"{base_url}/{entry.location}"
+        return self._autocomplete_refs.get(path)
 
     def search(self, search_path: str, /) -> collections.Iterator[DocEntry]:
         """Search the index for an entry.
@@ -126,29 +147,67 @@ class DocIndex:
             results: list[dict[str, str]] = self._search_index.search(search_path)
         except lunr.exceptions.QueryParseError as exc:  # type: ignore
             raise tanjun.CommandError(f"Invalid query: `{exc.args[0]}`")
+
         return (self._data[entry["ref"]] for entry in results)
+
+
+def process_hikari(raw_data: bytes, /) -> DocIndex:
+    data: dict[str, typing.Any] = json.loads(raw_data)
+    base_urls: list[str] = []
+
+    # Sorting this like this gives us an easier way to prioritise child modules over parents.
+    base_urls = sorted(
+        map("hikari.".__add__, (".".join(url.split("/")) for url in data["urls"])),
+        key=lambda e: e.count("."),
+        reverse=True,
+    )
+    built_data: list[dict[str, str]] = []
+    for entry in data["index"]:
+        fullpath: str = entry["r"]
+
+        for module_path in base_urls:
+            if fullpath.startswith(module_path):
+                break
+
+        else:
+            raise RuntimeError
+
+        # Ignore the first entry of .split(".") as "hikari" isn't included in this part of the path.
+        link = "/".join(module_path.split(".")[1:])
+        if qual_name := fullpath[len(module_path) + 1 :]:
+            title = qual_name
+            link += "#" + fullpath
+
+        else:
+            title = fullpath
+
+        built_data.append({"location": link, "title": title, "text": entry["d"]})
+
+    return DocIndex("Hikari", HIKARI_PAGES, built_data)
 
 
 async def _docs_command(
     ctx: tanjun.abc.Context,
     component_client: yuyo.ComponentClient,
     index: DocIndex,
-    docs_url: str,
-    name: str,
     path: str | None,
     public: bool,
     **kwargs: typing.Any,
 ) -> None:
     if not path:
-        await ctx.respond(docs_url, component=utility.delete_row(ctx))
+        await ctx.respond(index.docs_url, component=utility.delete_row(ctx))
+        return
+
+    if autocomplete_result := index.get_autocomplete_result(path):
+        await ctx.respond(embed=autocomplete_result.to_embed())
         return
 
     if kwargs["list"]:
         iterator = utility.embed_iterator(
-            utility.chunk((f"[{m.title}]({index.make_link(docs_url, m)})" for m in index.search(path)), 10),
+            utility.chunk((f"[{m.title}]({m.url})" for m in index.search(path)), 10),
             lambda entries: "\n".join(entries),
-            title=f"{name} Documentation",
-            url=docs_url,
+            title=f"{index.name} Documentation",
+            url=index.docs_url,
         )
         paginator = yuyo.ComponentPaginator(
             iterator,
@@ -170,18 +229,7 @@ async def _docs_command(
         components = executor.builders
 
     else:
-        iterator = (
-            (
-                hikari.UNDEFINED,
-                hikari.Embed(
-                    description=metadata.text[:87] + "..." if len(metadata.text) > 90 else metadata.text,
-                    color=utility.embed_colour(),
-                    title=metadata.title,
-                    url=index.make_link(docs_url, metadata),
-                ),
-            )
-            for metadata in index.search(path)
-        )
+        iterator = ((hikari.UNDEFINED, metadata.to_embed()) for metadata in index.search(path))
         executor = paginator = yuyo.ComponentPaginator(
             iterator,
             authors=(ctx.author,) if not public else (),
@@ -213,10 +261,15 @@ def make_autocomplete(get_index: collections.Callable[..., _CoroT[_DocIndexT]]) 
     ) -> None:
         """Autocomplete strategy."""
         if not value:
+            await ctx.set_choices()
             return
 
         try:
-            await ctx.set_choices({entry.title: entry.location for entry, _ in zip(index.search(value), range(25))})
+            # A hash of the location is used as the raw partial paths can easily get over 100 characters
+            # (the value length limit).
+            await ctx.set_choices(
+                {entry.title: entry.hashed_location for entry, _ in zip(index.search(value), range(25))}
+            )
         except tanjun.CommandError:
             await ctx.set_choices()
 
@@ -254,8 +307,29 @@ def _with_docs_message_options(command: _MessageCommandT, /) -> _MessageCommandT
     )
 
 
+hikari_index = tanjun.dependencies.data.cache_callback(
+    utility.FetchedResource(HIKARI_PAGES + "/hikari/index.json", process_hikari),
+    expire_after=datetime.timedelta(hours=12),
+)
+
+
+@_with_docs_message_options
+@tanjun.as_message_command("docs hikari")
+@docs_group.with_command
+@_with_docs_slash_options(hikari_index)
+@tanjun.as_slash_command("hikari", "Search Hikari's documentation")
+def docs_hikari_command(
+    ctx: tanjun.abc.Context,
+    component_client: alluka.Injected[yuyo.ComponentClient],
+    index: Annotated[DocIndex, alluka.inject(callback=hikari_index)],
+    **kwargs: typing.Any,
+) -> _CoroT[None]:
+    """Search Hikari's documentation."""
+    return _docs_command(ctx, component_client, index, **kwargs)
+
+
 sake_index = tanjun.dependencies.data.cache_callback(
-    utility.FetchedResource(SAKE_PAGES + "/search/search_index.json", DocIndex.from_json),
+    utility.FetchedResource(SAKE_PAGES + "/search/search_index.json", DocIndex.from_json("Sake", SAKE_PAGES)),
     expire_after=datetime.timedelta(hours=12),
 )
 
@@ -270,11 +344,11 @@ def sake_docs_command(
     index: Annotated[DocIndex, alluka.inject(callback=sake_index)],
     **kwargs: typing.Any,
 ) -> _CoroT[None]:
-    return _docs_command(ctx, component_client, index, SAKE_PAGES, "Sake", **kwargs)
+    return _docs_command(ctx, component_client, index, **kwargs)
 
 
 tanjun_index = tanjun.dependencies.data.cache_callback(
-    utility.FetchedResource(TANJUN_PAGES + "/search/search_index.json", DocIndex.from_json),
+    utility.FetchedResource(TANJUN_PAGES + "/search/search_index.json", DocIndex.from_json("Tanjun", TANJUN_PAGES)),
     expire_after=datetime.timedelta(hours=12),
 )
 
@@ -289,11 +363,11 @@ def tanjun_docs_command(
     index: Annotated[DocIndex, alluka.inject(callback=tanjun_index)],
     **kwargs: typing.Any,
 ) -> _CoroT[None]:
-    return _docs_command(ctx, component_client, index, TANJUN_PAGES, "Tanjun", **kwargs)
+    return _docs_command(ctx, component_client, index, **kwargs)
 
 
 yuyo_index = tanjun.dependencies.data.cache_callback(
-    utility.FetchedResource(YUYO_PAGES + "/search/search_index.json", DocIndex.from_json),
+    utility.FetchedResource(YUYO_PAGES + "/search/search_index.json", DocIndex.from_json("Yuyo", YUYO_PAGES)),
     expire_after=datetime.timedelta(hours=12),
 )
 
@@ -308,7 +382,7 @@ def yuyo_docs_command(
     index: Annotated[DocIndex, alluka.inject(callback=yuyo_index)],
     **kwargs: typing.Any,
 ) -> _CoroT[None]:
-    return _docs_command(ctx, component_client, index, YUYO_PAGES, "Yuyo", **kwargs)
+    return _docs_command(ctx, component_client, index, **kwargs)
 
 
 load_docs = tanjun.Component(name="docs").load_from_scope().make_loader()
