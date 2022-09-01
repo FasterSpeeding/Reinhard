@@ -124,7 +124,7 @@ class DocIndex:
         """
         try:
             results: list[dict[str, str]] = self._search_index.search(search_path)
-        except lunr.exceptions.QueryParseError as exc:
+        except lunr.exceptions.QueryParseError as exc:  # type: ignore
             raise tanjun.CommandError(f"Invalid query: `{exc.args[0]}`")
         return (self._data[entry["ref"]] for entry in results)
 
@@ -137,7 +137,6 @@ async def _docs_command(
     name: str,
     path: str | None,
     public: bool,
-    desc_splitter: str = "\n",
     **kwargs: typing.Any,
 ) -> None:
     if not path:
