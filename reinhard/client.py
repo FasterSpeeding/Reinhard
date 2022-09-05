@@ -32,6 +32,7 @@
 from __future__ import annotations
 
 import asyncio
+import pathlib
 import typing
 
 import hikari
@@ -78,7 +79,7 @@ def _rukari(config: config_.FullConfig | None) -> tuple[hikari.Runnable, tanjun.
             shards=bot,
             event_managed=True,
             mention_prefix=config.mention_prefix,
-            declare_global_commands=config.declare_global_commands,
+            declare_global_commands=False if config.hot_reload else config.declare_global_commands,
         )
         .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open)
         .add_client_callback(tanjun.ClientCallbackNames.CLOSING, component_client.close)
@@ -147,8 +148,23 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> tanjun.Client:
         .add_prefix(config.prefixes)
         .set_type_dependency(config_.FullConfig, config)
         .set_type_dependency(config_.Tokens, config.tokens)
-        .load_modules("reinhard.components")
     )
+
+    components_dir = pathlib.Path(".") / "reinhard" / "components"
+    if config.hot_reload:
+        (
+            tanjun.HotReloader(
+                commands_guild=config.declare_global_commands
+                if isinstance(config.declare_global_commands, hikari.Snowflake)
+                else None
+            )
+            .add_directory(components_dir, namespace="reinhard.components")
+            .add_to_client(client)
+        )
+
+    else:
+        client.load_directory(components_dir, namespace="reinhard.components")
+
     assert isinstance(client.rest.http_settings, hikari.impl.HTTPSettings)
     assert isinstance(client.rest.proxy_settings, hikari.impl.ProxySettings)
     utility.SessionManager(
@@ -194,7 +210,9 @@ def build_from_gateway_bot(
     reaction_client = yuyo.ReactionClient.from_gateway_bot(bot, event_managed=False)
     return _build(
         tanjun.Client.from_gateway_bot(
-            bot, mention_prefix=config.mention_prefix, declare_global_commands=config.declare_global_commands
+            bot,
+            mention_prefix=config.mention_prefix,
+            declare_global_commands=False if config.hot_reload else config.declare_global_commands,
         )
         .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open)
         .add_client_callback(tanjun.ClientCallbackNames.CLOSING, component_client.close)
@@ -233,7 +251,10 @@ def build_from_rest_bot(
         utility.DELETE_CUSTOM_ID, utility.delete_button_callback, prefix_match=True
     )
     client = _build(
-        tanjun.Client.from_rest_bot(bot, declare_global_commands=config.declare_global_commands)
+        tanjun.Client.from_rest_bot(
+            bot,
+            declare_global_commands=False if config.hot_reload else config.declare_global_commands,
+        )
         .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open)
         .add_client_callback(tanjun.ClientCallbackNames.CLOSING, component_client.close)
         .set_type_dependency(yuyo.ComponentClient, component_client),

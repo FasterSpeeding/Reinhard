@@ -210,6 +210,7 @@ class FullConfig(Config):
     prefixes: collections.Set[str] = frozenset()
     ptf: PTFConfig | None = None
     declare_global_commands: typing.Union[bool, hikari.Snowflake] = True
+    hot_reload: bool = False
 
     @classmethod
     def from_env(cls) -> FullConfig:
@@ -232,6 +233,7 @@ class FullConfig(Config):
                 lambda v: nv if (nv := _str_to_bool(v, default=None)) is not None else hikari.Snowflake(v),
                 True,
             ),
+            hot_reload=_cast_or_else(os.environ, "hot_reload", _str_to_bool, False),
         )
 
     @classmethod
