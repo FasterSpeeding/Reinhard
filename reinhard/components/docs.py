@@ -103,7 +103,7 @@ class DocIndex:
         self.docs_url = docs_url
         self._autocomplete_refs: dict[str, DocEntry] = {entry.hashed_location: entry for entry in self._data.values()}
         self.name = name
-        self._search_index: lunr.index.Index = lunr.lunr("location", ("title", "location"), data)
+        self._search_index: lunr.index.Index = lunr.lunr("location", ("location",), data)
 
     @classmethod
     def from_json(cls: type[_DocIndexT], name: str, url: str, /) -> collections.Callable[[str | bytes], _DocIndexT]:
