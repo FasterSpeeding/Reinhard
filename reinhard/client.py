@@ -32,6 +32,7 @@
 from __future__ import annotations
 
 import asyncio
+import datetime
 import pathlib
 import typing
 
@@ -152,12 +153,14 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> tanjun.Client:
 
     components_dir = pathlib.Path(".") / "reinhard" / "components"
     if config.hot_reload:
+        guilds = (
+            config.declare_global_commands if isinstance(config.declare_global_commands, hikari.Snowflake) else None
+        )
+        redeclare = None if config.declare_global_commands is False else datetime.timedelta(seconds=10)
         (
             tanjun.HotReloader(
-                commands_guild=config.declare_global_commands
-                if isinstance(config.declare_global_commands, hikari.Snowflake)
-                else None,
-                redeclare_cmds_after=config.declare_global_commands is not False,
+                commands_guild=guilds,
+                redeclare_cmds_after=redeclare,
             )
             .add_directory(components_dir, namespace="reinhard.components")
             .add_to_client(client)
