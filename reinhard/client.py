@@ -156,7 +156,8 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> tanjun.Client:
             tanjun.HotReloader(
                 commands_guild=config.declare_global_commands
                 if isinstance(config.declare_global_commands, hikari.Snowflake)
-                else None
+                else None,
+                redeclare_cmds_after=config.declare_global_commands is not False,
             )
             .add_directory(components_dir, namespace="reinhard.components")
             .add_to_client(client)
