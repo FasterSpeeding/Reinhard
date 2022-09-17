@@ -315,9 +315,8 @@ hikari_index = tanjun.dependencies.data.cache_callback(
 
 @_with_docs_message_options
 @tanjun.as_message_command("docs hikari")
-@docs_group.with_command
 @_with_docs_slash_options(hikari_index)
-@tanjun.as_slash_command("hikari", "Search Hikari's documentation")
+@docs_group.as_sub_command("hikari", "Search Hikari's documentation")
 def docs_hikari_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
