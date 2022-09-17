@@ -365,13 +365,12 @@ class _MultiBanner:
 @tanjun.with_own_permission_check(hikari.Permissions.BAN_MEMBERS)
 @tanjun.with_multi_argument("users", converters=tanjun.conversion.parse_user_id)
 @tanjun.as_message_command("ban members")
-@ban_group.with_command
 @tanjun.with_str_slash_option(
     "users",
     "Space separated sequence of users to ban",
     converters=lambda value: set(map(tanjun.conversion.parse_user_id, value.split())),
 )
-@tanjun.as_slash_command("members", "Ban one or more members")
+@ban_group.as_sub_command("members", "Ban one or more members")
 async def multi_ban_command(
     ctx: tanjun.abc.SlashContext | tanjun.abc.MessageContext,
     users: set[hikari.Snowflake],
@@ -404,9 +403,8 @@ async def multi_ban_command(
 @tanjun.with_own_permission_check(hikari.Permissions.BAN_MEMBERS)
 @_with_filter_message_options
 @tanjun.as_message_command("ban authors")
-@ban_group.with_command
 @_with_filter_slash_options
-@tanjun.as_slash_command("authors", "Ban the authors of recent messages.")
+@ban_group.as_sub_command("authors", "Ban the authors of recent messages.")
 async def ban_authors_command(
     ctx: tanjun.abc.Context,
     clear_message_days: Annotated[

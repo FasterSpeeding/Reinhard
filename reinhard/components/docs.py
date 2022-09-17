@@ -500,9 +500,8 @@ hikari_index = tanjun.dependencies.data.cache_callback(
 
 @_with_docs_message_options
 @tanjun.as_message_command("docs hikari")
-@docs_group.with_command
 @_with_docs_slash_options(hikari_index)
-@tanjun.as_slash_command("hikari", "Search Hikari's documentation")
+@docs_group.as_sub_command("hikari", "Search Hikari's documentation")
 def docs_hikari_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
@@ -523,9 +522,8 @@ sake_index = tanjun.dependencies.data.cache_callback(
 
 @_with_docs_message_options
 @tanjun.as_message_command("docs sake")
-@docs_group.with_command
 @_with_docs_slash_options(sake_index)
-@tanjun.as_slash_command("sake", "Search Sake's documentation")
+@docs_group.as_sub_command("sake", "Search Sake's documentation")
 def sake_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
@@ -543,9 +541,8 @@ tanjun_index = tanjun.dependencies.data.cache_callback(
 
 @_with_docs_message_options
 @tanjun.as_message_command("docs tanjun")
-@docs_group.with_command
 @_with_docs_slash_options(tanjun_index)
-@tanjun.as_slash_command("tanjun", "Search Tanjun's documentation")
+@docs_group.as_sub_command("tanjun", "Search Tanjun's documentation")
 def tanjun_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
@@ -563,9 +560,8 @@ yuyo_index = tanjun.dependencies.data.cache_callback(
 
 @_with_docs_message_options
 @tanjun.as_message_command("docs yuyo")
-@docs_group.with_command
 @_with_docs_slash_options(yuyo_index)
-@tanjun.as_slash_command("yuyo", "Search Yuyo's documentation")
+@docs_group.as_sub_command("yuyo", "Search Yuyo's documentation")
 def yuyo_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
