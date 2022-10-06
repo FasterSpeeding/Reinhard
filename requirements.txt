@@ -1,5 +1,5 @@
 asyncpg~=0.26.0
-python-dotenv~=0.20
+python-dotenv~=0.21
 hikari[speedups]~=2.0.0.dev110
 hikari-sake~=1.0.3a1
 hikari-tanjun~=2.7.0a1
