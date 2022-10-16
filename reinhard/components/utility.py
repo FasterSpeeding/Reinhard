@@ -274,7 +274,7 @@ async def mentions_command(
 @tanjun.as_message_command("members")
 @tanjun.as_slash_command("members", "Search for a member in the current guild.", dm_enabled=False)
 async def members_command(
-    ctx: tanjun.abc.Context, name: Annotated[Str, "Greedy argument of the name to search for.", Greedy()]
+    ctx: tanjun.abc.Context, name: Annotated[Greedy[Str], "Greedy argument of the name to search for."]
 ) -> None:
     """Search for a member in the current guild."""
     assert ctx.guild_id is not None
@@ -305,7 +305,7 @@ def _format_char_line(char: str, to_file: bool) -> str:
 @tanjun.as_slash_command("char", "Get information about the UTF-8 characters in the executing message.")
 async def char_command(
     ctx: tanjun.abc.Context,
-    characters: Annotated[Str, "The UTF-8 characters to get information about", Greedy()],
+    characters: Annotated[Greedy[Str], "The UTF-8 characters to get information about"],
     file: Annotated[
         Bool,
         Flag(aliases=("-f",), empty_value=True),

@@ -52,7 +52,8 @@ import hikari
 import tanjun
 import yuyo
 from hikari import traits
-from tanjun.annotations import Bool, Converted, Flag, Greedy, Str, with_annotated_args
+from tanjun.annotations import Bool, Converted, Flag, Greedy, Positional, Str
+from tanjun.annotations import with_annotated_args
 
 from .. import utility
 
@@ -70,8 +71,9 @@ async def error_message_command(_: tanjun.abc.Context) -> None:
 async def echo_command(
     ctx: tanjun.abc.Context,
     entity_factory: alluka.Injected[traits.EntityFactoryAware],
-    content: Annotated[hikari.UndefinedOr[Str], Greedy()] = hikari.UNDEFINED,
-    raw_embed: Annotated[hikari.UndefinedOr[dict[str, typing.Any]], Converted(json.loads)] = hikari.UNDEFINED,
+    # TODO: Greedy should implicitly mark arguments as positional.
+    content: Positional[Greedy[hikari.UndefinedOr[Str]]] = hikari.UNDEFINED,
+    raw_embed: hikari.UndefinedOr[Converted[json.loads]] = hikari.UNDEFINED,
 ) -> None:
     """Command used for getting the bot to mirror a response."""
     embed: hikari.UndefinedOr[hikari.Embed] = hikari.UNDEFINED
