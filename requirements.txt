@@ -1,4 +1,4 @@
-asyncpg~=0.26.0
+asyncpg~=0.27.0
 python-dotenv~=0.21
 hikari[speedups]~=2.0.0.dev111
 hikari-sake~=1.0.3a1
