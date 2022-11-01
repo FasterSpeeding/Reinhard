@@ -4,5 +4,5 @@ flake8==5.0.4
 isort==5.10.1
 pyright==1.1.277
 pytest==7.2.0
-slotscheck==0.15.0
+slotscheck==0.16.0
 sort-all==1.2.0
