@@ -2,7 +2,7 @@ black==22.10.0
 codespell==2.2.2
 flake8==5.0.4
 isort==5.10.1
-pyright==1.1.277
+pyright==1.1.278
 pytest==7.2.0
 slotscheck==0.16.0
 sort-all==1.2.0
