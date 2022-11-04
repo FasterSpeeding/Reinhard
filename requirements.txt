@@ -1,7 +1,7 @@
 asyncpg==0.27.0
 python-dotenv==0.21
 hikari[speedups]==2.0.0.dev111
-hikari-sake==1.0.3a1
+hikari-sake==1.0.3a1.post1
 hikari-tanjun==2.8.1a1
 hikari-yuyo==1.2.1a1
 markdownify==0.11.6
