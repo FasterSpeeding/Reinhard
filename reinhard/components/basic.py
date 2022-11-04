@@ -34,6 +34,7 @@ from __future__ import annotations
 __all__: list[str] = ["load_basic"]
 
 import datetime
+import importlib.metadata
 import math
 import platform
 import time
@@ -51,14 +52,24 @@ from .. import utility
 try:
     import alluka_rust  # type: ignore
 
+    alluka_rust_ver = "v" + importlib.metadata.version("alluka_rust")
+
+
 except ImportError:
     alluka_rust = None
+    alluka_rust_ver = None
 
 try:
     import rukari  # type: ignore
 
+    rukari_ver: str | None = "v" + importlib.metadata.version("rukari")
+
 except ImportError:
     rukari = None
+    rukari_ver = None
+
+ALLUKA_VER = "v" + importlib.metadata.version("alluka")
+HIKARI_VER = "v" + importlib.metadata.version("hikari")
 
 
 @tanjun.as_message_command("about")
@@ -83,16 +94,16 @@ async def about_command(
         name = "Reinhard: REST Server"
 
     if alluka_rust and isinstance(ctx.injection_client, alluka_rust.Client):
-        alluka_ver = f"Rust ({alluka_rust.__version__})"
+        alluka_ver = f"Rust ({alluka_rust_ver})"
 
     else:
-        alluka_ver = f"Pure-Python ({alluka.__version__})"
+        alluka_ver = f"Pure-Python ({ALLUKA_VER})"
 
     if bot and rukari and isinstance(bot, rukari.Bot):
-        hikari_ver = f"Rukari ({rukari.__version__})"
+        hikari_ver = f"Rukari ({rukari_ver})"
 
     else:
-        hikari_ver = f"Pure-Python ({hikari.__version__})"
+        hikari_ver = f"Pure-Python ({HIKARI_VER})"
 
     description = (
         "An experimental pythonic Hikari bot.\n "
@@ -204,7 +215,7 @@ async def cache_command(
         .add_field(name="Standard cache stats", value=f"```{cache_stats}```")
         .set_footer(
             icon="http://i.imgur.com/5BFecvA.png",
-            text=f"Made with Hikari v{hikari.__version__} (python {platform.python_version()})",
+            text=f"Made with Hikari {HIKARI_VER} (python {platform.python_version()})",
         )
     )
 

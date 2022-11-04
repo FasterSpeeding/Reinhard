@@ -203,11 +203,11 @@ async def eval_command(
     embed_generator = (
         (
             hikari.UNDEFINED,
-            hikari.Embed(colour=colour, description=text, title=f"Eval page {page}").set_footer(
+            hikari.Embed(colour=colour, description=text, title=f"Eval page {page + 1}").set_footer(
                 text=f"Time taken: {exec_time} ms"
             ),
         )
-        for text, page in string_paginator
+        for page, text in enumerate(string_paginator)
     )
     paginator = yuyo.ComponentPaginator(
         embed_generator,

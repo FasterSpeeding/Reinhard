@@ -36,6 +36,7 @@ __slots__: list[str] = ["load_reference"]
 
 import dataclasses
 import datetime
+import importlib.metadata
 import inspect
 import logging
 import re
@@ -728,7 +729,7 @@ hikari_index = (
 hikari_command = reference_group.with_command(
     _with_index_slash_options(
         tanjun.SlashCommand(
-            _IndexCommand(hikari_index, f"Hikari v{hikari.__version__}"),
+            _IndexCommand(hikari_index, "Hikari v" + importlib.metadata.version("hikari")),
             "hikari",
             "Find the references for types in hikari",
         ),
@@ -749,7 +750,7 @@ lightbulb_command = reference_group.with_command(
         tanjun.SlashCommand(
             _IndexCommand(
                 lightbulb_index,
-                f"Lightbulb v{lightbulb.__version__}",
+                "Lightbulb v" + importlib.metadata.version("hikari-lightbulb"),
             ),
             "lightbulb",
             "Find the references for types in lightbulb",
@@ -772,7 +773,7 @@ sake_command = reference_group.with_command(
         tanjun.SlashCommand(
             _IndexCommand(
                 sake_index,
-                f"Sake v{sake.__version__}",
+                "Sake v" + importlib.metadata.version("hikari-sake"),
             ),
             "sake",
             "Find the references for types in Sake",
@@ -794,7 +795,7 @@ tanjun_command = reference_group.with_command(
         tanjun.SlashCommand(
             _IndexCommand(
                 tanjun_index,
-                f"Tanjun v{tanjun.__version__}",
+                "Tanjun v" + importlib.metadata.version("hikari-tanjun"),
             ),
             "tanjun",
             "Find the references for types in Tanjun",
@@ -816,7 +817,7 @@ yuyo_command = reference_group.with_command(
         tanjun.SlashCommand(
             _IndexCommand(
                 yuyo_index,
-                f"Yuyo v{yuyo.__version__}",
+                "Yuyo v" + importlib.metadata.version("hikari-yuyo"),
             ),
             "yuyo",
             "Find the references for a Yuyo type in Yuyo",
