@@ -317,6 +317,7 @@ def make_asgi_app(*, config: config_.FullConfig | None = None) -> yuyo.AsgiBot:
 
     bot = yuyo.AsgiBot(config.tokens.bot, hikari.TokenType.BOT)
     client = build_from_rest_bot(bot, config=config)
-    bot.add_startup_callback(client.open).add_shutdown_callback(client.close)
+    bot.add_startup_callback(lambda _: client.open())
+    bot.add_shutdown_callback(lambda _: client.close())
 
     return bot
