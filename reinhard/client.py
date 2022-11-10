@@ -254,7 +254,7 @@ def build_from_rest_bot(
     component_client = yuyo.ComponentClient.from_rest_bot(bot).set_constant_id(
         utility.DELETE_CUSTOM_ID, utility.delete_button_callback, prefix_match=True
     )
-    client = _build(
+    return _build(
         tanjun.Client.from_rest_bot(
             bot,
             declare_global_commands=False if config.hot_reload else config.declare_global_commands,
@@ -264,7 +264,6 @@ def build_from_rest_bot(
         .set_type_dependency(yuyo.ComponentClient, component_client),
         config,
     )
-    return client
 
 
 def run_gateway_bot(*, config: config_.FullConfig | None = None) -> None:
