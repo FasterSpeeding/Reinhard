@@ -5,7 +5,7 @@ hikari-sake==1.0.3a1.post1
 hikari-tanjun==2.9.0a1
 hikari-yuyo==1.2.1a1
 markdownify==0.11.6
-psutil==5.9.3
+psutil==5.9.4
 uvloop==0.17; platform_system != "Windows"
 uvicorn==0.19
 youtube_dl==2021.12.17
