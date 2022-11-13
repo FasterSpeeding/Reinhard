@@ -35,9 +35,8 @@ import pathlib
 
 import nox
 
-nox.options.sessions = ["reformat", "flake8", "slot-check", "spell-check", "type-check", "test"]  # type: ignore
+nox.options.sessions = ["reformat", "flake8", "slot-check", "spell-check", "type-check", "test"]
 GENERAL_TARGETS = ["./noxfile.py", "./reinhard", "./tests"]
-PYTHON_VERSIONS = ["3.9", "3.10"]  # TODO: @nox.session(python=["3.6", "3.7", "3.8"])?
 
 
 def _try_find_option(session: nox.Session, name: str, *other_names: str, when_empty: str | None = None) -> str | None:
