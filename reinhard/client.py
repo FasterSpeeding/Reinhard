@@ -31,7 +31,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-import asyncio
 import datetime
 import pathlib
 import typing
@@ -258,6 +257,7 @@ def build_from_rest_bot(
         tanjun.Client.from_rest_bot(
             bot,
             declare_global_commands=False if config.hot_reload else config.declare_global_commands,
+            bot_managed=True,
         )
         .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open)
         .add_client_callback(tanjun.ClientCallbackNames.CLOSING, component_client.close)
@@ -278,14 +278,6 @@ def run_gateway_bot(*, config: config_.FullConfig | None = None) -> None:
     bot.run()
 
 
-async def _run_rest(*, config: config_.FullConfig | None = None) -> None:
-    bot, client = build_rest_bot(config=config)
-
-    await bot.start(port=1800)
-    async with client:
-        await bot.join()
-
-
 def run_rest_bot(*, config: config_.FullConfig | None = None) -> None:
     """Run a Reinhard RESTBot locally.
 
@@ -294,7 +286,8 @@ def run_rest_bot(*, config: config_.FullConfig | None = None) -> None:
     config: reinhard.config.FullConfig
         The configuration to use.
     """
-    asyncio.run(_run_rest(config=config))
+    bot, _ = build_rest_bot(config=config)
+    bot.run(port=1800)
 
 
 def make_asgi_app(*, config: config_.FullConfig | None = None) -> yuyo.AsgiBot:
@@ -315,8 +308,5 @@ def make_asgi_app(*, config: config_.FullConfig | None = None) -> yuyo.AsgiBot:
         config = config_.FullConfig.from_env()
 
     bot = yuyo.AsgiBot(config.tokens.bot, hikari.TokenType.BOT)
-    client = build_from_rest_bot(bot, config=config)
-    bot.add_startup_callback(lambda _: client.open())
-    bot.add_shutdown_callback(lambda _: client.close())
-
+    build_from_rest_bot(bot, config=config)
     return bot
