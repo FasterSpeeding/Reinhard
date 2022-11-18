@@ -67,4 +67,4 @@ FILE_EMOJI: typing.Final[hikari.UnicodeEmoji] = hikari.UnicodeEmoji("\N{CARD FIL
 
 
 def embed_colour() -> hikari.Colour:
-    return random.choices((MAYA_BLUE, WHITE, AMARANTH_PINK), (2, 1, 2))[0]
+    return random.choices((MAYA_BLUE, WHITE, AMARANTH_PINK), (2, 1, 2))[0]  # noqa: S311 - thinks this is cryptographic

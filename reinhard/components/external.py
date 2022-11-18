@@ -107,8 +107,8 @@ class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
 
             try:
                 data = await response.json()
-            except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError) as exc:
-                raise exc
+            except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError):
+                raise
 
             self._next_page_token = data.get("nextPageToken")
             # TODO: only store urls?
@@ -176,8 +176,8 @@ class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
 
             try:
                 data = await response.json()
-            except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError) as exc:
-                raise exc
+            except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError):
+                raise
 
             # TODO: only store urls?
             self._buffer.extend(data[resource_type + "s"]["items"])
@@ -323,9 +323,9 @@ async def moe_command(
 
     try:
         data = (await response.json())["data"]
-    except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, LookupError, ValueError) as exc:
+    except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, LookupError, ValueError):
         await ctx.respond(content="Image API returned invalid data.", component=utility.delete_row(ctx))
-        raise exc
+        raise
 
     await ctx.respond(
         content=f"{data['image']} (source {data.get('source') or 'unknown'})", component=utility.delete_row(ctx)

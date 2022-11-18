@@ -144,10 +144,10 @@ async def eval_python_code_no_capture(
     }
     compiled_code = compile(code, file_name, "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
     if compiled_code.co_flags & inspect.CO_COROUTINE:
-        await eval(compiled_code, globals_)
+        await eval(compiled_code, globals_)  # noqa: S307 - insecure function
 
     else:
-        eval(compiled_code, globals_)
+        eval(compiled_code, globals_)  # noqa: S307 - insecure function
 
 
 def _bytes_from_io(

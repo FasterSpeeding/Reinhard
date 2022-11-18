@@ -88,7 +88,7 @@ def embed_iterator(
         )
         for index, description in enumerate(descriptions)
     )
-    return map(lambda v: (hikari.UNDEFINED, cast_embed(v[1])), iterator) if cast_embed else iterator
+    return ((hikari.UNDEFINED, cast_embed(v[1])) for v in iterator) if cast_embed else iterator
 
 
 def chunk(iterator: collections.Iterator[_ValueT], max: int) -> collections.Iterator[list[_ValueT]]:

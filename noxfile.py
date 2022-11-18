@@ -88,7 +88,7 @@ def cleanup(session: nox.Session) -> None:
 @nox.session(reuse_venv=True)
 def flake8(session: nox.Session) -> None:
     install_requirements(session, include_standard=True)
-    session.run("flake8", *GENERAL_TARGETS)
+    session.run("pflake8", *GENERAL_TARGETS)
 
 
 @nox.session(reuse_venv=True, name="slot-check")
@@ -104,7 +104,7 @@ def spell_check(session: nox.Session) -> None:
     session.run(
         "codespell",
         *GENERAL_TARGETS,
-        ".flake8",
+        ".gitattributes",
         ".gitignore",
         "LICENSE",
         "pyproject.toml",

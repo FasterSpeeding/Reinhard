@@ -257,7 +257,7 @@ async def mentions_command(
     try:
         message_ = await ctx.rest.fetch_message(channel_id, message)
     except hikari.NotFoundError:
-        raise tanjun.CommandError("Message not found")
+        raise tanjun.CommandError("Message not found") from None
 
     mentions: str | None = None
     if message_.mentions.users:
