@@ -5,7 +5,7 @@ isort==5.10.1
 pyright==1.1.282
 pyproject-flake8>5.0.0  # These are always pinned to the flake8 ver anyways
 pytest==7.2.0
-slotscheck==0.16.0
+slotscheck==0.16.1
 sort-all==1.2.0
 
 # Flake8 config
