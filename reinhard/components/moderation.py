@@ -377,8 +377,8 @@ class _MultiBanner:
 async def multi_ban_command(
     ctx: tanjun.abc.SlashContext | tanjun.abc.MessageContext,
     users: collections.Collection[hikari.Snowflake],
-    clear_message_days: Annotated[Ranged[0, 7], Flag(aliases=("--clear", "-c")),] = 0,
-    members_only: Annotated[Bool, Flag(empty_value=True, aliases=("-m",)),] = False,
+    clear_message_days: Annotated[Ranged[0, 7], Flag(aliases=("--clear", "-c"))] = 0,
+    members_only: Annotated[Bool, Flag(empty_value=True, aliases=("-m",))] = False,
 ) -> None:
     """Ban multiple users from using the bot.
 
@@ -411,7 +411,7 @@ async def multi_ban_command(
 async def ban_authors_command(
     ctx: tanjun.abc.Context,
     clear_message_days: Annotated[Ranged[0, 7], Flag(aliases=("--clear", "-c"))] = 0,
-    members_only: Annotated[Bool, Flag(empty_value=True, aliases=("--members-only", "-m")),] = False,
+    members_only: Annotated[Bool, Flag(empty_value=True, aliases=("--members-only", "-m"))] = False,
     **kwargs: typing.Any,
 ) -> None:
     """Ban the authors of recent messages.

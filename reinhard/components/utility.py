@@ -338,7 +338,7 @@ def _format_char_line(char: str, to_file: bool) -> str:
 async def char(
     ctx: tanjun.abc.Context,
     characters: Greedy[Str],
-    file: Annotated[Bool, Flag(aliases=("-f",), empty_value=True),] = False,
+    file: Annotated[Bool, Flag(aliases=("-f",), empty_value=True)] = False,
 ) -> None:
     """Get information about the UTF-8 characters in the executing message.
 
