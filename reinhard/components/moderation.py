@@ -43,7 +43,10 @@ from typing import Annotated
 
 import hikari
 import tanjun
-from tanjun.annotations import Bool, Flag, Ranged, with_annotated_args
+from tanjun.annotations import Bool
+from tanjun.annotations import Flag
+from tanjun.annotations import Ranged
+from tanjun.annotations import with_annotated_args
 
 from .. import utility
 

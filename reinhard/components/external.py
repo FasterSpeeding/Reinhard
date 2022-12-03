@@ -50,7 +50,13 @@ import alluka
 import hikari
 import tanjun
 import yuyo
-from tanjun.annotations import Bool, Choices, Converted, Flag, Greedy, Name, Str
+from tanjun.annotations import Bool
+from tanjun.annotations import Choices
+from tanjun.annotations import Converted
+from tanjun.annotations import Flag
+from tanjun.annotations import Greedy
+from tanjun.annotations import Name
+from tanjun.annotations import Str
 from tanjun.annotations import with_annotated_args
 
 from .. import config as config_

@@ -30,7 +30,7 @@ ignore = [
 
 [tool.isort]
 profile = "black"
-multi_line_output = 9
+force_single_line = true
 
 [tool.pyright]
 include = ["reinhard"]

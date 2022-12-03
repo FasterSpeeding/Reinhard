@@ -38,8 +38,18 @@ from typing import Annotated
 
 import hikari
 import tanjun
-from tanjun.annotations import Bool, Channel, Color, Flag, Greedy, Member, Role
-from tanjun.annotations import Snowflake, SnowflakeOr, Str, User, with_annotated_args
+from tanjun.annotations import Bool
+from tanjun.annotations import Channel
+from tanjun.annotations import Color
+from tanjun.annotations import Flag
+from tanjun.annotations import Greedy
+from tanjun.annotations import Member
+from tanjun.annotations import Role
+from tanjun.annotations import Snowflake
+from tanjun.annotations import SnowflakeOr
+from tanjun.annotations import Str
+from tanjun.annotations import User
+from tanjun.annotations import with_annotated_args
 
 from .. import utility
 

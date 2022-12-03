@@ -52,7 +52,12 @@ import hikari
 import tanjun
 import yuyo
 from hikari import traits
-from tanjun.annotations import Bool, Converted, Flag, Greedy, Positional, Str
+from tanjun.annotations import Bool
+from tanjun.annotations import Converted
+from tanjun.annotations import Flag
+from tanjun.annotations import Greedy
+from tanjun.annotations import Positional
+from tanjun.annotations import Str
 from tanjun.annotations import with_annotated_args
 
 from .. import utility
