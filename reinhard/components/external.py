@@ -50,6 +50,7 @@ import alluka
 import hikari
 import tanjun
 import yuyo
+from tanchan import doc_parse
 from tanjun.annotations import Bool
 from tanjun.annotations import Choices
 from tanjun.annotations import Converted
@@ -57,7 +58,6 @@ from tanjun.annotations import Flag
 from tanjun.annotations import Greedy
 from tanjun.annotations import Name
 from tanjun.annotations import Str
-from tanjun.annotations import with_annotated_args
 
 from .. import config as config_
 from .. import utility
@@ -77,11 +77,7 @@ SPOTIFY_RESOURCE_TYPES = ("track", "album", "artist", "playlist")
 class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType]]):
     __slots__ = ("_session", "_buffer", "_next_page_token", "_parameters")
 
-    def __init__(
-        self,
-        session: aiohttp.ClientSession,
-        parameters: dict[str, str | int],
-    ) -> None:
+    def __init__(self, session: aiohttp.ClientSession, parameters: dict[str, str | int]) -> None:
         self._session = session
         self._buffer: list[dict[str, typing.Any]] = []
         self._next_page_token: str | None = ""
@@ -132,13 +128,7 @@ class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
 
 
 class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType]]):
-    __slots__ = (
-        "_acquire_authorization",
-        "_session",
-        "_buffer",
-        "_offset",
-        "_parameters",
-    )
+    __slots__ = ("_acquire_authorization", "_session", "_buffer", "_offset", "_parameters")
 
     _limit: typing.Final[int] = 50
 
@@ -214,37 +204,40 @@ def yt_check(_: tanjun.abc.Context, tokens: alluka.Injected[config_.Tokens]) -> 
 
 
 # TODO: should different resource types be split between different sub commands?
-@with_annotated_args(follow_wrapped=True)
+@doc_parse.with_annotated_args(follow_wrapped=True)
 @tanjun.with_check(yt_check, follow_wrapped=True)
 @tanjun.as_message_command("youtube", "yt")
-@tanjun.as_slash_command("youtube", "Search for a resource on youtube.")
-async def youtube_command(
+@doc_parse.as_slash_command()
+async def youtube(
     ctx: tanjun.abc.Context,
     session: alluka.Injected[aiohttp.ClientSession],
     tokens: alluka.Injected[config_.Tokens],
     component_client: alluka.Injected[yuyo.ComponentClient],
-    query: Annotated[Greedy[Str], "Query string to search for a resource by."],
-    resource_type: Annotated[
-        Choices[YtResource],
-        Name("type"),
-        Flag(aliases=("-t",)),
-        "The type of resource to search for. Defaults to video.",
-    ] = YtResource.Video,
-    region: Annotated[
-        Str | None, "The ISO 3166-1 code of the region to search for results in.", Flag(aliases=("-r",))
-    ] = None,
-    language: Annotated[
-        Str | None,
-        "The ISO 639-1 two letter identifier of the language to limit search to.",
-        Flag(aliases=("-l",)),
-    ] = None,
-    order: Annotated[Choices[YtOrder], "The order to return results in. Defaults to relevance."] = YtOrder.Relevance,
-    safe_search: Annotated[
-        Bool | None,
-        "Whether safe search should be enabled or not. The default for this is based on the current channel.",
-    ] = None,
+    query: Greedy[Str],
+    resource_type: Annotated[Choices[YtResource], Name("type"), Flag(aliases=("-t",))] = YtResource.Video,
+    region: Annotated[Str | None, Flag(aliases=("-r",))] = None,
+    language: Annotated[Str | None, Flag(aliases=("-l",))] = None,
+    order: Choices[YtOrder] = YtOrder.Relevance,
+    safe_search: Bool | None = None,
 ) -> None:
-    """Search for a resource on youtube."""
+    """Search for a resource on youtube.
+
+    Parameters
+    ----------
+    query
+        Query string to search for a resource by.
+    resource_type
+        The type of resource to search for. Defaults to video.
+    region
+        The ISO 3166-1 code of the region to search for results in.
+    language
+        The ISO 639-1 two letter identifier of the language to limit search to.
+    order
+        The order to return results in. Defaults to relevance.
+    safe_search
+        Whether safe search should be enabled or not.
+        The default for this is based on the current channel.
+    """
     assert tokens.google is not None
     if safe_search is not False:
         channel: hikari.PartialChannel | None
@@ -306,9 +299,7 @@ async def youtube_command(
 # @tanjun.with_option("source", "--source", "-s", default=None)
 # @tanjun.as_message_command("moe")  # TODO: https://lewd.bowsette.pictures/api/request
 async def moe_command(
-    ctx: tanjun.abc.Context,
-    session: alluka.Injected[aiohttp.ClientSession],
-    source: str | None = None,
+    ctx: tanjun.abc.Context, session: alluka.Injected[aiohttp.ClientSession], source: str | None = None
 ) -> None:
     params = {}
     if source is not None:
@@ -338,11 +329,7 @@ async def moe_command(
     )
 
 
-async def query_nekos_life(
-    endpoint: str,
-    response_key: str,
-    session: alluka.Injected[aiohttp.ClientSession],
-) -> str:
+async def query_nekos_life(endpoint: str, response_key: str, session: alluka.Injected[aiohttp.ClientSession]) -> str:
     # TODO: retries
     response = await session.get(url="https://nekos.life/api/v2" + endpoint)
 
@@ -379,9 +366,7 @@ async def query_nekos_life(
     return result
 
 
-def _build_spotify_auth(
-    config: alluka.Injected[config_.Tokens],
-) -> utility.ClientCredentialsOauth2:
+def _build_spotify_auth(config: alluka.Injected[config_.Tokens]) -> utility.ClientCredentialsOauth2:
     if not config.spotify_id or not config.spotify_secret:
         raise tanjun.MissingDependencyError("Missing spotify secret and/or client id", None)
 
@@ -397,24 +382,27 @@ class SpotifyType(str, enum.Enum):
     Playlist = "playlist"
 
 
-@with_annotated_args(follow_wrapped=True)
+@doc_parse.with_annotated_args(follow_wrapped=True)
 @tanjun.as_message_command("spotify")
-@tanjun.as_slash_command("spotify", "Search for a resource on spotify.")
-async def spotify_command(
+@doc_parse.as_slash_command()
+async def spotify(
     ctx: tanjun.abc.Context,
     *,
-    query: Annotated[Str, "The string query to search by."],
+    query: Str,
     session: alluka.Injected[aiohttp.ClientSession],
     component_client: alluka.Injected[yuyo.ComponentClient],
     spotify_auth: Annotated[utility.ClientCredentialsOauth2, tanjun.cached_inject(_build_spotify_auth)],
-    resource_type: Annotated[
-        Choices[SpotifyType],
-        Name("type"),
-        Flag(aliases=("-t",)),
-        "Type of resource to search for. Defaults to track.",
-    ] = SpotifyType.Track,
+    resource_type: Annotated[Choices[SpotifyType], Name("type"), Flag(aliases=("-t",))] = SpotifyType.Track,
 ) -> None:
-    """Search for a resource on spotify."""
+    """Search for a resource on spotify.
+
+    Parameters
+    ----------
+    query
+        The string query to search by.
+    resource_type
+        Type of resource to search for. Defaults to track.
+    """
     paginator = yuyo.ComponentPaginator(
         SpotifyPaginator(spotify_auth.acquire_token, session, {"query": query, "type": resource_type.value}),
         authors=[ctx.author.id],
@@ -438,7 +426,7 @@ async def spotify_command(
         component_client.set_executor(message, paginator)
 
 
-@with_annotated_args
+@tanjun.annotations.with_annotated_args
 @tanjun.with_owner_check
 @tanjun.as_message_command("ytdl")
 async def ytdl_command(
@@ -457,9 +445,7 @@ async def ytdl_command(
     try:
         # Create Message
         response = await session.post(
-            config.message_service + "/messages",
-            json={"title": f"Reinhard upload {time.time()}"},
-            auth=auth,
+            config.message_service + "/messages", json={"title": f"Reinhard upload {time.time()}"}, auth=auth
         )
         response.raise_for_status()
         message_id = (await response.json())["id"]
@@ -496,25 +482,28 @@ domain_hashes = tanjun.cached_inject(
 )
 
 
-@with_annotated_args(follow_wrapped=True)
+@doc_parse.with_annotated_args(follow_wrapped=True)
 @tanjun.as_message_command("check_domain", "check domain")
-@tanjun.as_slash_command("check_domain", 'Check whether a domain is on Discord\'s "bad" domain list')
+@doc_parse.as_slash_command()
 async def check_domain(
-    ctx: tanjun.abc.Context,
-    url: Annotated[Converted[urllib.parse.urlparse], "The domain to check"],
-    bad_domains: Annotated[list[str], domain_hashes],
+    ctx: tanjun.abc.Context, url: Converted[urllib.parse.urlparse], bad_domains: Annotated[list[str], domain_hashes]
 ) -> None:
+    """Check whether a domain is on Discord's "bad" domain list.
+
+    Parameters
+    ----------
+    url
+        The domain to check.
+    """
     domain = url.netloc or url.path
     domain_hash = hashlib.sha256(domain.encode("utf-8")).hexdigest()
     if domain_hash in bad_domains:
         await ctx.respond(
-            content="\N{LARGE RED SQUARE} Domain is on the bad domains list.",
-            component=utility.delete_row(ctx),
+            content="\N{LARGE RED SQUARE} Domain is on the bad domains list.", component=utility.delete_row(ctx)
         )
     else:
         await ctx.respond(
-            content="\N{LARGE YELLOW SQUARE} Domain is not on the bad domains list.",
-            component=utility.delete_row(ctx),
+            content="\N{LARGE YELLOW SQUARE} Domain is not on the bad domains list.", component=utility.delete_row(ctx)
         )
 
 

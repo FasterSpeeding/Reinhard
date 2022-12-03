@@ -58,7 +58,6 @@ from tanjun.annotations import Flag
 from tanjun.annotations import Greedy
 from tanjun.annotations import Positional
 from tanjun.annotations import Str
-from tanjun.annotations import with_annotated_args
 
 from .. import utility
 
@@ -71,7 +70,7 @@ async def error_message_command(_: tanjun.abc.Context) -> None:
     raise Exception("This is an exception, get used to it.")
 
 
-@with_annotated_args
+@tanjun.annotations.with_annotated_args
 @tanjun.as_message_command("echo")
 async def echo_command(
     ctx: tanjun.abc.Context,
@@ -165,7 +164,7 @@ def _bytes_from_io(
     return hikari.Bytes(data, name, mimetype=mimetype)
 
 
-@with_annotated_args
+@tanjun.annotations.with_annotated_args
 # @tanjun.with_option("ephemeral_response", "-e", "--ephemeral", converters=tanjun.to_bool, default=False, empty_value=True)
 @tanjun.as_message_command("eval", "exec")
 async def eval_command(

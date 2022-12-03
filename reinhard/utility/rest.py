@@ -164,8 +164,6 @@ class ClientCredentialsOauth2:
 
         else:
             _LOGGER.warning(
-                "Received %r from %s while trying to authenticate as client credentials",
-                response.status,
-                self._path,
+                "Received %r from %s while trying to authenticate as client credentials", response.status, self._path
             )
         raise tanjun.CommandError("Couldn't authenticate")

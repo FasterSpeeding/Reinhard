@@ -748,10 +748,7 @@ lightbulb_index = (
 lightbulb_command = reference_group.with_command(
     _with_index_slash_options(
         tanjun.SlashCommand(
-            _IndexCommand(
-                lightbulb_index,
-                "Lightbulb v" + importlib.metadata.version("hikari-lightbulb"),
-            ),
+            _IndexCommand(lightbulb_index, "Lightbulb v" + importlib.metadata.version("hikari-lightbulb")),
             "lightbulb",
             "Find the references for types in lightbulb",
         ),
@@ -771,10 +768,7 @@ sake_index = (
 sake_command = reference_group.with_command(
     _with_index_slash_options(
         tanjun.SlashCommand(
-            _IndexCommand(
-                sake_index,
-                "Sake v" + importlib.metadata.version("hikari-sake"),
-            ),
+            _IndexCommand(sake_index, "Sake v" + importlib.metadata.version("hikari-sake")),
             "sake",
             "Find the references for types in Sake",
         ),
@@ -793,10 +787,7 @@ tanjun_index = (
 tanjun_command = reference_group.with_command(
     _with_index_slash_options(
         tanjun.SlashCommand(
-            _IndexCommand(
-                tanjun_index,
-                "Tanjun v" + importlib.metadata.version("hikari-tanjun"),
-            ),
+            _IndexCommand(tanjun_index, "Tanjun v" + importlib.metadata.version("hikari-tanjun")),
             "tanjun",
             "Find the references for types in Tanjun",
         ),
@@ -815,10 +806,7 @@ yuyo_index = (
 yuyo_command = reference_group.with_command(
     _with_index_slash_options(
         tanjun.SlashCommand(
-            _IndexCommand(
-                yuyo_index,
-                "Yuyo v" + importlib.metadata.version("hikari-yuyo"),
-            ),
+            _IndexCommand(yuyo_index, "Yuyo v" + importlib.metadata.version("hikari-yuyo")),
             "yuyo",
             "Find the references for a Yuyo type in Yuyo",
         ),

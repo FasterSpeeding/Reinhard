@@ -38,6 +38,7 @@ from typing import Annotated
 
 import hikari
 import tanjun
+from tanchan import doc_parse
 from tanjun.annotations import Bool
 from tanjun.annotations import Channel
 from tanjun.annotations import Color
@@ -49,26 +50,24 @@ from tanjun.annotations import Snowflake
 from tanjun.annotations import SnowflakeOr
 from tanjun.annotations import Str
 from tanjun.annotations import User
-from tanjun.annotations import with_annotated_args
 
 from .. import utility
 
 
-@with_annotated_args(follow_wrapped=True)
+@doc_parse.with_annotated_args(follow_wrapped=True)
 @tanjun.as_message_command("color", "colour")
-@tanjun.as_slash_command("color", "Get a visual representation of a color or role's color.")
-async def colour_command(
-    ctx: tanjun.abc.Context,
-    color: Annotated[
-        Color | None, Flag(aliases=("-r",)), "the hex/int literal representation of a colour to show"
-    ] = None,
-    role: Annotated[Role | None, "A role to get the colour for."] = None,
+@doc_parse.as_slash_command()
+async def color(
+    ctx: tanjun.abc.Context, color: Annotated[Color | None, Flag(aliases=("-r",))] = None, role: Role | None = None
 ) -> None:
     """Get a visual representation of a color or role's color.
 
-    Argument:
-        colour: Either the hex/int literal representation of a colour to show or the ID/mention of a role to get
-            the colour of.
+    Parameters
+    ----------
+    color
+        The hex/int literal representation of a colour to show.
+    role
+        A role to get the colour for.
     """
     if role:
         color = role.color
@@ -102,18 +101,19 @@ async def colour_command(
 #         ...  # TODO: Implement this to allow getting the embeds from a suppressed message.
 
 
-@with_annotated_args(follow_wrapped=True)
+@doc_parse.with_annotated_args(follow_wrapped=True)
 @tanjun.with_guild_check(follow_wrapped=True)
 @tanjun.as_message_command("member")
-@tanjun.as_slash_command("member", "Get information about a member in the current guild.", dm_enabled=False)
-async def member_command(
-    ctx: tanjun.abc.Context,
-    member: Annotated[
-        Member | None,
-        "The member to get information about. If not provided then this will default to the command's author",
-    ] = None,
-) -> None:
-    """Get information about a member in the current guild."""
+@doc_parse.as_slash_command(dm_enabled=False)
+async def member(ctx: tanjun.abc.Context, member: Member | None = None) -> None:
+    """Get information about a member in the current guild.
+
+    Parameters
+    ----------
+    member
+        The member to get information about.
+        If not provided then this will default to the command's author.
+    """
     assert ctx.guild_id is not None  # This is asserted by a previous check.
     assert ctx.member is not None  # This is always the case for messages made in hikari.
     if member is None:
@@ -172,13 +172,19 @@ async def member_command(
     await ctx.respond(embed=embed, component=utility.delete_row(ctx))
 
 
-@with_annotated_args(follow_wrapped=True)
+@doc_parse.with_annotated_args(follow_wrapped=True)
 @tanjun.with_guild_check(follow_wrapped=True)
 @tanjun.as_message_command("role")
 # TODO: the normal role converter is limited to the current guild right?
-@tanjun.as_slash_command("role", "Get information about a role in the current guild.", dm_enabled=False)
-async def role_command(ctx: tanjun.abc.Context, role: Annotated[Role, "The role to get information about."]) -> None:
-    """Get information about a role in the current guild."""
+@doc_parse.as_slash_command(dm_enabled=False)
+async def role(ctx: tanjun.abc.Context, role: Role) -> None:
+    """Get information about a role in the current guild.
+
+    Parameters
+    ----------
+    role
+        The role to get information about.
+    """
     if role.guild_id != ctx.guild_id:
         raise tanjun.CommandError("Role not found")
 
@@ -205,16 +211,18 @@ async def role_command(ctx: tanjun.abc.Context, role: Annotated[Role, "The role 
     await ctx.respond(embed=embed, component=utility.delete_row(ctx))
 
 
-@with_annotated_args(follow_wrapped=True)
+@doc_parse.with_annotated_args(follow_wrapped=True)
 @tanjun.as_message_command("user")
-@tanjun.as_slash_command("user", "Get information about a Discord user.")
-async def user_command(
-    ctx: tanjun.abc.Context,
-    user: Annotated[
-        User | None, "The user to target. If left as None then this will target the command's author."
-    ] = None,
-) -> None:
-    """Get information about a Discord user."""
+@doc_parse.as_slash_command()
+async def user(ctx: tanjun.abc.Context, user: User | None = None) -> None:
+    """Get information about a Discord user.
+
+    Parameters
+    ----------
+    user
+        The user to target.
+        If left as None then this will target the command's author.
+    """
     if user is None:
         user = ctx.author
 
@@ -235,16 +243,18 @@ async def user_command(
     await ctx.respond(embed=embed, component=utility.delete_row(ctx))
 
 
-@with_annotated_args(follow_wrapped=True)
+@doc_parse.with_annotated_args(follow_wrapped=True)
 @tanjun.as_message_command("avatar")
-@tanjun.as_slash_command("avatar", "Get a user's avatar.")
-async def avatar_command(
-    ctx: tanjun.abc.Context,
-    user: Annotated[
-        User | None, "User to get the avatar for. If not provided then this returns the current user's avatar."
-    ] = None,
-) -> None:
-    """Get a user's avatar."""
+@doc_parse.as_slash_command()
+async def avatar(ctx: tanjun.abc.Context, user: User | None = None) -> None:
+    """Get a user's avatar.
+
+    Parameters
+    ----------
+    user
+        User to get the avatar for.
+        If not provided then this returns the current user's avatar.
+    """
     if user is None:
         user = ctx.author
 
@@ -253,16 +263,24 @@ async def avatar_command(
     await ctx.respond(embed=embed, component=utility.delete_row(ctx))
 
 
-@with_annotated_args(follow_wrapped=True)
+@doc_parse.with_annotated_args(follow_wrapped=True)
 @tanjun.as_message_command("mentions")
 # TODO: check if the user can access the provided channel
-@tanjun.as_slash_command("mentions", "Get a list of the users who were pinged by a message.")
-async def mentions_command(
+@doc_parse.as_slash_command()
+async def mentions(
     ctx: tanjun.abc.Context,
-    message: Annotated[Snowflake, "ID of the message to get the ping list for."],
-    channel: Annotated[SnowflakeOr[Channel | None], Flag(aliases=("-c",)), "The channel the message is in."] = None,
+    message: Snowflake,
+    channel: Annotated[SnowflakeOr[Channel | None], Flag(aliases=("-c",))] = None,
 ) -> None:
-    """Get a list of the users who were pinged by a message."""
+    """Get a list of the users who were pinged by a message.
+
+    Parameters
+    ----------
+    message
+        ID of the message to get the ping list for.
+    channel
+        The channel the message is in.
+    """
     channel_id = hikari.Snowflake(channel) if channel else ctx.channel_id
     try:
         message_ = await ctx.rest.fetch_message(channel_id, message)
@@ -279,14 +297,18 @@ async def mentions_command(
     )
 
 
-@with_annotated_args(follow_wrapped=True)
+@doc_parse.with_annotated_args(follow_wrapped=True)
 @tanjun.with_guild_check(follow_wrapped=True)
 @tanjun.as_message_command("members")
-@tanjun.as_slash_command("members", "Search for a member in the current guild.", dm_enabled=False)
-async def members_command(
-    ctx: tanjun.abc.Context, name: Annotated[Greedy[Str], "Greedy argument of the name to search for."]
-) -> None:
-    """Search for a member in the current guild."""
+@doc_parse.as_slash_command(dm_enabled=False)
+async def members(ctx: tanjun.abc.Context, name: Greedy[Str]) -> None:
+    """Search for a member in the current guild.
+
+    Parameters
+    ----------
+    name
+        Greedy argument of the name to search for.
+    """
     assert ctx.guild_id is not None
     members = await ctx.rest.search_members(ctx.guild_id, name)
 
@@ -310,21 +332,24 @@ def _format_char_line(char: str, to_file: bool) -> str:
     return f"`\\U{code:08x}`/`{char}`: {name} <http://www.fileformat.info/info/unicode/char/{code:x}>"
 
 
-@with_annotated_args(follow_wrapped=True)
+@doc_parse.with_annotated_args(follow_wrapped=True)
 @tanjun.as_message_command("char")
-@tanjun.as_slash_command("char", "Get information about the UTF-8 characters in the executing message.")
-async def char_command(
+@doc_parse.as_slash_command()
+async def char(
     ctx: tanjun.abc.Context,
-    characters: Annotated[Greedy[Str], "The UTF-8 characters to get information about"],
-    file: Annotated[
-        Bool,
-        Flag(aliases=("-f",), empty_value=True),
-        "Whether this should send a file response regardless of response length",
-    ] = False,
+    characters: Greedy[Str],
+    file: Annotated[Bool, Flag(aliases=("-f",), empty_value=True),] = False,
 ) -> None:
     """Get information about the UTF-8 characters in the executing message.
 
     Running `char file...` will ensure that the output is always sent as a markdown file.
+
+    Parameters
+    ----------
+    characters
+        The UTF-8 characters to get information about.
+    file
+        Whether this should send a file response regardless of response length.
     """
     if len(characters) > 20:
         file = True

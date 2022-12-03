@@ -51,13 +51,7 @@ _ValueT_co = typing.TypeVar("_ValueT_co", covariant=True)
 _FieldT_co = typing.TypeVar("_FieldT_co", bound=str, contravariant=True)
 
 FilterTypeT = typing.Union[
-    Literal["lt"],
-    Literal["le"],
-    Literal["eq"],
-    Literal["ne"],
-    Literal["ge"],
-    Literal["gt"],
-    Literal["contains"],
+    Literal["lt"], Literal["le"], Literal["eq"], Literal["ne"], Literal["ge"], Literal["gt"], Literal["contains"],
 ]
 # For a reference on what these all mean see https://docs.python.org/3/library/operator.html
 

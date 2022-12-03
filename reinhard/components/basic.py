@@ -46,6 +46,7 @@ import hikari
 import psutil
 import tanjun
 from hikari import snowflakes
+from tanchan import doc_parse
 
 from .. import utility
 
@@ -73,8 +74,8 @@ HIKARI_VER = "v" + importlib.metadata.version("hikari")
 
 
 @tanjun.as_message_command("about")
-@tanjun.as_slash_command("about", "Get basic information about the current bot instance.")
-async def about_command(
+@doc_parse.as_slash_command()
+async def about(
     ctx: tanjun.abc.Context,
     process: Annotated[psutil.Process, tanjun.cached_inject(psutil.Process)],
     bot: alluka.Injected[hikari.ShardAware | None],
@@ -114,15 +115,12 @@ async def about_command(
         .set_author(name=name, url=hikari.__url__)
         .add_field(name="Uptime", value=str(uptime), inline=True)
         .add_field(
-            name="Process",
-            value=f"{memory_usage:.2f} MB ({memory_percent:.0f}%)\n{cpu_usage:.2f}% CPU",
-            inline=True,
+            name="Process", value=f"{memory_usage:.2f} MB ({memory_percent:.0f}%)\n{cpu_usage:.2f}% CPU", inline=True
         )
         .add_field(name="Hikari impl", value=hikari_ver, inline=True)
         .add_field(name="Alluka impl", value=alluka_ver, inline=True)
         .set_footer(
-            icon="http://i.imgur.com/5BFecvA.png",
-            text=f"Made with Hikari (python {platform.python_version()})",
+            icon="http://i.imgur.com/5BFecvA.png", text=f"Made with Hikari (python {platform.python_version()})"
         )
     )
 
@@ -135,8 +133,8 @@ async def help_command(ctx: tanjun.abc.Context) -> None:
 
 
 @tanjun.as_message_command("ping")
-@tanjun.as_slash_command("ping", "Get the bot's current delay.")
-async def ping_command(ctx: tanjun.abc.Context, /) -> None:
+@doc_parse.as_slash_command()
+async def ping(ctx: tanjun.abc.Context, /) -> None:
     """Get the bot's current delay."""
     start_time = time.perf_counter()
     await ctx.rest.fetch_my_user()
@@ -172,14 +170,14 @@ def cache_check(ctx: tanjun.abc.Context) -> bool:
 
 @tanjun.with_check(cache_check, follow_wrapped=True)
 @tanjun.as_message_command("cache")
-@tanjun.as_slash_command("cache", "Get general information about this bot's cache.")
-async def cache_command(
+@doc_parse.as_slash_command()
+async def cache(
     ctx: tanjun.abc.Context,
     cache: alluka.Injected[hikari.api.Cache],
     me: Annotated[hikari.OwnUser, tanjun.inject_lc(hikari.OwnUser)],
     process: Annotated[psutil.Process, tanjun.cached_inject(psutil.Process)],
 ) -> None:
-    """Get general information about this bot."""
+    """Get general information about this bot's cache."""
     start_date = datetime.datetime.fromtimestamp(process.create_time())
     uptime = datetime.datetime.now() - start_date
     memory_usage: float = process.memory_full_info().uss / 1024**2
@@ -208,9 +206,7 @@ async def cache_command(
         .set_author(name="Hikari: testing client", icon=me.avatar_url or me.default_avatar_url, url=hikari.__url__)
         .add_field(name="Uptime", value=str(uptime), inline=True)
         .add_field(
-            name="Process",
-            value=f"{memory_usage:.2f} MB ({memory_percent:.0f}%)\n{cpu_usage:.2f}% CPU",
-            inline=True,
+            name="Process", value=f"{memory_usage:.2f} MB ({memory_percent:.0f}%)\n{cpu_usage:.2f}% CPU", inline=True
         )
         .add_field(name="Standard cache stats", value=f"```{cache_stats}```")
         .set_footer(
@@ -223,10 +219,9 @@ async def cache_command(
 
 
 @tanjun.as_message_command("invite")
-@tanjun.as_slash_command("invite", "Invite the bot to your server(s)")
-async def invite_command(
-    ctx: tanjun.abc.Context, me: Annotated[hikari.OwnUser, tanjun.inject_lc(hikari.OwnUser)]
-) -> None:
+@doc_parse.as_slash_command()
+async def invite(ctx: tanjun.abc.Context, me: Annotated[hikari.OwnUser, tanjun.inject_lc(hikari.OwnUser)]) -> None:
+    """Invite the bot to your server(s)."""
     await ctx.respond(
         f"https://discord.com/oauth2/authorize?client_id={me.id}&scope=bot%20applications.commands&permissions=8",
         component=utility.delete_row(ctx),

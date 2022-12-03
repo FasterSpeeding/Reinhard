@@ -157,10 +157,7 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> tanjun.Client:
         )
         redeclare = None if config.declare_global_commands is False else datetime.timedelta(seconds=10)
         (
-            tanjun.HotReloader(
-                commands_guild=guilds,
-                redeclare_cmds_after=redeclare,
-            )
+            tanjun.HotReloader(commands_guild=guilds, redeclare_cmds_after=redeclare)
             .add_directory(components_dir, namespace="reinhard.components")
             .add_to_client(client)
         )

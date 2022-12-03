@@ -43,10 +43,10 @@ from typing import Annotated
 
 import hikari
 import tanjun
+from tanchan import doc_parse
 from tanjun.annotations import Bool
 from tanjun.annotations import Flag
 from tanjun.annotations import Ranged
-from tanjun.annotations import with_annotated_args
 
 from .. import utility
 
@@ -363,7 +363,7 @@ class _MultiBanner:
             return "No members were banned", hikari.UNDEFINED
 
 
-@with_annotated_args(follow_wrapped=True)
+@doc_parse.with_annotated_args(follow_wrapped=True)
 @tanjun.with_author_permission_check(hikari.Permissions.BAN_MEMBERS)
 @tanjun.with_own_permission_check(hikari.Permissions.BAN_MEMBERS)
 @tanjun.with_multi_argument("users", converters=tanjun.conversion.parse_user_id)
@@ -376,19 +376,19 @@ class _MultiBanner:
 @ban_group.as_sub_command("members", "Ban one or more members")
 async def multi_ban_command(
     ctx: tanjun.abc.SlashContext | tanjun.abc.MessageContext,
-    users: set[hikari.Snowflake],
-    clear_message_days: Annotated[
-        Ranged[0, 7],
-        Flag(aliases=("--clear", "-c")),
-        "Number of days to clear their recent messages for.",
-    ] = 0,
-    members_only: Annotated[
-        Bool,
-        Flag(empty_value=True, aliases=("-m",)),
-        "Only ban users who are currently in the guild.",
-    ] = False,
+    users: collections.Collection[hikari.Snowflake],
+    clear_message_days: Annotated[Ranged[0, 7], Flag(aliases=("--clear", "-c")),] = 0,
+    members_only: Annotated[Bool, Flag(empty_value=True, aliases=("-m",)),] = False,
 ) -> None:
-    """Ban multiple users from using the bot."""
+    """Ban multiple users from using the bot.
+
+    Parameters
+    ----------
+    clear_message_days
+        Number of days to clear their recent messages for.
+    members_only
+        Only ban users who are currently in the guild.
+    """
     banner = await _MultiBanner.build(
         ctx,
         reason=f"Bulk ban triggered by {ctx.author.username}#{ctx.author.discriminator} ({ctx.author.id})",
@@ -401,7 +401,7 @@ async def multi_ban_command(
     await ctx.respond(content, attachment=attachment, component=utility.delete_row(ctx))
 
 
-@with_annotated_args(follow_wrapped=True)
+@doc_parse.with_annotated_args(follow_wrapped=True)
 @tanjun.with_author_permission_check(hikari.Permissions.BAN_MEMBERS)
 @tanjun.with_own_permission_check(hikari.Permissions.BAN_MEMBERS)
 @_with_filter_message_options
@@ -410,16 +410,19 @@ async def multi_ban_command(
 @ban_group.as_sub_command("authors", "Ban the authors of recent messages.")
 async def ban_authors_command(
     ctx: tanjun.abc.Context,
-    clear_message_days: Annotated[
-        Ranged[0, 7], Flag(aliases=("--clear", "-c")), "Number of days to clear their recent messages for."
-    ] = 0,
-    members_only: Annotated[
-        Bool,
-        Flag(empty_value=True, aliases=("--members-only", "-m")),
-        "Only ban users who are currently in the guild.",
-    ] = False,
+    clear_message_days: Annotated[Ranged[0, 7], Flag(aliases=("--clear", "-c"))] = 0,
+    members_only: Annotated[Bool, Flag(empty_value=True, aliases=("--members-only", "-m")),] = False,
     **kwargs: typing.Any,
 ) -> None:
+    """Ban the authors of recent messages.
+
+    Parameters
+    ----------
+    clear_message_days
+        Number of days to clear their recent messages for.
+    members_only
+        Only ban users who are currently in the guild.
+    """
     found_authors = set[hikari.Snowflake]()
     banner = await _MultiBanner.build(
         ctx,
