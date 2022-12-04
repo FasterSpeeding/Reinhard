@@ -50,9 +50,8 @@ if typing.TYPE_CHECKING:
 _ValueT_co = typing.TypeVar("_ValueT_co", covariant=True)
 _FieldT_co = typing.TypeVar("_FieldT_co", bound=str, contravariant=True)
 
-FilterTypeT = typing.Union[
-    Literal["lt"], Literal["le"], Literal["eq"], Literal["ne"], Literal["ge"], Literal["gt"], Literal["contains"],
-]
+FilterTypeT = Literal["lt", "le", "eq", "ne", "ge", "gt", "contains"]
+
 # For a reference on what these all mean see https://docs.python.org/3/library/operator.html
 
 
@@ -176,7 +175,7 @@ class StarDatabaseHandler(typing.Protocol):
 
     async def get_star(
         self, message_id: hikari.SnowflakeishOr[hikari.Message], user_id: hikari.SnowflakeishOr[hikari.User]
-    ) -> typing.Optional[protos.Star]:
+    ) -> protos.Star | None:
         raise NotImplementedError
 
     def iter_stars(self) -> DatabaseIterator[StarFields, protos.Star]:

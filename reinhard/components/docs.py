@@ -53,7 +53,7 @@ from .. import utility
 docs_group = tanjun.slash_command_group("docs", "Search relevant document sites.")
 
 _T = typing.TypeVar("_T")
-_CoroT = typing.Coroutine[typing.Any, typing.Any, _T]
+_CoroT = collections.Coroutine[typing.Any, typing.Any, _T]
 _DocIndexT = typing.TypeVar("_DocIndexT", bound="DocIndex")
 _MessageCommandT = typing.TypeVar("_MessageCommandT", bound=tanjun.MessageCommand[typing.Any])
 _SlashCommandT = typing.TypeVar("_SlashCommandT", bound=tanjun.SlashCommand[typing.Any])
@@ -163,7 +163,7 @@ class DocIndex(abc.ABC):
 
         Parameters
         ----------
-        path : str
+        path
             The absolute path to the entry.
 
             This is matched case-sensitively.
@@ -186,10 +186,9 @@ class DocIndex(abc.ABC):
 
         Parameters
         ----------
-        base_url : str
+        base_url
             The base URL of the documentation site.
-
-        entry : DocEntry
+        entry
             The entry to link to.
 
         Returns
@@ -203,7 +202,7 @@ class DocIndex(abc.ABC):
 
         Parameters
         ----------
-        search_path : str
+        search_path
             The partial path to search for.
 
             This is matched case-insensitively.
@@ -251,7 +250,7 @@ def process_hikari_index(data: dict[str, typing.Any]) -> dict[str, typing.Any]:
 
     Parameters
     ----------
-    data : dict[str, typing.Any]
+    data
         The index data.
 
     Returns

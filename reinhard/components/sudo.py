@@ -155,7 +155,7 @@ async def eval_python_code_no_capture(
 
 
 def _bytes_from_io(
-    stream: io.StringIO, name: str, mimetype: typing.Optional[str] = "text/x-python;charset=utf-8"
+    stream: io.StringIO, name: str, mimetype: str | None = "text/x-python;charset=utf-8"
 ) -> hikari.Bytes:
     index = stream.tell()
     stream.seek(0)

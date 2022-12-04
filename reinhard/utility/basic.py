@@ -70,11 +70,11 @@ def embed_iterator(
     /,
     *,
     title: typing.Any = None,
-    url: typing.Optional[str] = None,
-    color: typing.Optional[hikari.Colorish] = None,
-    timestamp: typing.Optional[datetime.datetime] = None,
-    cast_embed: typing.Optional[collections.Callable[[hikari.Embed], hikari.Embed]] = None,
-) -> collections.Iterator[typing.Tuple[hikari.UndefinedType, hikari.Embed]]:
+    url: str | None = None,
+    color: hikari.Colorish | None = None,
+    timestamp: datetime.datetime | None = None,
+    cast_embed: collections.Callable[[hikari.Embed], hikari.Embed] | None = None,
+) -> collections.Iterator[tuple[hikari.UndefinedType, hikari.Embed]]:
     iterator = (
         (
             hikari.UNDEFINED,
@@ -168,7 +168,7 @@ async def delete_button_callback(ctx: yuyo.ComponentContext) -> None:
 
     Parameters
     ----------
-    ctx : yuyo.ComponentContext
+    ctx
         The context that triggered this delete.
     """
     author_ids = set(map(hikari.Snowflake, ctx.interaction.custom_id.removeprefix(DELETE_CUSTOM_ID).split(",")))
@@ -195,7 +195,7 @@ def delete_row(ctx: tanjun_abc.Context) -> hikari.impl.ActionRowBuilder:
 
     Parameters
     ----------
-    ctx : tanjun.abc.Context
+    ctx
         Context to use to make this row builder.
 
         This will only allow the context's author to delete the response.
@@ -218,7 +218,7 @@ def delete_row_from_authors(*authors: hikari.Snowflakeish) -> hikari.impl.Action
 
     Parameters
     ----------
-    *authors: hikari.Snowflakeish
+    *authors
         IDs of authors who should be allowed to delete the response.
 
         Both user IDs and role IDs are supported with no IDs indicating
@@ -246,14 +246,11 @@ class FileCallback:
 
     Parameters
     ----------
-    ctx : tanjun.abc.Context
+    ctx
         The command context this is linked to.
-
-    Other Parameters
-    ----------------
-    files : collections.abc.Sequence[hikari.Resourceish]
+    files
         Collection of the files to send when the to file button is pressed.
-    make_files : collections.abc.Callable[[], collections.abc.Sequence[hikari.Resourceish]]
+    make_files
         A callback which returns the files tosend when the to file button is
         pressed.
     """
@@ -266,7 +263,7 @@ class FileCallback:
         /,
         *,
         files: collections.Sequence[hikari.Resourceish] = (),
-        make_files: typing.Optional[collections.Callable[[], collections.Sequence[hikari.Resourceish]]] = None,
+        make_files: collections.Callable[[], collections.Sequence[hikari.Resourceish]] | None = None,
         post_components: hikari.UndefinedOr[collections.Sequence[hikari.api.ComponentBuilder]] = hikari.UNDEFINED,
     ) -> None:
         self._ctx = ctx
@@ -288,7 +285,7 @@ def paginator_with_to_file(
     /,
     *,
     files: collections.Sequence[hikari.Resourceish] = (),
-    make_files: typing.Optional[collections.Callable[[], collections.Sequence[hikari.Resourceish]]] = None,
+    make_files: collections.Callable[[], collections.Sequence[hikari.Resourceish]] | None = None,
 ) -> yuyo.MultiComponentExecutor:
     """Wrap a paginator with a "to file" button.
 
@@ -297,16 +294,13 @@ def paginator_with_to_file(
 
     Parameters
     ----------
-    ctx : tanjun_abc.Context
+    ctx
         The context to use.
-    paginator : yuyo.ComponentPaginator
+    paginator
         The paginator to wrap.
-
-    Other Parameters
-    ----------------
-    files : collections.abc.Sequence[hikari.Resourceish]
+    files
         Collection of the files to send when the to file button is pressed.
-    make_files : typing.Optional[collections.abc.Callable[[], collections.abc.Sequence[hikari.Resourceish]]]
+    make_files
         A callback which returns the files tosend when the to file button is
         pressed.
 

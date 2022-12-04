@@ -207,7 +207,7 @@ class FullConfig(Config):
     owner_only: bool = False
     prefixes: collections.Set[str] = frozenset()
     ptf: PTFConfig | None = None
-    declare_global_commands: typing.Union[bool, hikari.Snowflake] = True
+    declare_global_commands: bool | hikari.Snowflake = True
     hot_reload: bool = False
 
     @classmethod

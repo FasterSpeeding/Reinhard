@@ -47,9 +47,9 @@ async def on_error(ctx: tanjun.abc.Context, exception: BaseException) -> None:
 
     Parameters
     ----------
-    ctx : tanjun.abc.Context
+    ctx
         The context of the command.
-    exception : BaseException
+    exception
         The exception that was raised.
     """
     # TODO: better permission checks
@@ -66,9 +66,9 @@ async def on_parser_error(ctx: tanjun.abc.Context, exception: tanjun.ParserError
 
     Parameters
     ----------
-    ctx : tanjun.abc.Context
+    ctx
         The context of the command.
-    exception : tanjun.ParserError
+    exception
         The exception that was raised.
     """
     # TODO: better permission checks

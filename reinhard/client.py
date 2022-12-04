@@ -94,9 +94,9 @@ def _rukari(config: config_.FullConfig | None) -> tuple[hikari.Runnable, tanjun.
 def build_gateway_bot(*, config: config_.FullConfig | None = None) -> tuple[hikari.Runnable, tanjun.Client]:
     """Build a gateway bot with a bound Reinhard client.
 
-    Other Parameters
-    ----------------
-    config: reinhard.config.FullConfig
+    Parameters
+    ----------
+    config
         The configuration to use.
 
     Returns
@@ -125,9 +125,9 @@ def build_gateway_bot(*, config: config_.FullConfig | None = None) -> tuple[hika
 def build_rest_bot(*, config: config_.FullConfig | None = None) -> tuple[hikari.impl.RESTBot, tanjun.Client]:
     """Build a REST bot with a bound Reinhard client.
 
-    Other Parameters
-    ----------------
-    config: reinhard.config.FullConfig
+    Parameters
+    ----------
+    config
         The configuration to use.
 
     Returns
@@ -188,12 +188,9 @@ def build_from_gateway_bot(
 
     Parameters
     ----------
-    bot: hikari.impl.GatewayBot
+    bot
         The gateway bot to use.
-
-    Other Parameters
-    ----------------
-    config: reinhard.config.FullConfig
+    config
         The configuration to use.
 
     Returns
@@ -231,12 +228,9 @@ def build_from_rest_bot(
 
     Parameters
     ----------
-    bot: hikari.impl.RESTBot
+    bot
         The REST bot to use.
-
-    Other Parameters
-    ----------------
-    config: reinhard.config.FullConfig
+    config
         The configuration to use.
 
     Returns
@@ -266,9 +260,9 @@ def build_from_rest_bot(
 def run_gateway_bot(*, config: config_.FullConfig | None = None) -> None:
     """Run a Reinhard gateway bot.
 
-    Other Parameters
-    ----------------
-    config: reinhard.config.FullConfig
+    Parameters
+    ----------
+    config
         The configuration to use.
     """
     bot, _ = build_gateway_bot(config=config)
@@ -278,9 +272,9 @@ def run_gateway_bot(*, config: config_.FullConfig | None = None) -> None:
 def run_rest_bot(*, config: config_.FullConfig | None = None) -> None:
     """Run a Reinhard RESTBot locally.
 
-    Other Parameters
-    ----------------
-    config: reinhard.config.FullConfig
+    Parameters
+    ----------
+    config
         The configuration to use.
     """
     bot, _ = build_rest_bot(config=config)
@@ -290,9 +284,9 @@ def run_rest_bot(*, config: config_.FullConfig | None = None) -> None:
 def make_asgi_app(*, config: config_.FullConfig | None = None) -> yuyo.AsgiBot:
     """Make an ASGI app for the bot.
 
-    Other Parameters
-    ----------------
-    config: reinhard.config.FullConfig
+    Parameters
+    ----------
+    config
         The configuration to use.
 
     Returns

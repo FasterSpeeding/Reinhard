@@ -65,12 +65,12 @@ class CachedScripts:
             self.load_all_sql_files(root_dir, pattern)
 
     def load_sql_file(self, file_path: str) -> None:
-        """
-        Load an sql script from it's path into `self.scripts`.
+        """Load an sql script from it's path into `self.scripts`.
 
-        Args:
-            file_path:
-                The string path of the file to load.
+        Parameters
+        ----------
+        file_path
+            The string path of the file to load.
         """
         if not file_path.lower().endswith(".sql"):
             raise ValueError("File must be of type 'sql'")
@@ -84,14 +84,14 @@ class CachedScripts:
             self.scripts[name] = file.read()
 
     def load_all_sql_files(self, root_dir: str = "./reinhard/sql", pattern: str = ".") -> None:
-        """
-        Load all the sql files from location recursively.
+        """Load all the sql files from location recursively.
 
-        Args:
-            root_dir:
-                The string path of the root directory, defaults to reinhard's sql folder.
-            pattern:
-                The optional regex string to use for matching the names of files to load.
+        Parameters
+        ----------
+        root_dir
+            The string path of the root directory, defaults to reinhard's sql folder.
+        pattern
+            The optional regex string to use for matching the names of files to load.
         """
         root_dir_path = pathlib.Path(root_dir)
         for file in root_dir_path.rglob("*"):
@@ -106,14 +106,14 @@ class CachedScripts:
 
 
 async def initialise_schema(sql_scripts: CachedScripts, conn: asyncpg.Connection) -> None:
-    """
-    Initialise the database schema if not already present.
+    """Initialise the database schema if not already present.
 
-    Args:
-        sql_scripts:
-            An instance of :class:`CachedScripts` where schema has been loaded.
-        conn:
-            An active :class:`asyncpg.Connection`.
+    Parameters
+    ----------
+    sql_scripts
+        An instance of `CachedScripts` where schema has been loaded.
+    conn
+        An active `asyncpg.Connection`.
     """
     try:
         await conn.execute(sql_scripts.schema)

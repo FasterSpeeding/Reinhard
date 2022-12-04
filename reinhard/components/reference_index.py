@@ -148,11 +148,11 @@ def _split_by_tl_commas(string: str) -> collections.Iterator[str]:
 class ReferenceIndex:
     """Index used for tracking references to types in specified modules.
 
-    Other Parameters
-    ----------------
-    track_3rd_party : bool
+    Parameters
+    ----------
+    track_3rd_party
         Whether to track references to types in 3rd party (non-indexed) modules.
-    track_builtins : bool
+    track_builtins
         Whether to track references to types in the builtin module.
     """
 
@@ -208,7 +208,7 @@ class ReferenceIndex:
             _add_search_entry(self._object_search_tree, path)
 
     def _get_or_parse_module_imports(self, module_name: str) -> dict[str, str]:
-        imports: typing.Optional[dict[str, str]]
+        imports: dict[str, str] | None
         if (imports := self._module_imports.get(module_name)) is not None:
             return imports
 
@@ -356,7 +356,7 @@ class ReferenceIndex:
         obj: types.MethodType | types.FunctionType | type[typing.Any] | classmethod[typing.Any] | property,
         /,
         *,
-        path: typing.Optional[str] = None,
+        path: str | None = None,
     ) -> bool:
         if isinstance(obj, (types.MethodType, types.FunctionType, classmethod)):
             if return_type := obj.__annotations__.get("return"):
@@ -413,7 +413,7 @@ class ReferenceIndex:
 
         Parameters
         ----------
-        module : types.ModuleType
+        module
             The module to index.
         """
         self._indexed_modules[module.__name__] = module
@@ -432,7 +432,7 @@ class ReferenceIndex:
         module: types.ModuleType,
         /,
         *,
-        check: typing.Optional[collections.Callable[[types.ModuleType], bool]],
+        check: collections.Callable[[types.ModuleType], bool] | None,
         children_only: bool,
         recursive: bool,
     ) -> _ReferenceIndexT:
@@ -464,7 +464,7 @@ class ReferenceIndex:
         module: types.ModuleType,
         /,
         *,
-        check: typing.Optional[collections.Callable[[types.ModuleType], bool]] = None,
+        check: collections.Callable[[types.ModuleType], bool] | None = None,
         children_only: bool = True,
         recursive: bool = True,
     ) -> _ReferenceIndexT:
@@ -474,20 +474,17 @@ class ReferenceIndex:
 
         Parameters
         ----------
-        module : types.ModuleType
+        module
             The module to index the sub-modules in.
-
-        Other Parameters
-        ----------------
-        check : typing.Optional[collections.Callable[[types.ModuleType], bool]]
+        check
             If provided, a callback which will decide which sub-modules should be indexed.
             If `None` then all sub-modules will be indexed.
-        children_only : bool
+        children_only
             Whether found modules which aren't direct children of the passed
             module should be ignored.
 
             Defaults to `True`.
-        recursive : bool
+        recursive
             If `True` then this will recursively index sub-modules instead of just
             indexing modules directly on the provided module.
 
@@ -517,7 +514,7 @@ class ReferenceIndex:
 
         Parameters
         ----------
-        module : types.ModuleType
+        module
             The module to scan for type references.
         """
         module_members = dict[str, typing.Any](filter(_is_public_key, inspect.getmembers(module)))
@@ -540,7 +537,7 @@ class ReferenceIndex:
         module: types.ModuleType,
         /,
         *,
-        check: typing.Optional[collections.Callable[[types.ModuleType], bool]] = None,
+        check: collections.Callable[[types.ModuleType], bool] | None = None,
         children_only: bool = True,
         recursive: bool = True,
     ) -> _ReferenceIndexT:
@@ -548,20 +545,17 @@ class ReferenceIndex:
 
         Parameters
         ----------
-        module : types.ModuleType
+        module
             The module to scan sub-modules in.
-
-        Other Parameters
-        ----------------
-        check : typing.Optional[collections.Callable[[types.ModuleType], bool]]
+        check
             If provided, a callback which will decide which sub-modules should be scanned.
             If `None` then all sub-modules will be scanned.
-        children_only : bool
+        children_only
             Whether found modules which aren't direct children of the passed
             module should be ignored.
 
             Defaults to `True`.
-        recursive : bool
+        recursive
             If `True` then this will recursively scan sub-modules instead of just
             scanning modules directly on the provided module.
 
@@ -577,19 +571,19 @@ class ReferenceIndex:
             recursive=recursive,
         )
 
-    def search(self, path: str, /) -> typing.Optional[tuple[str, collections.Sequence[str]]]:
+    def search(self, path: str, /) -> tuple[str, collections.Sequence[str]] | None:
         """Search for a type to get its references.
 
         Parameters
         ----------
-        path : str
+        path
             Partial path of the type to search for.
 
             This will be matched case-insensitively.
 
         Returns
         -------
-        typing.Optional[tuple[str, collections.Sequence[str]]]
+        tuple[str, collections.abc.Sequence[str]] | None
             The type's full path and a list of references to it.
 
             If the type was not found then `None` is returned.
@@ -605,19 +599,19 @@ class ReferenceIndex:
         yield from _search_tree(self._object_search_tree, path, True)
         yield from _search_tree(self._alias_search_tree, path, True)
 
-    def get_references(self, path: str, /) -> typing.Optional[collections.Sequence[str]]:
+    def get_references(self, path: str, /) -> collections.Sequence[str] | None:
         """Get the tracked references for a type by its absolute path.
 
         Parameters
         ----------
-        path : str
+        path
             The absolute path of the type to get references for.
 
             This is matched case-sensitively.
 
         Returns
         -------
-        typing.Optional[collections.Sequence[str]]
+        collections.abc.Sequence[str] | None
             The references to the type if found else `None`.
         """
         if result := self._object_paths_to_uses.get(path):
