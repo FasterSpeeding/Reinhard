@@ -39,4 +39,4 @@ RUN if [ -n "${rukari_hash}" ]; then \
     python -m pip install git+https://github.com/FasterSpeeding/Rukari.git@${rukari_hash}; \
 fi
 
-ENTRYPOINT if ${DOCKER_DEBUG} == false; then python main.py; else python -OO main.py; fi
+ENTRYPOINT if ${DOCKER_DEBUG} == false; then python main.py; else python -O main.py; fi
