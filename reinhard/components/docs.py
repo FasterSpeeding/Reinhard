@@ -242,97 +242,6 @@ class DocIndex(abc.ABC):
                 yield self._metadata[path]
 
 
-PLACEHOLDER = "???"
-
-
-def process_hikari_index(data: dict[str, typing.Any]) -> dict[str, typing.Any]:
-    """Process Hikari's unique index format to make it compatible with the logic for Tanjun's index.
-
-    Parameters
-    ----------
-    data
-        The index data.
-
-    Returns
-    -------
-    dict[str, typing.Any]
-        The processed index data.
-    """
-    base_urls: dict[str, typing.Any] = {}
-
-    for path in (".".join(url.split("/")) for url in data["urls"]):
-        position = base_urls
-        for char in path:
-            try:
-                position = position[char]
-
-            except KeyError:
-                position[char] = position = {}
-
-    built_data: dict[str, typing.Any] = {"documentStore": {"docs": {}}, "index": {"fullname": {"root": {}}}}
-    docs_store = built_data["documentStore"]["docs"]
-    index_store = built_data["index"]["fullname"]["root"]
-
-    for entry in data["index"]:
-        fullpath: str = entry["r"]
-        path = fullpath.removeprefix("hikari.")
-        doc: str = entry["d"]
-
-        position = base_urls
-        last_dot = 0
-        for index, char in enumerate(path):
-            if char == ".":
-                last_dot = index
-
-            try:
-                position = position[char]
-
-            except KeyError:
-                break
-
-        docs_store[fullpath] = {
-            "doc": doc,
-            "type": PLACEHOLDER,
-            "fullname": fullpath,
-            "modulename": path[:last_dot],
-            "qualname": fullpath.removeprefix(path[:last_dot] + "."),
-            "signature": PLACEHOLDER,
-            "bases": [PLACEHOLDER],
-        }
-        for node in map(str.lower, path.rsplit(".")[-1].split("_")):
-            position: dict[str, typing.Any] = index_store
-            for char in node:
-                try:
-                    position = position[char]
-
-                except KeyError:
-                    position[char] = position = {}
-
-            try:
-                position["docs"][fullpath] = PLACEHOLDER
-
-            except KeyError:
-                position["docs"] = {fullpath: PLACEHOLDER}
-
-    return built_data
-
-
-class HikariIndex(DocIndex):
-    """Doc index specialised for Hikari's documentation."""
-
-    __slots__ = ()
-
-    def __init__(self, data: dict[str, typing.Any], /) -> None:
-        super().__init__(process_hikari_index(data), process_doc=False)
-
-    def make_link(self, base_url: str, entry: DocEntry, /) -> str:
-        fragment = ""
-        if entry.fullname.removeprefix(entry.module_name):
-            fragment = "#" + entry.fullname
-
-        return base_url + "/".join(entry.module_name.split(".")) + fragment
-
-
 class PdocIndex(DocIndex):
     """Doc index specialised for Pdoc indexes."""
 
@@ -488,28 +397,6 @@ def _with_docs_message_options(command: _MessageCommandT, /) -> _MessageCommandT
         .add_argument("path", default=None)
         .add_option("public", "-p", "--public", converters=tanjun.to_bool, default=False, empty_value=True)
         .add_option("list", "-l", "--list", converters=tanjun.to_bool, default=False, empty_value=True)
-    )
-
-
-hikari_index = tanjun.dependencies.data.cache_callback(
-    utility.FetchedResource(HIKARI_PAGES + "/hikari/index.json", HikariIndex.from_json),
-    expire_after=datetime.timedelta(hours=12),
-)
-
-
-@_with_docs_message_options
-@tanjun.as_message_command("docs hikari")
-@_with_docs_slash_options(hikari_index)
-@docs_group.as_sub_command("hikari", "Search Hikari's documentation")
-def docs_hikari_command(
-    ctx: tanjun.abc.Context,
-    component_client: alluka.Injected[yuyo.ComponentClient],
-    index: Annotated[HikariIndex, alluka.inject(callback=hikari_index)],
-    **kwargs: typing.Any,
-) -> _CoroT[None]:
-    """Search Hikari's documentation."""
-    return _docs_command(
-        ctx, component_client, index, HIKARI_PAGES, HIKARI_PAGES + "/hikari/", "Hikari", desc_splitter=".", **kwargs
     )
 
 
