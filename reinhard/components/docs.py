@@ -151,41 +151,6 @@ class DocIndex:
         return (self._data[entry["ref"]] for entry in results)
 
 
-def process_hikari(raw_data: bytes, /) -> DocIndex:
-    data: dict[str, typing.Any] = json.loads(raw_data)
-    base_urls: list[str] = []
-
-    # Sorting this like this gives us an easier way to prioritise child modules over parents.
-    base_urls = sorted(
-        map("hikari.".__add__, (".".join(url.split("/")) for url in data["urls"])),
-        key=lambda e: e.count("."),
-        reverse=True,
-    )
-    built_data: list[dict[str, str]] = []
-    for entry in data["index"]:
-        fullpath: str = entry["r"]
-
-        for module_path in base_urls:
-            if fullpath.startswith(module_path):
-                break
-
-        else:
-            raise RuntimeError
-
-        # Ignore the first entry of .split(".") as "hikari" isn't included in this part of the path.
-        link = "/".join(module_path.split(".")[1:])
-        if qual_name := fullpath[len(module_path) + 1 :]:
-            title = qual_name
-            link += "#" + fullpath
-
-        else:
-            title = fullpath
-
-        built_data.append({"location": link, "title": title, "text": entry["d"]})
-
-    return DocIndex("Hikari", HIKARI_PAGES, built_data)
-
-
 async def _docs_command(
     ctx: tanjun.abc.Context,
     component_client: yuyo.ComponentClient,
@@ -305,26 +270,6 @@ def _with_docs_message_options(command: _MessageCommandT, /) -> _MessageCommandT
         .add_option("public", "-p", "--public", converters=tanjun.to_bool, default=False, empty_value=True)
         .add_option("list", "-l", "--list", converters=tanjun.to_bool, default=False, empty_value=True)
     )
-
-
-hikari_index = tanjun.dependencies.data.cache_callback(
-    utility.FetchedResource(HIKARI_PAGES + "/hikari/index.json", process_hikari),
-    expire_after=datetime.timedelta(hours=12),
-)
-
-
-@_with_docs_message_options
-@tanjun.as_message_command("docs hikari")
-@_with_docs_slash_options(hikari_index)
-@docs_group.as_sub_command("hikari", "Search Hikari's documentation")
-def docs_hikari_command(
-    ctx: tanjun.abc.Context,
-    component_client: alluka.Injected[yuyo.ComponentClient],
-    index: Annotated[DocIndex, alluka.inject(callback=hikari_index)],
-    **kwargs: typing.Any,
-) -> _CoroT[None]:
-    """Search Hikari's documentation."""
-    return _docs_command(ctx, component_client, index, **kwargs)
 
 
 sake_index = tanjun.dependencies.data.cache_callback(
