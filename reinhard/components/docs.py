@@ -97,6 +97,7 @@ class DocIndex:
     __slots__ = ("_autocomplete_refs", "_data", "docs_url", "name", "_search_index")
 
     def __init__(self, name: str, docs_url: str, data: list[dict[str, str]], /) -> None:
+        # Since the top level dir dupes other places in my projects this can be skipped to improve performance.
         data = [entry for entry in data if not entry["location"].startswith("reference/#")]
         self._data: dict[str, DocEntry] = {
             entry["location"]: DocEntry(docs_url, entry["location"], entry) for entry in data
@@ -147,7 +148,7 @@ class DocIndex:
         try:
             results: list[dict[str, str]] = self._search_index.search(search_path)
         except lunr.exceptions.QueryParseError as exc:  # type: ignore
-            raise tanjun.CommandError(f"Invalid query: `{exc.args[0]}`")
+            raise tanjun.CommandError(f"Invalid query: `{exc.args[0]}`") from None
 
         return (self._data[entry["ref"]] for entry in results)
 
