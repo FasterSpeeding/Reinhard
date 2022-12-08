@@ -1,6 +1,6 @@
 asyncpg==0.27.0
 python-dotenv==0.21
-hikari[speedups]==2.0.0.dev112
+hikari[speedups]==2.0.0.dev113
 hikari-sake==1.0.4a1.post1
 hikari-tanjun==2.10.1a1
 hikari-yuyo==1.4.0a1.post1
