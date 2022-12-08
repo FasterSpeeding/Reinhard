@@ -7,7 +7,7 @@ hikari-yuyo==1.4.0a1.post1
 lunr==0.6.2
 markdownify==0.11.6
 psutil==5.9.4
-tanchan==0.1.0
+tanchan==0.2.0
 uvloop==0.17; platform_system != "Windows"
 uvicorn==0.20.0
 youtube_dl==2021.12.17
