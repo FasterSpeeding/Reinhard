@@ -2,7 +2,7 @@ black==22.10.0
 codespell==2.2.2
 flake8==6.0.0
 isort==5.10.1
-pyright==1.1.282
+pyright==1.1.283
 pyproject-flake8>5.0.0  # These are always pinned to the flake8 ver anyways
 pytest==7.2.0
 slotscheck==0.16.1
