@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# cython: language_level=3
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2022, Faster Speeding
@@ -32,15 +31,15 @@
 from __future__ import annotations
 
 __all__: list[str] = [
-    "paginator_with_to_file",
+    "DELETE_CUSTOM_ID",
+    "FileCallback",
     "basic_name_grid",
     "chunk",
-    "DELETE_CUSTOM_ID",
     "delete_button_callback",
     "delete_row",
     "delete_row_from_authors",
     "embed_iterator",
-    "FileCallback",
+    "paginator_with_to_file",
     "prettify_date",
     "prettify_index",
     "raise_error",

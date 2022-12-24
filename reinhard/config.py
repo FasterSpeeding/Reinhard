@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# cython: language_level=3
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2022, Faster Speeding
@@ -31,7 +30,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["DatabaseConfig", "Tokens", "FullConfig"]
+__all__: list[str] = ["DatabaseConfig", "FullConfig", "Tokens"]
 
 import abc
 import dataclasses

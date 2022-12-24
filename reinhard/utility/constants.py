@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# cython: language_level=3
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2022, Faster Speeding
@@ -34,12 +33,12 @@ from __future__ import annotations
 __all__ = [
     "AMARANTH_PINK",
     "DELETE_EMOJI",
-    "embed_colour",
     "FAILED_COLOUR",
     "FILE_EMOJI",
     "MAYA_BLUE",
     "PASS_COLOUR",
     "WHITE",
+    "embed_colour",
 ]
 
 import random

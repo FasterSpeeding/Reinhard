@@ -6,7 +6,7 @@ COPY ./reinhard ./reinhard
 COPY ./requirements.txt ./requirements.txt
 COPY ./main.py ./main.py
 
-# Only neccessary if pyjion is also being installed.
+# Only necessary if pyjion is also being installed.
 # RUN wget https://packages.microsoft.com/config/ubuntu/21.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
 # RUN dpkg -i packages-microsoft-prod.deb
 # RUN rm packages-microsoft-prod.deb

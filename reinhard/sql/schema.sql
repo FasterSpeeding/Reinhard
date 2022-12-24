@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS StarredMessages (
    -- starboard_channel_id BIGINT,
     starboard_message_id    BIGINT,
 
-    CONSTRAINT starred_messages_pk 
+    CONSTRAINT starred_messages_pk
         PRIMARY KEY (message_id)
 );
 

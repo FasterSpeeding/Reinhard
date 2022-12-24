@@ -1,0 +1,44 @@
+name: Resync piped
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - piped
+
+jobs:
+  resync-piped:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          submodules: "true"
+          token: ${{ secrets.ACTIONS_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.10
+
+      - name: install prerequisites
+        run: |
+          python -m pip install --upgrade pip wheel
+          python -m pip install -r ./piped/python/base-requirements/nox.txt
+
+      - name: Resync Piped
+        run: python -m nox -s copy-actions
+
+      - name: Freeze dependency locks
+        run: python -m nox -s freeze-locks
+
+      - name: Add & Commit
+        uses: EndBug/add-and-commit@v9.1.1
+        with:
+          message: Resync piped
