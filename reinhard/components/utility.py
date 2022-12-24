@@ -288,8 +288,8 @@ async def mentions(
         raise tanjun.CommandError("Message not found") from None
 
     mentions: str | None = None
-    if message_.mentions.users:
-        mentions = ", ".join(map(str, message_.mentions.users.values()))
+    if message_.user_mentions:
+        mentions = ", ".join(map(str, message_.user_mentions.values()))
 
     await ctx.respond(
         content=f"Pinging mentions: {mentions}" if mentions else "No pinging mentions.",

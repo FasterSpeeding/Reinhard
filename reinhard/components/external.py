@@ -240,14 +240,24 @@ async def youtube(
     """
     assert tokens.google is not None
     if safe_search is not False:
-        channel: hikari.PartialChannel | None
-        if ctx.cache and (channel := ctx.cache.get_guild_channel(ctx.channel_id)):
+        channel = None
+        if ctx.cache:
+            channel = ctx.cache.get_guild_channel(ctx.channel_id) or ctx.cache.get_thread(ctx.channel_id)
+
+        # TODO: handle retires
+        channel = channel or await ctx.rest.fetch_channel(ctx.channel_id)
+        if isinstance(channel, hikari.PermissibleGuildChannel):
             channel_is_nsfw = channel.is_nsfw
 
+        elif isinstance(channel, hikari.GuildThreadChannel):
+            parent_channel = ctx.cache.get_guild_channel(channel.id) if ctx.cache else None
+            parent_channel = parent_channel or await ctx.rest.fetch_channel(channel.parent_id)
+            assert isinstance(parent_channel, hikari.PermissibleGuildChannel)
+            channel_is_nsfw = parent_channel.is_nsfw
+
         else:
-            # TODO: handle retires
-            channel = await ctx.rest.fetch_channel(ctx.channel_id)
-            channel_is_nsfw = channel.is_nsfw if isinstance(channel, hikari.GuildChannel) else False
+            _LOGGER.warning("Unexpected channel type in youtube of %r", type(channel))
+            channel_is_nsfw = False
 
         if safe_search is None:
             safe_search = not channel_is_nsfw

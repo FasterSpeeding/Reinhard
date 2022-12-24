@@ -190,7 +190,7 @@ DELETE_CUSTOM_ID = "AUTHOR_DELETE_BUTTON:"
 """Prefix ID used for delete buttons."""
 
 
-def delete_row(ctx: tanjun_abc.Context) -> hikari.impl.ActionRowBuilder:
+def delete_row(ctx: tanjun_abc.Context) -> hikari.impl.MessageActionRowBuilder:
     """Make an action row builder with a delete button from a context.
 
     Parameters
@@ -206,14 +206,14 @@ def delete_row(ctx: tanjun_abc.Context) -> hikari.impl.ActionRowBuilder:
         Action row builder with a delete button.
     """
     return (
-        hikari.impl.ActionRowBuilder()
+        hikari.impl.MessageActionRowBuilder()
         .add_button(hikari.ButtonStyle.DANGER, DELETE_CUSTOM_ID + str(ctx.author.id))
         .set_emoji(constants.DELETE_EMOJI)
         .add_to_container()
     )
 
 
-def delete_row_from_authors(*authors: hikari.Snowflakeish) -> hikari.impl.ActionRowBuilder:
+def delete_row_from_authors(*authors: hikari.Snowflakeish) -> hikari.impl.MessageActionRowBuilder:
     """Make an action row builder with a delete button from a list of authors.
 
     Parameters
@@ -231,7 +231,7 @@ def delete_row_from_authors(*authors: hikari.Snowflakeish) -> hikari.impl.Action
     """
 
     return (
-        hikari.impl.ActionRowBuilder()
+        hikari.impl.MessageActionRowBuilder()
         .add_button(hikari.ButtonStyle.DANGER, DELETE_CUSTOM_ID + ",".join(map(str, authors)))
         .set_emoji(constants.DELETE_EMOJI)
         .add_to_container()
