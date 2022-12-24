@@ -42,6 +42,3 @@ jobs:
 
       - name: Lint with flake8
         run: python -m nox -s flake8
-
-      - name: Check slotting
-        run: python -m nox -s slot-check
