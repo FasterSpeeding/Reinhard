@@ -37,8 +37,8 @@ force_single_line = true
 
 [tool.piped]
 codespell_ignore = "nd|swith"
-default_sessions = ["reformat", "verify-markup", "flake8", "spell-check", "slot-check", "type-check"]
-hide = ["build", "generate_docs", "publish", "test", "test_coverage", "test_publish", "verify_types"]
+default_sessions = ["reformat", "verify-markup", "flake8", "spell-check", "type-check"]
+hide = ["build", "generate_docs", "publish", "slot-check", "test", "test_coverage", "test_publish", "verify_types"]
 top_level_targets = ["./noxfile.py", "./reinhard"]
 version_constraint = "3.10,<3.12"
 
