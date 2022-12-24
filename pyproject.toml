@@ -27,6 +27,7 @@ ignore = [
     "S101",    # Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.
     "E203",    # whitespace before ':'
     "E231",    # missing whitespace after ','
+    "TC003",   # Avoid specifying long messages outside the exception class
 ]
 per-file-ignores = ["noxfile.py: D100, FA101, F401, F403, INP001"]
 

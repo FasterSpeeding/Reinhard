@@ -52,7 +52,7 @@ class Star(typing.Protocol):
 
 
 class Guild(typing.Protocol):
-    id: int
+    id: int  # noqa: VNE003
     starboard_channel_id: int | None
     log_members: bool
     member_join_log: int | None

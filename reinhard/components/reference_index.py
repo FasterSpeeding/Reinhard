@@ -38,6 +38,7 @@ import datetime
 import importlib.metadata
 import inspect
 import logging
+import pathlib
 import re
 import sys
 import types
@@ -83,11 +84,11 @@ _END_KEY = "_link"
 
 def _add_search_entry(index: dict[str, typing.Any], path: str) -> None:
     for char in path.rsplit(".", 1)[-1].lower():
-        if char not in index:
-            index[char] = index = {}
+        if sub_index := index.get(char):
+            index = sub_index
 
         else:
-            index = index[char]
+            index[char] = index = {}
 
     if links := index.get(_END_KEY):
         if path not in links:
@@ -220,7 +221,7 @@ class ReferenceIndex:
         ), "These modules were all imported using the normal import system so this should never be None"
         # TODO: parse as ast instead to support fancy stuff like multi-line imports.
         # TODO: do we want to explicitly work out star imports?
-        with open(module_path, "r") as file:
+        with pathlib.Path(module_path).open("r") as file:
             for match in filter(None, map(_IMPORT_CAPTURE_PATTERN.match, file.readlines())):
                 groups = match.groups()
                 if groups[1]:  # `import {0} as {1}`

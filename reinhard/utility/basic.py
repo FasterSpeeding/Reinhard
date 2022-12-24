@@ -90,11 +90,11 @@ def embed_iterator(
     return ((hikari.UNDEFINED, cast_embed(v[1])) for v in iterator) if cast_embed else iterator
 
 
-def chunk(iterator: collections.Iterator[_ValueT], max: int) -> collections.Iterator[list[_ValueT]]:
+def chunk(iterator: collections.Iterator[_ValueT], max_value: int, /) -> collections.Iterator[list[_ValueT]]:
     chunk: list[_ValueT] = []
     for entry in iterator:
         chunk.append(entry)
-        if len(chunk) == max:
+        if len(chunk) == max_value:
             yield chunk
             chunk = []
 
@@ -102,11 +102,11 @@ def chunk(iterator: collections.Iterator[_ValueT], max: int) -> collections.Iter
         yield chunk
 
 
-def prettify_date(date: datetime.datetime) -> str:
+def prettify_date(date: datetime.datetime, /) -> str:
     return date.strftime("%a %d %b %Y %H:%M:%S %Z")
 
 
-def prettify_index(index: int, max_digit_count: int) -> str:
+def prettify_index(index: int, max_digit_count: int, /) -> str:
     name = str(index).zfill(max_digit_count)
     match index % 10:
         case 1 if index % 100 != 11:
@@ -136,7 +136,7 @@ def raise_error(
     return raise_command_error_
 
 
-def basic_name_grid(flags: enum.IntFlag) -> str:  # TODO: actually deal with max len lol
+def basic_name_grid(flags: enum.IntFlag, /) -> str:  # TODO: actually deal with max len lol
     names = [
         name
         for name, flag in type(flags).__members__.items()
@@ -162,7 +162,7 @@ def basic_name_grid(flags: enum.IntFlag) -> str:  # TODO: actually deal with max
     return "\n".join(name_grid)
 
 
-async def delete_button_callback(ctx: yuyo.ComponentContext) -> None:
+async def delete_button_callback(ctx: yuyo.ComponentContext, /) -> None:
     """Constant callback used by delete buttons.
 
     Parameters
@@ -189,7 +189,7 @@ DELETE_CUSTOM_ID = "AUTHOR_DELETE_BUTTON:"
 """Prefix ID used for delete buttons."""
 
 
-def delete_row(ctx: tanjun_abc.Context) -> hikari.impl.MessageActionRowBuilder:
+def delete_row(ctx: tanjun_abc.Context, /) -> hikari.impl.MessageActionRowBuilder:
     """Make an action row builder with a delete button from a context.
 
     Parameters
