@@ -44,6 +44,9 @@ from collections import abc as collections
 import dotenv
 import hikari
 
+if typing.TYPE_CHECKING:
+    from typing_extensions import Self
+
 ConfigT = typing.TypeVar("ConfigT", bound="Config")
 DefaultT = typing.TypeVar("DefaultT")
 ValueT = typing.TypeVar("ValueT")
@@ -86,13 +89,17 @@ class Config(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def from_env(cls: type[ConfigT]) -> ConfigT:
+    def from_env(cls) -> Self:
         raise NotImplementedError
 
     @classmethod
     @abc.abstractmethod
-    def from_mapping(cls: type[ConfigT], mapping: collections.Mapping[str, typing.Any], /) -> ConfigT:
+    def from_mapping(cls, mapping: collections.Mapping[str, typing.Any], /) -> Self:
         raise NotImplementedError
+
+
+def _maybe_up(string: str, up: bool) -> str:
+    return string.upper() if up else string
 
 
 @dataclasses.dataclass(kw_only=True, repr=False, slots=True)
@@ -104,17 +111,17 @@ class DatabaseConfig(Config):
     user: str = "postgres"
 
     @classmethod
-    def from_env(cls: type[ConfigT]) -> ConfigT:
-        return cls.from_mapping(os.environ)
+    def from_env(cls) -> Self:
+        return cls.from_mapping(os.environ, _up_case=True)
 
     @classmethod
-    def from_mapping(cls, mapping: collections.Mapping[str, typing.Any], /) -> DatabaseConfig:
+    def from_mapping(cls, mapping: collections.Mapping[str, typing.Any], /, *, _up_case: bool = False) -> Self:
         return cls(
-            password=_cast_or_else(mapping, "database_password", str),
-            database=_cast_or_else(mapping, "database", str, "postgres"),
-            host=_cast_or_else(mapping, "database_host", str, "localhost"),
-            port=_cast_or_else(mapping, "database_port", int, 5432),
-            user=_cast_or_else(mapping, "database_user", str, "postgres"),
+            password=_cast_or_else(mapping, _maybe_up("database_password", _up_case), str),
+            database=_cast_or_else(mapping, _maybe_up("database", _up_case), str, "postgres"),
+            host=_cast_or_else(mapping, _maybe_up("database_host", _up_case), str, "localhost"),
+            port=_cast_or_else(mapping, _maybe_up("database_port", _up_case), int, 5432),
+            user=_cast_or_else(mapping, _maybe_up("database_user", _up_case), str, "postgres"),
         )
 
 
@@ -127,17 +134,17 @@ class PTFConfig(Config):
     username: str
 
     @classmethod
-    def from_env(cls: type[ConfigT]) -> ConfigT:
-        return cls.from_mapping(os.environ)
+    def from_env(cls) -> Self:
+        return cls.from_mapping(os.environ, _up_case=True)
 
     @classmethod
-    def from_mapping(cls, mapping: collections.Mapping[str, typing.Any], /) -> PTFConfig:
+    def from_mapping(cls, mapping: collections.Mapping[str, typing.Any], /, *, _up_case: bool = False) -> Self:
         return cls(
-            auth_service=_cast_or_else(mapping, "auth_service", str),
-            file_service=_cast_or_else(mapping, "file_service", str),
-            message_service=_cast_or_else(mapping, "message_service", str),
-            username=_cast_or_else(mapping, "ptf_username", str),
-            password=_cast_or_else(mapping, "ptf_password", str),
+            auth_service=_cast_or_else(mapping, _maybe_up("auth_service", _up_case), str),
+            file_service=_cast_or_else(mapping, _maybe_up("file_service", _up_case), str),
+            message_service=_cast_or_else(mapping, _maybe_up("message_service", _up_case), str),
+            username=_cast_or_else(mapping, _maybe_up("ptf_username", _up_case), str),
+            password=_cast_or_else(mapping, _maybe_up("ptf_password", _up_case), str),
         )
 
 
@@ -149,16 +156,16 @@ class Tokens(Config):
     spotify_secret: str | None = None
 
     @classmethod
-    def from_env(cls: type[ConfigT]) -> ConfigT:
-        return cls.from_mapping(os.environ)
+    def from_env(cls) -> Self:
+        return cls.from_mapping(os.environ, _up_case=True)
 
     @classmethod
-    def from_mapping(cls, mapping: collections.Mapping[str, typing.Any], /) -> Tokens:
+    def from_mapping(cls, mapping: collections.Mapping[str, typing.Any], /, *, _up_case: bool = False) -> Self:
         return cls(
             bot=str(mapping["token"]),
-            google=_cast_or_else(mapping, "google", str, None),
-            spotify_id=_cast_or_else(mapping, "spotify_id", str, None),
-            spotify_secret=_cast_or_else(mapping, "spotify_secret", str, None),
+            google=_cast_or_else(mapping, _maybe_up("google", _up_case), str, None),
+            spotify_id=_cast_or_else(mapping, _maybe_up("spotify_id", _up_case), str, None),
+            spotify_secret=_cast_or_else(mapping, _maybe_up("spotify_secret", _up_case), str, None),
         )
 
 
@@ -215,27 +222,27 @@ class FullConfig(Config):
         dotenv.load_dotenv()
 
         return cls(
-            cache=_cast_or_else(os.environ, "cache", hikari.api.CacheComponents, DEFAULT_CACHE),
+            cache=_cast_or_else(os.environ, "CACHE", hikari.api.CacheComponents, DEFAULT_CACHE),
             database=DatabaseConfig.from_env(),
-            emoji_guild=_cast_or_else(os.environ, "emoji_guild", hikari.Snowflake, None),
-            intents=_cast_or_else(os.environ, "intents", hikari.Intents, DEFAULT_INTENTS),
-            log_level=_cast_or_else(os.environ, "log_level", lambda v: int(v) if v.isdigit() else v, logging.INFO),
-            mention_prefix=_cast_or_else(os.environ, "mention_prefix", _str_to_bool, True),
-            owner_only=_cast_or_else(os.environ, "owner_only", _str_to_bool, False),
-            prefixes=_cast_or_else(os.environ, "prefixes", lambda v: frozenset(map(str, v)), frozenset[str]()),
-            ptf=PTFConfig.from_env() if os.getenv("ptf_username") else None,
+            emoji_guild=_cast_or_else(os.environ, "EMOJI_GUILD", hikari.Snowflake, None),
+            intents=_cast_or_else(os.environ, "INTENTS", hikari.Intents, DEFAULT_INTENTS),
+            log_level=_cast_or_else(os.environ, "LOG_LEVEL", lambda v: int(v) if v.isdigit() else v, logging.INFO),
+            mention_prefix=_cast_or_else(os.environ, "MENTION_PREFIX", _str_to_bool, True),
+            owner_only=_cast_or_else(os.environ, "OWNER_ONLY", _str_to_bool, False),
+            prefixes=_cast_or_else(os.environ, "PREFIXES", lambda v: frozenset(map(str, v)), frozenset[str]()),
+            ptf=PTFConfig.from_env() if os.getenv("PTF_USERNAME") else None,
             tokens=Tokens.from_env(),
             declare_global_commands=_cast_or_else(
                 os.environ,
-                "declare_global_commands",
+                "DECLARE_GLOBAL_COMMANDS",
                 lambda v: nv if (nv := _str_to_bool(v, default=None)) is not None else hikari.Snowflake(v),
                 True,
             ),
-            hot_reload=_cast_or_else(os.environ, "hot_reload", _str_to_bool, False),
+            hot_reload=_cast_or_else(os.environ, "HOT_RELOAD", _str_to_bool, False),
         )
 
     @classmethod
-    def from_mapping(cls, mapping: collections.Mapping[str, typing.Any], /) -> FullConfig:
+    def from_mapping(cls, mapping: collections.Mapping[str, typing.Any], /) -> Self:
         log_level = mapping.get("log_level", logging.INFO)
         if not isinstance(log_level, (str, int)):
             raise ValueError("Invalid log level found in config")
@@ -254,7 +261,7 @@ class FullConfig(Config):
             intents=_cast_or_else(mapping, "intents", hikari.Intents, DEFAULT_INTENTS),
             log_level=log_level,
             mention_prefix=bool(mapping.get("mention_prefix", True)),
-            owner_only=bool(mapping.get("ownerA_only", False)),
+            owner_only=bool(mapping.get("owner_only", False)),
             prefixes=frozenset(map(str, mapping["prefixes"])) if "prefixes" in mapping else frozenset(),
             ptf=_cast_or_else(mapping, "ptf", PTFConfig.from_mapping, None),
             tokens=Tokens.from_mapping(mapping["tokens"]),

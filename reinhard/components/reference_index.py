@@ -56,7 +56,9 @@ import yuyo
 
 from .. import utility
 
-_ReferenceIndexT = typing.TypeVar("_ReferenceIndexT", bound="ReferenceIndex")
+if typing.TYPE_CHECKING:
+    from typing_extensions import Self
+
 _MessageCommandT = typing.TypeVar("_MessageCommandT", bound=tanjun.MessageCommand[typing.Any])
 _SlashCommandT = typing.TypeVar("_SlashCommandT", bound=tanjun.SlashCommand[typing.Any])
 _LOGGER = logging.getLogger("hikari.reinhard.reference_index")
@@ -404,9 +406,7 @@ class ReferenceIndex:
 
         return False
 
-    def index_module(
-        self: _ReferenceIndexT, module: types.ModuleType, /, *, recursive: bool = False
-    ) -> _ReferenceIndexT:
+    def index_module(self, module: types.ModuleType, /, *, recursive: bool = False) -> Self:
         """Add a module to the internal index of in-scope modules.
 
         Any types declared in these modules will have their uses tracked.
@@ -425,7 +425,7 @@ class ReferenceIndex:
         return self
 
     def _walk_sub_modules(
-        self: _ReferenceIndexT,
+        self,
         start_point: str,
         found_modules: set[str],
         callback: collections.Callable[[types.ModuleType], typing.Any],
@@ -435,7 +435,7 @@ class ReferenceIndex:
         check: collections.Callable[[types.ModuleType], bool] | None,
         children_only: bool,
         recursive: bool,
-    ) -> _ReferenceIndexT:
+    ) -> Self:
         for _, sub_module in filter(_is_public_key, inspect.getmembers(module)):
             if isinstance(sub_module, types.ModuleType) and sub_module.__name__ not in found_modules:
                 if children_only and not sub_module.__name__.startswith(start_point):
@@ -460,14 +460,14 @@ class ReferenceIndex:
         return self
 
     def index_sub_modules(
-        self: _ReferenceIndexT,
+        self,
         module: types.ModuleType,
         /,
         *,
         check: collections.Callable[[types.ModuleType], bool] | None = None,
         children_only: bool = True,
         recursive: bool = True,
-    ) -> _ReferenceIndexT:
+    ) -> Self:
         """Add a module's sub-modules to the internal index of in-scope modules.
 
         Any types declared in these modules will have their uses tracked.
@@ -500,16 +500,14 @@ class ReferenceIndex:
             recursive=recursive,
         )
 
-    def scan_indexed_modules(self: _ReferenceIndexT) -> _ReferenceIndexT:
+    def scan_indexed_modules(self) -> Self:
         """Scan the indexed modules for type references."""
         for module in self._indexed_modules.values():
             self.scan_module(module)
 
         return self
 
-    def scan_module(
-        self: _ReferenceIndexT, module: types.ModuleType, /, *, recursive: bool = False
-    ) -> _ReferenceIndexT:
+    def scan_module(self, module: types.ModuleType, /, *, recursive: bool = False) -> Self:
         """Scan a module for type references.
 
         Parameters
@@ -533,14 +531,14 @@ class ReferenceIndex:
         return self
 
     def scan_sub_modules(
-        self: _ReferenceIndexT,
+        self,
         module: types.ModuleType,
         /,
         *,
         check: collections.Callable[[types.ModuleType], bool] | None = None,
         children_only: bool = True,
         recursive: bool = True,
-    ) -> _ReferenceIndexT:
+    ) -> Self:
         """Scan sub-modules for type references.
 
         Parameters

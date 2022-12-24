@@ -41,11 +41,11 @@ if typing.TYPE_CHECKING:
     from collections import abc as collections
 
     import hikari
+    from typing_extensions import Self
 
     from . import protos
 
     _OtherValueT = typing.TypeVar("_OtherValueT")
-    _DatabaseCollectionT = typing.TypeVar("_DatabaseCollectionT", bound="DatabaseCollection[typing.Any, typing.Any]")
 
 _ValueT_co = typing.TypeVar("_ValueT_co", covariant=True)
 _FieldT_co = typing.TypeVar("_FieldT_co", bound=str, contravariant=True)
@@ -106,18 +106,16 @@ class DatabaseCollection(typing.Protocol[_FieldT_co, _ValueT_co]):
     async def count(self) -> int:
         raise NotImplementedError
 
-    def filter(
-        self: _DatabaseCollectionT, filter_type: FilterTypeT, *rules: tuple[_FieldT_co, typing.Any]
-    ) -> _DatabaseCollectionT:
+    def filter(self, filter_type: FilterTypeT, *rules: tuple[_FieldT_co, typing.Any]) -> Self:
         raise NotImplementedError
 
-    def filter_truth(self: _DatabaseCollectionT, *fields: _FieldT_co, truth: bool = True) -> _DatabaseCollectionT:
+    def filter_truth(self, *fields: _FieldT_co, truth: bool = True) -> Self:
         raise NotImplementedError
 
     async def iter(self) -> collections.Iterator[_ValueT_co]:
         raise NotImplementedError
 
-    def limit(self: _DatabaseCollectionT, limit: int, /) -> _DatabaseCollectionT:
+    def limit(self, limit: int, /) -> Self:
         raise NotImplementedError
 
     # TODO: do we want to finalise here?
@@ -126,7 +124,7 @@ class DatabaseCollection(typing.Protocol[_FieldT_co, _ValueT_co]):
     ) -> collections.Iterator[_OtherValueT]:
         raise NotImplementedError
 
-    def order_by(self: _DatabaseCollectionT, field: _FieldT_co, /, ascending: bool = True) -> _DatabaseCollectionT:
+    def order_by(self, field: _FieldT_co, /, ascending: bool = True) -> Self:
         raise NotImplementedError
 
 

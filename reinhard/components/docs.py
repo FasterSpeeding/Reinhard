@@ -51,6 +51,9 @@ import yuyo
 
 from .. import utility
 
+if typing.TYPE_CHECKING:
+    from typing_extensions import Self
+
 docs_group = tanjun.slash_command_group("docs", "Search relevant document sites.")
 
 _T = typing.TypeVar("_T")
@@ -108,7 +111,7 @@ class DocIndex:
         self._search_index: lunr.index.Index = lunr.lunr("location", ("title", "location"), data)
 
     @classmethod
-    def from_json(cls: type[_DocIndexT], name: str, url: str, /) -> collections.Callable[[str | bytes], _DocIndexT]:
+    def from_json(cls, name: str, url: str, /) -> collections.Callable[[str | bytes], Self]:
         """Build this index from a JSON payload."""
         return lambda data: cls(name, url, json.loads(data)["docs"])
 
