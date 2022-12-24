@@ -4,6 +4,3 @@ services:
     env_file: .env
     build:
       context: .
-      args:
-        alluka_rust_hash: ${alluka_rust_hash}
-        rukari_hash: ${rukari_hash}

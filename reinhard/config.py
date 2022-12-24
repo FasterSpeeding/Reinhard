@@ -162,7 +162,7 @@ class Tokens(Config):
     @classmethod
     def from_mapping(cls, mapping: collections.Mapping[str, typing.Any], /, *, _up_case: bool = False) -> Self:
         return cls(
-            bot=str(mapping["token"]),
+            bot=str(mapping[_maybe_up("token", _up_case)]),
             google=_cast_or_else(mapping, _maybe_up("google", _up_case), str, None),
             spotify_id=_cast_or_else(mapping, _maybe_up("spotify_id", _up_case), str, None),
             spotify_secret=_cast_or_else(mapping, _maybe_up("spotify_secret", _up_case), str, None),
