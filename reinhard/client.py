@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# cython: language_level=3
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2022, Faster Speeding
@@ -40,7 +39,6 @@ import tanjun
 import yuyo
 import yuyo.asgi
 
-# from . import sql
 from . import config as config_
 from . import utility
 
@@ -55,7 +53,7 @@ def _rukari(config: config_.FullConfig | None) -> tuple[hikari.Runnable, tanjun.
     except ImportError:
         return None
 
-    print("Initiating with Rukari")
+    print("Initiating with Rukari")  # noqa: T201
     if config is None:
         config = config_.FullConfig.from_env()
 
@@ -110,14 +108,13 @@ def build_gateway_bot(*, config: config_.FullConfig | None = None) -> tuple[hika
     if result := _rukari(config):
         return result
 
-    print("Initiating with standard Hikari impl")
+    print("Initiating with standard Hikari impl")  # noqa: T201
     bot = hikari.GatewayBot(
         config.tokens.bot,
         logs=config.log_level,
         intents=config.intents,
         cache_settings=hikari.impl.CacheSettings(components=config.cache),
-        # rest_url="https://canary.discord.com/api/v8"
-        # rest_url="https://staging.discord.co/api/v8"
+        # Staging url = https://staging.discord.co/api/v8
     )
     return bot, build_from_gateway_bot(bot, config=config)
 

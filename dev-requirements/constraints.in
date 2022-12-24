@@ -1,0 +1,16 @@
+asyncpg==0.27.0
+python-dotenv==0.21
+hikari[speedups]==2.0.0.dev113
+hikari-sake==1.0.4a1.post1
+hikari-tanjun==2.10.1a1
+hikari-yuyo==1.4.0a1.post1
+lunr==0.6.2
+markdownify==0.11.6
+psutil==5.9.4
+tanchan==0.2.0
+# uvloop==0.17; platform_system != "Windows"
+uvicorn==0.20.0
+youtube_dl==2021.12.17
+# Since this is for the find references feature,
+# don't care about versioning like at all.
+hikari-lightbulb

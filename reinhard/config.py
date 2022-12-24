@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# cython: language_level=3
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2022, Faster Speeding
@@ -31,7 +30,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["DatabaseConfig", "Tokens", "FullConfig"]
+__all__: list[str] = ["DatabaseConfig", "FullConfig", "Tokens"]
 
 import abc
 import dataclasses
@@ -245,7 +244,7 @@ class FullConfig(Config):
     def from_mapping(cls, mapping: collections.Mapping[str, typing.Any], /) -> Self:
         log_level = mapping.get("log_level", logging.INFO)
         if not isinstance(log_level, (str, int)):
-            raise ValueError("Invalid log level found in config")
+            raise TypeError("Invalid log level found in config")
 
         elif isinstance(log_level, str):
             log_level = log_level.upper()
@@ -269,17 +268,17 @@ class FullConfig(Config):
         )
 
 
-def get_config_from_file(file: pathlib.Path | None = None) -> FullConfig:
+def get_config_from_file(path: pathlib.Path | None = None, /) -> FullConfig:
     import yaml
 
-    if file is None:
-        file = pathlib.Path("config.json")
-        file = pathlib.Path("config.yaml") if not file.exists() else file
+    if path is None:
+        path = pathlib.Path("config.json")
+        path = pathlib.Path("config.yaml") if not path.exists() else path
 
-        if not file.exists():
+        if not path.exists():
             raise RuntimeError("Couldn't find valid yaml or json configuration file")
 
-    data = file.read_text()
+    data = path.read_text()
     return FullConfig.from_mapping(yaml.safe_load(data))
 
 

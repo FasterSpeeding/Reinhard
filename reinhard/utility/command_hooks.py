@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# cython: language_level=3
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2022, Faster Speeding
@@ -76,7 +75,7 @@ async def on_parser_error(ctx: tanjun.abc.Context, exception: tanjun.ParserError
 
     if isinstance(exception, tanjun.ConversionError) and exception.errors:
         if len(exception.errors) > 1:
-            message += ":\n* " + "\n* ".join(map("`{}`".format, exception.errors))
+            message += ":\n* " + "\n* ".join(map("`{}`".format, exception.errors))  # noqa: FS002
 
         else:
             message = f"{message}: `{exception.errors[0]}`"

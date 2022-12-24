@@ -27,11 +27,31 @@ ignore = [
     "S101",    # Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.
     "E203",    # whitespace before ':'
     "E231",    # missing whitespace after ','
+    "TC003",   # Avoid specifying long messages outside the exception class
 ]
+per-file-ignores = ["noxfile.py: D100, FA101, F401, F403, INP001"]
 
 [tool.isort]
 profile = "black"
 force_single_line = true
+
+[tool.piped]
+codespell_ignore = "nd|swith"
+default_sessions = ["reformat", "verify-markup", "flake8", "spell-check", "type-check"]
+hide = ["build", "generate_docs", "publish", "slot-check", "test", "test_coverage", "test_publish", "verify_types"]
+top_level_targets = ["./noxfile.py", "./reinhard"]
+version_constraint = "3.10,<3.12"
+
+[tool.piped.github_actions."*"]
+default_py_ver = "3.10"
+
+[tool.piped.github_actions.freeze_for_pr]
+[tool.piped.github_actions.lint]
+[tool.piped.github_actions.reformat]
+[tool.piped.github_actions.resync_piped]
+[tool.piped.github_actions.type_check]
+[tool.piped.github_actions.upgrade_locks]
+[tool.piped.github_actions.verify_locks]
 
 [tool.pyright]
 include = ["reinhard"]

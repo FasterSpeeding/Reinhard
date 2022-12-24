@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# cython: language_level=3
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2022, Faster Speeding
@@ -284,10 +283,7 @@ async def youtube(
 
     paginator = yuyo.ComponentPaginator(YoutubePaginator(session, parameters), authors=[ctx.author.id])
     try:
-        if not (first_response := await paginator.get_next_entry()):
-            # data["pageInfo"]["totalResults"] will not reliably be `0` when no data is returned and they don't use 404
-            # for that so we'll just check to see if nothing is being returned.
-            raise tanjun.CommandError(f"Couldn't find `{query}`.")  # TODO: delete row
+        first_response = await paginator.get_next_entry()
 
     except RuntimeError as exc:
         raise tanjun.CommandError(str(exc)) from None  # TODO: delete row
@@ -298,6 +294,11 @@ async def youtube(
         raise
 
     else:
+        if not first_response:
+            # data["pageInfo"]["totalResults"] will not reliably be `0` when no data is returned and they don't use 404
+            # for that so we'll just check to see if nothing is being returned.
+            raise tanjun.CommandError(f"Couldn't find `{query}`.")  # TODO: delete row
+
         content, embed = first_response
         message = await ctx.respond(content, embed=embed, component=paginator, ensure_result=True)
         component_client.set_executor(message, paginator)
@@ -419,8 +420,7 @@ async def spotify(
     )
 
     try:
-        if not (first_response := await paginator.get_next_entry()):
-            raise tanjun.CommandError(f"Couldn't find {resource_type.value}") from None  # TODO: delete row
+        first_response = await paginator.get_next_entry()
 
     except RuntimeError as exc:
         raise tanjun.CommandError(str(exc)) from None  # TODO: delete row
@@ -431,6 +431,9 @@ async def spotify(
         raise
 
     else:
+        if not first_response:
+            raise tanjun.CommandError(f"Couldn't find {resource_type.value}") from None  # TODO: delete row
+
         content, embed = first_response
         message = await ctx.respond(content, embed=embed, component=paginator, ensure_result=True)
         component_client.set_executor(message, paginator)

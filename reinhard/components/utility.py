@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# cython: language_level=3
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2022, Faster Speeding
@@ -84,23 +83,6 @@ async def color(
     await ctx.respond(embed=embed, component=utility.delete_row(ctx))
 
 
-# # @decorators.as_message_command
-# async def copy_command(
-#     self,
-#     ctx: tanjun.MessageContext,
-#     message: converters.BaseIDConverter,
-#     channel: converters.BaseIDConverter | None = None,
-# ) -> None:
-#     try:
-#         message = await self.tanjun.rest.fetch_message(
-#             message=message, channel=channel or ctx.channel_id
-#         )
-#     except (hikari.NotFound, hikari.Forbidden) as exc:
-#         await ctx.respond(content="Failed to get message.")
-#     else:
-#         ...  # TODO: Implement this to allow getting the embeds from a suppressed message.
-
-
 @doc_parse.with_annotated_args(follow_wrapped=True)
 @tanjun.with_guild_check(follow_wrapped=True)
 @tanjun.as_message_command("member")
@@ -124,7 +106,7 @@ async def member(ctx: tanjun.abc.Context, member: Member | None = None) -> None:
     roles = {role.id: role for role in map(guild.roles.get, member.role_ids) if role}
     ordered_roles = sorted(((role.position, role) for role in roles.values()), reverse=True)
 
-    roles_repr = "\n".join(map("{0[1].name}: {0[1].id}".format, ordered_roles))
+    roles_repr = "\n".join(map("{0[1].name}: {0[1].id}".format, ordered_roles))  # noqa: FS002
 
     for _, role in ordered_roles:
         if role.colour:
@@ -352,7 +334,7 @@ async def char(
         Whether this should send a file response regardless of response length.
     """
     if len(characters) > 20:
-        file = True
+        file = True  # noqa: VNE002
 
     content: hikari.UndefinedOr[str] = hikari.UNDEFINED
     content = "\n".join(_format_char_line(char, file) for char in characters)
@@ -361,9 +343,6 @@ async def char(
     # highly doubt this'll ever be over 1990 when file is False but better safe than sorry.
     if file or len(content) >= 1990:
         response_file = hikari.Bytes(content.encode(), "character-info.md", mimetype="text/markdown; charset=UTF-8")
-
-    else:
-        content = content
 
     await ctx.respond(content=content, attachment=response_file, component=utility.delete_row(ctx))
 

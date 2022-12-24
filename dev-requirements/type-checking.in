@@ -1,0 +1,5 @@
+-r ../piped/python/base-requirements/nox.in
+-r ../piped/python/base-requirements/type-checking.in
+-r ./constraints.in
+
+types-PyYAML==6.0.12.2

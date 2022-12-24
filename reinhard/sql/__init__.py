@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# cython: language_level=3
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2022, Faster Speeding
@@ -31,7 +30,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-import os
 import pathlib
 import re
 
@@ -64,7 +62,7 @@ class CachedScripts:
         if root_dir is not None:
             self.load_all_sql_files(root_dir, pattern)
 
-    def load_sql_file(self, file_path: str) -> None:
+    def load_sql_file(self, file_path: pathlib.Path, /) -> None:
         """Load an sql script from it's path into `self.scripts`.
 
         Parameters
@@ -72,11 +70,11 @@ class CachedScripts:
         file_path
             The string path of the file to load.
         """
-        if not file_path.lower().endswith(".sql"):
+        if not file_path.name.endswith(".sql"):
             raise ValueError("File must be of type 'sql'")
 
-        with open(file_path, "r") as file:
-            name = os.path.basename(file.name)[:-4]
+        with file_path.open("r") as file:
+            name = file_path.name[:-4]
 
             if name in self.scripts:
                 raise RuntimeError(f"Script {name!r} already loaded.")  # TODO: allow overwriting?
@@ -94,9 +92,9 @@ class CachedScripts:
             The optional regex string to use for matching the names of files to load.
         """
         root_dir_path = pathlib.Path(root_dir)
-        for file in root_dir_path.rglob("*"):
-            if file.is_file() and file.name.endswith(".sql") and re.match(pattern, file.name):
-                self.load_sql_file(str(file.absolute()))
+        for path in root_dir_path.rglob("*"):
+            if path.is_file() and path.name.endswith(".sql") and re.match(pattern, path.name):
+                self.load_sql_file(path)
 
     create_post_star = script_getter_factory("create_post_star")
     create_starboard_channel = script_getter_factory("create_starboard_channel")

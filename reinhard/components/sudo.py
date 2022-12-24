@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# cython: language_level=3
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2022, Faster Speeding
@@ -67,7 +66,7 @@ CallbackT = collections.Callable[..., collections.Coroutine[typing.Any, typing.A
 @tanjun.as_message_command("error")
 async def error_message_command(_: tanjun.abc.Context) -> None:
     """Command used for testing the current error handling."""
-    raise Exception("This is an exception, get used to it.")
+    raise Exception("This is an exception, get used to it.")  # noqa: TC002
 
 
 @tanjun.annotations.with_annotated_args
@@ -165,14 +164,12 @@ def _bytes_from_io(
 
 
 @tanjun.annotations.with_annotated_args
-# @tanjun.with_option("ephemeral_response", "-e", "--ephemeral", converters=tanjun.to_bool, default=False, empty_value=True)
 @tanjun.as_message_command("eval", "exec")
 async def eval_command(
     ctx: tanjun.abc.MessageContext,
     component: alluka.Injected[tanjun.abc.Component],
     component_client: alluka.Injected[yuyo.ComponentClient],
     file_output: Annotated[Bool, Flag(empty_value=True, aliases=("-f", "--file-out", "--file"))] = False,
-    # ephemeral_response: bool = False,
     suppress_response: Annotated[Bool, Flag(empty_value=True, aliases=("-s", "--suppress"))] = False,
 ) -> None:
     """Dynamically evaluate a script in the bot's environment.

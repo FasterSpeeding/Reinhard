@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# cython: language_level=3
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2022, Faster Speeding
@@ -29,118 +28,10 @@
 # CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-from __future__ import annotations
 
 import pathlib
+import sys
 
-import nox
+sys.path.insert(0, str(pathlib.Path(__file__).parent / "piped" / "python"))
 
-nox.options.sessions = ["reformat", "flake8", "slot-check", "spell-check", "type-check", "test"]
-GENERAL_TARGETS = ["./noxfile.py", "./reinhard", "./tests"]
-
-
-def _try_find_option(session: nox.Session, name: str, *other_names: str, when_empty: str | None = None) -> str | None:
-    args_iter = iter(session.posargs)
-    names = {name, *other_names}
-
-    for arg in args_iter:
-        if arg in names:
-            return next(args_iter, when_empty)
-
-
-def install_requirements(session: nox.Session, *other_requirements: str, include_standard: bool = False) -> None:
-    session.install("--upgrade", "wheel")
-
-    if include_standard:
-        other_requirements = ("-r", "requirements.txt", *other_requirements)
-
-    session.install("--upgrade", "-r", "dev-requirements.txt", *other_requirements)
-
-
-@nox.session(venv_backend="none")
-def cleanup(session: nox.Session) -> None:
-    import shutil
-
-    for raw_path in ["./.nox", "./.pytest_cache", "./coverage_html"]:
-        path = pathlib.Path(raw_path)
-        try:
-            shutil.rmtree(str(path.absolute()))
-
-        except Exception as exc:
-            session.warn(f"[ FAIL ] Failed to remove '{raw_path}': {exc!s}")
-
-        else:
-            session.log(f"[  OK  ] Removed '{raw_path}'")
-
-    # Remove individual files
-    for raw_path in ["./.coverage", "./coverage_html.xml"]:
-        path = pathlib.Path(raw_path)
-        try:
-            path.unlink()
-
-        except Exception as exc:
-            session.warn(f"[ FAIL ] Failed to remove '{raw_path}': {exc!s}")
-
-        else:
-            session.log(f"[  OK  ] Removed '{raw_path}'")
-
-
-@nox.session(reuse_venv=True)
-def flake8(session: nox.Session) -> None:
-    install_requirements(session, include_standard=True)
-    session.run("pflake8", *GENERAL_TARGETS)
-
-
-@nox.session(reuse_venv=True, name="slot-check")
-def slot_check(session: nox.Session) -> None:
-    """Check this project's slotted classes for common mistakes."""
-    install_requirements(session, include_standard=True)
-    session.run("slotscheck", "-m", "tanjun")
-
-
-@nox.session(reuse_venv=True, name="spell-check")
-def spell_check(session: nox.Session) -> None:
-    install_requirements(session)  # include_standard_requirements=False
-    session.run(
-        "codespell",
-        *GENERAL_TARGETS,
-        ".gitattributes",
-        ".gitignore",
-        "LICENSE",
-        "pyproject.toml",
-        "README.md",
-        "./github",
-        "--ignore-words-list",
-        "nd",
-    )
-
-
-@nox.session(reuse_venv=True)
-def reformat(session: nox.Session) -> None:
-    install_requirements(session)  # include_standard_requirements=False
-    session.run("black", *GENERAL_TARGETS)
-    session.run("isort", *GENERAL_TARGETS)
-    session.run("sort-all", *map(str, pathlib.Path("./tanjun/").glob("**/*.py")), success_codes=[0, 1])
-
-
-@nox.session(reuse_venv=True)
-def test(session: nox.Session) -> None:
-    install_requirements(session, include_standard=True)
-    session.run("pytest")
-
-
-@nox.session(name="test-coverage", reuse_venv=True)
-def test_coverage(session: nox.Session) -> None:
-    install_requirements(session, include_standard=True)
-    session.run("pytest", "--cov=reinhard", "--cov-report", "html:coverage_html", "--cov-report", "xml:coverage.xml")
-
-
-@nox.session(name="type-check", reuse_venv=True)
-def type_check(session: nox.Session) -> None:
-    install_requirements(session, "-r", "requirements.txt", "-r", "stub-requirements.txt", "-r", "nox-requirements.txt")
-
-    if _try_find_option(session, "--force-env", when_empty="True"):
-        session.env["PYRIGHT_PYTHON_GLOBAL_NODE"] = "off"
-
-    session.run("python", "-m", "pyright", "--version")
-    session.run("python", "-m", "pyright")
+from noxfile import *

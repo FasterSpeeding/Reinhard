@@ -1,0 +1,45 @@
+name: Resync piped
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - piped
+      - pyproject.toml
+
+jobs:
+  resync-piped:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          submodules: "true"
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: install prerequisites
+        run: |
+          python -m pip install --upgrade pip wheel
+          python -m pip install -r ./piped/python/base-requirements/nox.txt
+
+      - name: Resync Piped
+        run: python -m nox -s copy-piped bot-package-diff
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: gogo.patch
+          path: gogo.patch
+
+      - name: Check diff file
+        run: python -m nox -s is-diff-file-empty

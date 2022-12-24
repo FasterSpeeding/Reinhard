@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# cython: language_level=3
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2022, Faster Speeding
@@ -32,44 +31,39 @@
 
 __all__: list[str] = [
     # basic.py
-    "paginator_with_to_file",
+    "AIOHTTPStatusHandler",
+    "AMARANTH_PINK",
+    "ClientCredentialsOauth2",
+    "DELETE_CUSTOM_ID",
+    "DELETE_EMOJI",
+    "FAILED_COLOUR",
+    "FILE_EMOJI",
+    "FetchedResource",
+    "FileCallback",
+    "MAYA_BLUE",
+    "PASS_COLOUR",
+    "SessionManager",
+    "WHITE",
+    "YoutubeDownloader",
     "basic",
     "basic_name_grid",
     "chunk",
-    "DELETE_CUSTOM_ID",
+    "command_hooks",
+    "constants",
     "delete_button_callback",
     "delete_row",
     "delete_row_from_authors",
+    "dependencies",
+    "embed_colour",
     "embed_iterator",
-    "FileCallback",
+    "on_error",
+    "on_parser_error",
+    "paginator_with_to_file",
     "prettify_date",
     "prettify_index",
     "raise_error",
-    # command_hooks.py
-    "command_hooks",
-    "on_error",
-    "on_parser_error",
-    # constants.py
-    "constants",
-    "AMARANTH_PINK",
-    "DELETE_EMOJI",
-    "embed_colour",
-    "FAILED_COLOUR",
-    "FILE_EMOJI",
-    "MAYA_BLUE",
-    "PASS_COLOUR",
-    "WHITE",
-    # dependencies.py
-    "dependencies",
-    "SessionManager",
-    # rest.py
     "rest",
-    "AIOHTTPStatusHandler",
-    "ClientCredentialsOauth2",
-    "FetchedResource",
-    # ytdl.py
     "ytdl",
-    "YoutubeDownloader",
 ]
 
 from . import basic
