@@ -17,9 +17,9 @@ COPY ./main.py ./main.py
 
 ARG debug=false
 ENV DOCKER_DEBUG=${debug}
-RUN python -m pip install --upgrade pip wheel
-RUN python -m pip install -r requirements.txt
-# RUN python -m pip install pyjion
+RUN python -m pip install --no-cache-dir wheel && /
+    python -m pip install --no-cache-dir -r requirements.txt
+# RUN python -m pip install --no-cache-dir pyjion
 ENV ALLUKA_RUST_PATCH="true"
 ARG alluka_rust_hash
 ARG rukari_hash
@@ -29,14 +29,14 @@ RUN if [ -n "${rukari_hash}" ] || [ -n "${alluka_rust_hash}" ]; then \
 fi
 
 RUN if [ -n "${alluka_rust_hash}" ]; then \
-    python -m pip install --force-reinstall --no-deps git+https://github.com/fasterspeeding/tanjun.git@task/alluka_rust && \
+    python -m pip install --no-cache-dir  --force-reinstall --no-deps git+https://github.com/fasterspeeding/tanjun.git@task/alluka_rust && \
     export PATH="$HOME/.cargo/bin:$PATH" && \
-    python -m pip install git+https://github.com/fasterspeeding/alluka_rust.git@${alluka_rust_hash}; \
+    python -m pip install --no-cache-dir  git+https://github.com/fasterspeeding/alluka_rust.git@${alluka_rust_hash}; \
 fi
 
 RUN if [ -n "${rukari_hash}" ]; then \
     export PATH="$HOME/.cargo/bin:$PATH" && \
-    python -m pip install git+https://github.com/FasterSpeeding/Rukari.git@${rukari_hash}; \
+    python -m pip install --no-cache-dir  git+https://github.com/FasterSpeeding/Rukari.git@${rukari_hash}; \
 fi
 
 ENTRYPOINT if ${DOCKER_DEBUG} == false; then python main.py; else python -O main.py; fi
