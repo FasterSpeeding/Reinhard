@@ -3,7 +3,7 @@ FROM python:3.11.1
 WORKDIR /reinhard
 
 COPY ./reinhard ./reinhard
-COPY ./requirements.txt ./requirements.txt
+COPY ./dev-requirements/constraints.txt ./requirements.txt
 COPY ./main.py ./main.py
 
 # Only necessary if pyjion is also being installed.
@@ -17,7 +17,7 @@ COPY ./main.py ./main.py
 
 ARG debug=false
 ENV DOCKER_DEBUG=${debug}
-RUN python -m pip install --no-cache-dir wheel && /
+RUN python -m pip install --no-cache-dir wheel && \
     python -m pip install --no-cache-dir -r requirements.txt
 # RUN python -m pip install --no-cache-dir pyjion
 ENV ALLUKA_RUST_PATCH="true"
