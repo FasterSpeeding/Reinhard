@@ -136,3 +136,5 @@ data/
 main.build
 main.cmd
 main.exe
+
+gogo.patch
