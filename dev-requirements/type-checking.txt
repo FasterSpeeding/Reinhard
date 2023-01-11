@@ -828,9 +828,9 @@ pydantic==1.10.4 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:f2f7eb6273dd12472d7f218e1fef6f7c7c2f00ac2e1ecde4db8824c457300416 \
     --hash=sha256:fdf88ab63c3ee282c76d652fc86518aacb737ff35796023fae56a65ced1a5978 \
     --hash=sha256:fdf8d759ef326962b4678d89e275ffc55b7ce59d917d9f72233762061fd04a2d
-pyright==1.1.286 ; python_version >= "3.10" and python_version < "3.12" \
-    --hash=sha256:2bbf82114ac3838c31c91d1c32abe4858259bff094465cadff55eac465250f1b \
-    --hash=sha256:b80761f303bf437d764b2d194b06f07fb4ed38960d7f3a8b2f7f41da37aced70
+pyright==1.1.285 ; python_version >= "3.10" and python_version < "3.12" \
+    --hash=sha256:8a6b60b3ff0d000c549621c367cdf0013abdaf24d09e6f0b4b95031b357cc4b1 \
+    --hash=sha256:ecd28e8556352e2c7eb5f412c6841ec768d25e8a6136326d4a6a67d94370eba1
 python-dotenv==0.21.0 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:1684eb44636dd462b66c3ee016599815514527ad99965de77f43e0944634a7e5 \
     --hash=sha256:b77d08274639e3d34145dfa6c7008e66df0f04b7be7a75fd0d5292c191d79045
