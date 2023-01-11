@@ -201,9 +201,9 @@ pyyaml==6.0 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:dbad0e9d368bb989f4515da330b88a057617d16b6a8245084f1b05400f24609f \
     --hash=sha256:e61ceaab6f49fb8bdfaa0f92c4b57bcfbea54c09277b1b4f7ac376bfb7a7c174 \
     --hash=sha256:f84fbc98b019fef2ee9a1cb3ce93e3187a6df0b2538a651bfb890254ba9f90b5
-rich==13.0.0 ; python_version >= "3.10" and python_version < "3.12" \
-    --hash=sha256:12b1d77ee7edf251b741531323f0d990f5f570a4e7c054d0bfb59fb7981ad977 \
-    --hash=sha256:3aa9eba7219b8c575c6494446a59f702552efe1aa261e7eeb95548fa586e1950
+rich==13.0.1 ; python_version >= "3.10" and python_version < "3.12" \
+    --hash=sha256:25f83363f636995627a99f6e4abc52ed0970ebbd544960cc63cbb43aaac3d6f0 \
+    --hash=sha256:41fe1d05f433b0f4724cda8345219213d2bfa472ef56b2f64f415b5b94d51b04
 setuptools==65.6.3 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:57f6f22bde4e042978bcd50176fdb381d7c21a9efa4041202288d3737a0c6a54 \
     --hash=sha256:a7620757bf984b58deaf32fc8a4577a9bbc0850cf92c20e1ce41c38c19e5fb75
