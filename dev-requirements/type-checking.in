@@ -3,3 +3,4 @@
 -r ./constraints.in
 
 types-PyYAML==6.0.12.2
+pyright==1.1.285  # Pinned until a bug is fixed
