@@ -103,7 +103,7 @@ class CachedScripts:
     schema = script_getter_factory("schema")
 
 
-async def initialise_schema(sql_scripts: CachedScripts, conn: asyncpg.Connection) -> None:
+async def initialise_schema(sql_scripts: CachedScripts, conn: asyncpg.Connection[asyncpg.Record]) -> None:
     """Initialise the database schema if not already present.
 
     Parameters

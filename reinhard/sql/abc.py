@@ -54,25 +54,19 @@ FilterTypeT = Literal["lt", "le", "eq", "ne", "ge", "gt", "contains"]
 # For a reference on what these all mean see https://docs.python.org/3/library/operator.html
 
 
-StarredMessageFields = (
-    Literal["message_id"]
-    | Literal["message_content"]
-    | Literal["channel_id"]
-    | Literal["author_id"]
-    | Literal["author_avatar_hash"]
-    | Literal["message_status"]
-    | Literal["starboard_message_id"]
-)
-StarFields = Literal["message_id"] | Literal["starrer_id"]
-GuildFields = (
-    Literal["id"]
-    | Literal["starboard_channel_id"]
-    | Literal["log_members"]
-    | Literal["member_join_log"]
-    | Literal["message_spam_system"]
-)
-BotUserBanFields = Literal["user_id"] | Literal["reason"] | Literal["expires_at"]
-BotGuildBanFields = Literal["guild_id"] | Literal["reason"] | Literal["expires_at"]
+StarredMessageFields = Literal[
+    "message_id",
+    "message_content",
+    "channel_id",
+    "author_id",
+    "author_avatar_hash",
+    "message_status",
+    "starboard_message_id",
+]
+StarFields = Literal["message_id", "starrer_id"]
+GuildFields = Literal["id", "starboard_channel_id", "log_members", "member_join_log", "message_spam_system"]
+BotUserBanFields = Literal["user_id", "reason", "expires_at"]
+BotGuildBanFields = Literal["guild_id", "reason", "expires_at"]
 
 
 class SQLError(Exception):
