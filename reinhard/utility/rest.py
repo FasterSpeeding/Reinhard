@@ -94,7 +94,7 @@ class AIOHTTPStatusHandler(backoff.ErrorManager):
         self, *, break_on: collections.Iterable[int] = (), on_404: str | collections.Callable[[], None] | None = None
     ) -> None:
         super().clear_rules()
-        self.with_rule((aiohttp.ClientResponseError,), self._on_client_response_error)
+        self.add_rule((aiohttp.ClientResponseError,), self._on_client_response_error)
         self._break_on = set(break_on)
         self._on_404 = on_404
 

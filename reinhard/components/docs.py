@@ -178,17 +178,9 @@ async def _docs_command(
             title=f"{index.name} Documentation",
             url=index.docs_url,
         )
-        paginator = yuyo.ComponentPaginator(
-            iterator,
-            authors=(ctx.author,) if not public else (),
-            triggers=(
-                yuyo.pagination.LEFT_DOUBLE_TRIANGLE,
-                yuyo.pagination.LEFT_TRIANGLE,
-                yuyo.pagination.STOP_SQUARE,
-                yuyo.pagination.RIGHT_TRIANGLE,
-                yuyo.pagination.RIGHT_DOUBLE_TRIANGLE,
-            ),
-            timeout=datetime.timedelta(days=99999),  # TODO: switch to passing None here
+        # TODO: switch to passing None for `timeout`
+        paginator = utility.make_paginator(
+            iterator, author=None if public else ctx.author, timeout=datetime.timedelta(days=99999), full=True
         )
         executor = utility.paginator_with_to_file(
             ctx,
@@ -199,29 +191,18 @@ async def _docs_command(
 
     else:
         iterator = ((hikari.UNDEFINED, metadata.to_embed()) for metadata in index.search(path))
-        executor = paginator = yuyo.ComponentPaginator(
-            iterator,
-            authors=(ctx.author,) if not public else (),
-            triggers=(
-                yuyo.pagination.LEFT_DOUBLE_TRIANGLE,
-                yuyo.pagination.LEFT_TRIANGLE,
-                yuyo.pagination.STOP_SQUARE,
-                yuyo.pagination.RIGHT_TRIANGLE,
-                yuyo.pagination.RIGHT_DOUBLE_TRIANGLE,
-            ),
-        )
+        executor = paginator = utility.make_paginator(iterator, author=None if public else ctx.author, full=True)
         components = executor.builder()
 
     if first_response := await paginator.get_next_entry():
-        content, embed = first_response
-        message = await ctx.respond(content=content, components=components, embed=embed, ensure_result=True)
+        message = await ctx.respond(components=components, **first_response.to_kwargs(), ensure_result=True)
         component_client.set_executor(message, executor)
         return
 
     await ctx.respond("Entry not found", component=utility.delete_row(ctx))
 
 
-def make_autocomplete(get_index: collections.Callable[..., _CoroT[_DocIndexT]]) -> tanjun.abc.AutocompleteCallbackSig:
+def make_autocomplete(get_index: collections.Callable[..., _CoroT[_DocIndexT]]) -> tanjun.abc.AutocompleteSig[str]:
     async def _autocomplete(
         ctx: tanjun.abc.AutocompleteContext,
         value: str,

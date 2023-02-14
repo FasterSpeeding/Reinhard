@@ -281,7 +281,7 @@ async def youtube(
     if language is not None:
         parameters["relevanceLanguage"] = language
 
-    paginator = yuyo.ComponentPaginator(YoutubePaginator(session, parameters), authors=[ctx.author.id])
+    paginator = utility.make_paginator(YoutubePaginator(session, parameters), author=ctx.author)
     try:
         first_response = await paginator.get_next_entry()
 
@@ -299,8 +299,7 @@ async def youtube(
             # for that so we'll just check to see if nothing is being returned.
             raise tanjun.CommandError(f"Couldn't find `{query}`.")  # TODO: delete row
 
-        content, embed = first_response
-        message = await ctx.respond(content, embed=embed, component=paginator, ensure_result=True)
+        message = await ctx.respond(**first_response.to_kwargs(), component=paginator, ensure_result=True)
         component_client.set_executor(message, paginator)
 
 
@@ -414,9 +413,9 @@ async def spotify(
     resource_type
         Type of resource to search for. Defaults to track.
     """
-    paginator = yuyo.ComponentPaginator(
+    paginator = utility.make_paginator(
         SpotifyPaginator(spotify_auth.acquire_token, session, {"query": query, "type": resource_type.value}),
-        authors=[ctx.author.id],
+        author=ctx.author,
     )
 
     try:
@@ -434,8 +433,7 @@ async def spotify(
         if not first_response:
             raise tanjun.CommandError(f"Couldn't find {resource_type.value}") from None  # TODO: delete row
 
-        content, embed = first_response
-        message = await ctx.respond(content, embed=embed, component=paginator, ensure_result=True)
+        message = await ctx.respond(**first_response.to_kwargs(), component=paginator, ensure_result=True)
         component_client.set_executor(message, paginator)
 
 

@@ -210,17 +210,11 @@ async def eval_command(
         )
         for page, text in enumerate(string_paginator)
     )
-    paginator = yuyo.ComponentPaginator(
+    paginator = utility.make_paginator(
         embed_generator,
-        authors=[ctx.author.id],
-        triggers=(
-            yuyo.pagination.LEFT_DOUBLE_TRIANGLE,
-            yuyo.pagination.LEFT_TRIANGLE,
-            yuyo.pagination.STOP_SQUARE,
-            yuyo.pagination.RIGHT_TRIANGLE,
-            yuyo.pagination.RIGHT_DOUBLE_TRIANGLE,
-        ),
+        author=ctx.author,
         timeout=datetime.timedelta(days=99999),  # TODO: switch to passing None here
+        full=True,
     )
     first_response = await paginator.get_next_entry()
     executor = utility.paginator_with_to_file(
@@ -228,8 +222,7 @@ async def eval_command(
     )
 
     assert first_response is not None
-    content, embed = first_response
-    message = await ctx.respond(content=content, embed=embed, components=executor.builders, ensure_result=True)
+    message = await ctx.respond(**first_response.to_kwargs(), components=executor.builders, ensure_result=True)
     component_client.set_executor(message, executor)
 
 

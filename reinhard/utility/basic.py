@@ -39,12 +39,14 @@ __all__: list[str] = [
     "delete_row",
     "delete_row_from_authors",
     "embed_iterator",
+    "make_paginator",
     "paginator_with_to_file",
     "prettify_date",
     "prettify_index",
     "raise_error",
 ]
 
+import datetime
 import enum
 import typing
 
@@ -55,7 +57,6 @@ from tanjun import errors
 from . import constants
 
 if typing.TYPE_CHECKING:
-    import datetime
     from collections import abc as collections
 
     from tanjun import abc as tanjun_abc
@@ -170,9 +171,13 @@ async def delete_button_callback(ctx: yuyo.ComponentContext, /) -> None:
     ctx
         The context that triggered this delete.
     """
-    author_ids = set(map(hikari.Snowflake, ctx.interaction.custom_id.removeprefix(DELETE_CUSTOM_ID).split(",")))
+    # Filter is needed as "".split(",") will give [""] which is not a valid snowflake.
+    author_ids = set(
+        map(hikari.Snowflake, filter(None, ctx.interaction.custom_id.removeprefix(DELETE_CUSTOM_ID).split(",")))
+    )
     if (
-        ctx.interaction.user.id in author_ids
+        not author_ids  # no IDs == public
+        or ctx.interaction.user.id in author_ids
         or ctx.interaction.member
         and author_ids.intersection(ctx.interaction.member.role_ids)
     ):
@@ -185,8 +190,38 @@ async def delete_button_callback(ctx: yuyo.ComponentContext, /) -> None:
         )
 
 
+def make_paginator(
+    iterator: typing.Union[
+        collections.Iterator[yuyo.pagination.EntryT], collections.AsyncIterator[yuyo.pagination.EntryT]
+    ],
+    /,
+    *,
+    author: typing.Optional[hikari.SnowflakeishOr[hikari.User]] = None,
+    ephemeral_default: bool = False,
+    timeout: datetime.timedelta = datetime.timedelta(seconds=30),
+    full: bool = False,
+) -> yuyo.ComponentPaginator:
+    authors = [author] if author else []
+    paginator = yuyo.ComponentPaginator(
+        iterator, authors=authors, triggers=[], ephemeral_default=ephemeral_default, timeout=timeout
+    )
+    if full:
+        paginator.add_first_button()
+
+    paginator.add_previous_button().add_stop_button(custom_id=_make_delete_id(*authors)).add_next_button()
+
+    if full:
+        paginator.add_last_button()
+
+    return paginator
+
+
 DELETE_CUSTOM_ID = "AUTHOR_DELETE_BUTTON:"
 """Prefix ID used for delete buttons."""
+
+
+def _make_delete_id(*authors: hikari.SnowflakeishOr[hikari.User]) -> str:
+    return DELETE_CUSTOM_ID + ",".join(str(int(author)) for author in authors)
 
 
 def delete_row(ctx: tanjun_abc.Context, /) -> hikari.impl.MessageActionRowBuilder:
@@ -206,7 +241,7 @@ def delete_row(ctx: tanjun_abc.Context, /) -> hikari.impl.MessageActionRowBuilde
     """
     return (
         hikari.impl.MessageActionRowBuilder()
-        .add_button(hikari.ButtonStyle.DANGER, DELETE_CUSTOM_ID + str(ctx.author.id))
+        .add_button(hikari.ButtonStyle.DANGER, _make_delete_id(ctx.author))
         .set_emoji(constants.DELETE_EMOJI)
         .add_to_container()
     )
@@ -231,7 +266,7 @@ def delete_row_from_authors(*authors: hikari.Snowflakeish) -> hikari.impl.Messag
 
     return (
         hikari.impl.MessageActionRowBuilder()
-        .add_button(hikari.ButtonStyle.DANGER, DELETE_CUSTOM_ID + ",".join(map(str, authors)))
+        .add_button(hikari.ButtonStyle.DANGER, _make_delete_id(*authors))
         .set_emoji(constants.DELETE_EMOJI)
         .add_to_container()
     )
@@ -308,16 +343,12 @@ def paginator_with_to_file(
     yuyo.MultiComponentExecutor
         Executor with both the paginator and to file button.
     """
-    return (
-        yuyo.MultiComponentExecutor()  # TODO: add authors here
-        .add_executor(paginator)
-        .add_builder(paginator)
-        .add_action_row()
-        .add_button(
+    row = yuyo.MultiComponentExecutor().add_executor(paginator).add_builder(paginator)  # TODO: add authors here
+    (
+        row.add_action_row().add_button(
             hikari.ButtonStyle.SECONDARY,
             FileCallback(ctx, files=files, make_files=make_files, post_components=[paginator]),
+            emoji=constants.FILE_EMOJI,
         )
-        .set_emoji(constants.FILE_EMOJI)
-        .add_to_container()
-        .add_to_parent()
     )
+    return row

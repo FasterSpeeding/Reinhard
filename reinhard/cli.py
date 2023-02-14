@@ -34,7 +34,7 @@ from . import client as client_module
 
 
 def main() -> None:
-    client_module.run_gateway_bot()
+    client_module.run_rest_bot()
 
 
 if __name__ == "__main__":
