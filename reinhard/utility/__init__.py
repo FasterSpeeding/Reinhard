@@ -56,6 +56,7 @@ __all__: list[str] = [
     "dependencies",
     "embed_colour",
     "embed_iterator",
+    "make_paginator",
     "on_error",
     "on_parser_error",
     "paginator_with_to_file",
@@ -80,6 +81,7 @@ from .basic import delete_button_callback
 from .basic import delete_row
 from .basic import delete_row_from_authors
 from .basic import embed_iterator
+from .basic import make_paginator
 from .basic import paginator_with_to_file
 from .basic import prettify_date
 from .basic import prettify_index

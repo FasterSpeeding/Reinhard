@@ -656,17 +656,11 @@ class _IndexCommand:
             title=f"{len(uses)} references found for {full_path}",
             cast_embed=lambda e: e.set_footer(text=self.library_repr),
         )
-        paginator = yuyo.ComponentPaginator(
+        paginator = utility.make_paginator(
             iterator,
-            authors=(ctx.author,) if not public else (),
-            triggers=(
-                yuyo.pagination.LEFT_DOUBLE_TRIANGLE,
-                yuyo.pagination.LEFT_TRIANGLE,
-                yuyo.pagination.STOP_SQUARE,
-                yuyo.pagination.RIGHT_TRIANGLE,
-                yuyo.pagination.RIGHT_DOUBLE_TRIANGLE,
-            ),
+            author=None if public else ctx.author,
             timeout=datetime.timedelta(days=99999),  # TODO: switch to passing None here
+            full=True,
         )
 
         executor = utility.paginator_with_to_file(
@@ -675,8 +669,7 @@ class _IndexCommand:
 
         first_response = await paginator.get_next_entry()
         assert first_response
-        content, embed = first_response
-        message = await ctx.respond(content=content, components=executor.builders, embed=embed, ensure_result=True)
+        message = await ctx.respond(**first_response.to_kwargs(), components=executor.builders, ensure_result=True)
         component_client.set_executor(message, executor)
 
 
