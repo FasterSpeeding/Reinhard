@@ -2,7 +2,7 @@
 -r ../piped/python/base-requirements/type-checking.in
 -r ./constraints.in
 
-asyncpg-stubs==0.27.0
-pyright==1.1.285  # Pinned until a bug is fixed
-types-PyYAML==6.0.12.2
-types-psutil==5.9.5.6
+asyncpg-stubs>=0.27
+pyright>=1.1.285  # Pinned until a bug is fixed
+types-PyYAML>=6.0.12.2
+types-psutil>=5.9.5.6
