@@ -107,7 +107,9 @@ class DocIndex:
         self.docs_url = docs_url
         self._autocomplete_refs: dict[str, DocEntry] = {entry.hashed_location: entry for entry in self._data.values()}
         self.name = name
-        self._search_index: lunr.index.Index = lunr.lunr("location", ("title", "location"), data)
+        self._search_index: lunr.index.Index = lunr.lunr(  # pyright: ignore [ reportUnknownMemberType ]
+            "location", ("title", "location"), data
+        )
 
     @classmethod
     def from_json(cls, name: str, url: str, /) -> collections.Callable[[str | bytes], Self]:
@@ -148,9 +150,12 @@ class DocIndex:
             An iterator of the matching entries.
         """
         try:
-            results: list[dict[str, str]] = self._search_index.search(search_path)
+            results: list[dict[str, str]] = self._search_index.search(  # pyright: ignore [ reportUnknownMemberType ]
+                search_path
+            )
         except lunr.exceptions.QueryParseError as exc:  # type: ignore
-            raise tanjun.CommandError(f"Invalid query: `{exc.args[0]}`") from None
+            reason: str = exc.args[0]  # pyright: ignore [ reportUnknownMemberType ]
+            raise tanjun.CommandError(f"Invalid query: `{reason}`") from None
 
         return (self._data[entry["ref"]] for entry in results)
 
@@ -187,7 +192,7 @@ async def _docs_command(
             paginator,
             make_files=lambda: [hikari.Bytes("\n".join(m.title for m in index.search(str(path))), "results.txt")],
         )
-        components = executor.builders
+        components = executor.rows
 
     else:
         iterator = ((hikari.UNDEFINED, metadata.to_embed()) for metadata in index.search(path))

@@ -222,7 +222,7 @@ async def eval_command(
     )
 
     assert first_response is not None
-    message = await ctx.respond(**first_response.to_kwargs(), components=executor.builders, ensure_result=True)
+    message = await ctx.respond(**first_response.to_kwargs(), components=executor.rows, ensure_result=True)
     component_client.set_executor(message, executor)
 
 

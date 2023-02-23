@@ -3,6 +3,6 @@
 -r ./constraints.in
 
 asyncpg-stubs>=0.27
-pyright>=1.1.285  # Pinned until a bug is fixed
+pyright==1.1.294  # Pinned until bug fix
 types-PyYAML>=6.0.12.2
 types-psutil>=5.9.5.6
