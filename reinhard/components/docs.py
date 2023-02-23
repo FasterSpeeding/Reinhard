@@ -187,7 +187,7 @@ async def _docs_command(
             paginator,
             make_files=lambda: [hikari.Bytes("\n".join(m.title for m in index.search(str(path))), "results.txt")],
         )
-        components = executor.builders
+        components = executor.rows
 
     else:
         iterator = ((hikari.UNDEFINED, metadata.to_embed()) for metadata in index.search(path))

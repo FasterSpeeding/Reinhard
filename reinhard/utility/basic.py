@@ -181,12 +181,14 @@ async def delete_button_callback(ctx: yuyo.ComponentContext, /) -> None:
         or ctx.interaction.member
         and author_ids.intersection(ctx.interaction.member.role_ids)
     ):
-        await ctx.defer(hikari.ResponseType.DEFERRED_MESSAGE_UPDATE)
+        await ctx.defer(defer_type=hikari.ResponseType.DEFERRED_MESSAGE_UPDATE)
         await ctx.delete_initial_response()
 
     else:
         await ctx.create_initial_response(
-            hikari.ResponseType.MESSAGE_CREATE, "You do not own this message", flags=hikari.MessageFlag.EPHEMERAL
+            "You do not own this message",
+            response_type=hikari.ResponseType.MESSAGE_CREATE,
+            flags=hikari.MessageFlag.EPHEMERAL,
         )
 
 
@@ -320,7 +322,7 @@ def paginator_with_to_file(
     *,
     files: collections.Sequence[hikari.Resourceish] = (),
     make_files: collections.Callable[[], collections.Sequence[hikari.Resourceish]] | None = None,
-) -> yuyo.MultiComponentExecutor:
+) -> yuyo.components.ActionColumnExecutor:
     """Wrap a paginator with a "to file" button.
 
     .. note::
@@ -343,9 +345,9 @@ def paginator_with_to_file(
     yuyo.MultiComponentExecutor
         Executor with both the paginator and to file button.
     """
-    row = yuyo.MultiComponentExecutor().add_executor(paginator).add_builder(paginator)  # TODO: add authors here
+    row = yuyo.components.ActionColumnExecutor().add_row(paginator)  # TODO: add authors here
     (
-        row.add_action_row().add_button(
+        row.add_button(
             hikari.ButtonStyle.SECONDARY,
             FileCallback(ctx, files=files, make_files=make_files, post_components=[paginator]),
             emoji=constants.FILE_EMOJI,

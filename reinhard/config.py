@@ -290,3 +290,6 @@ def load_config() -> FullConfig:
         raise RuntimeError("Invalid configuration given in environment variables")
 
     return get_config_from_file(config_path)
+
+
+hikari.Snowflake(123321)

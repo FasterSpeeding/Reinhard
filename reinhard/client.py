@@ -38,6 +38,7 @@ import hikari
 import tanjun
 import yuyo
 import yuyo.asgi
+import yuyo.modals
 
 from . import config as config_
 from . import utility
@@ -69,6 +70,7 @@ def _rukari(config: config_.FullConfig | None) -> tuple[hikari.Runnable, tanjun.
     component_client = yuyo.ComponentClient(event_manager=bot.event_manager, event_managed=False).set_constant_id(
         utility.DELETE_CUSTOM_ID, utility.delete_button_callback, prefix_match=True
     )
+    modal_client = yuyo.modals.ModalClient.from_gateway_bot(bot, event_managed=False)
     reaction_client = yuyo.ReactionClient(rest=bot.rest, event_manager=bot.event_manager, event_managed=False)
     return bot, _build(
         tanjun.Client(
@@ -79,12 +81,15 @@ def _rukari(config: config_.FullConfig | None) -> tuple[hikari.Runnable, tanjun.
             mention_prefix=config.mention_prefix,
             declare_global_commands=False if config.hot_reload else config.declare_global_commands,
         )
-        .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open)
-        .add_client_callback(tanjun.ClientCallbackNames.CLOSING, component_client.close)
-        .add_client_callback(tanjun.ClientCallbackNames.STARTING, reaction_client.open)
-        .add_client_callback(tanjun.ClientCallbackNames.CLOSING, reaction_client.close)
+        .add_client_callback(
+            tanjun.ClientCallbackNames.STARTING, component_client.open, modal_client.open, reaction_client.open
+        )
+        .add_client_callback(
+            tanjun.ClientCallbackNames.CLOSING, component_client.close, modal_client.close, reaction_client.close
+        )
         .set_type_dependency(yuyo.ReactionClient, reaction_client)
-        .set_type_dependency(yuyo.ComponentClient, component_client),
+        .set_type_dependency(yuyo.ComponentClient, component_client)
+        .set_type_dependency(yuyo.modals.ModalClient, modal_client),
         config,
     )
 
@@ -201,6 +206,7 @@ def build_from_gateway_bot(
     component_client = yuyo.ComponentClient.from_gateway_bot(bot, event_managed=False).set_constant_id(
         utility.DELETE_CUSTOM_ID, utility.delete_button_callback, prefix_match=True
     )
+    modal_client = yuyo.modals.ModalClient.from_gateway_bot(bot, event_managed=False)
     reaction_client = yuyo.ReactionClient.from_gateway_bot(bot, event_managed=False)
     return _build(
         tanjun.Client.from_gateway_bot(
@@ -208,12 +214,15 @@ def build_from_gateway_bot(
             mention_prefix=config.mention_prefix,
             declare_global_commands=False if config.hot_reload else config.declare_global_commands,
         )
-        .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open)
-        .add_client_callback(tanjun.ClientCallbackNames.CLOSING, component_client.close)
-        .add_client_callback(tanjun.ClientCallbackNames.STARTING, reaction_client.open)
-        .add_client_callback(tanjun.ClientCallbackNames.CLOSING, reaction_client.close)
+        .add_client_callback(
+            tanjun.ClientCallbackNames.STARTING, component_client.open, modal_client.open, reaction_client.open
+        )
+        .add_client_callback(
+            tanjun.ClientCallbackNames.CLOSING, component_client.close, modal_client.close, reaction_client.close
+        )
         .set_type_dependency(yuyo.ReactionClient, reaction_client)
-        .set_type_dependency(yuyo.ComponentClient, component_client),
+        .set_type_dependency(yuyo.ComponentClient, component_client)
+        .set_type_dependency(yuyo.modals.ModalClient, modal_client),
         config,
     )
 
@@ -241,15 +250,17 @@ def build_from_rest_bot(
     component_client = yuyo.ComponentClient.from_rest_bot(bot).set_constant_id(
         utility.DELETE_CUSTOM_ID, utility.delete_button_callback, prefix_match=True
     )
+    modal_client = yuyo.modals.ModalClient.from_rest_bot(bot)
     return _build(
         tanjun.Client.from_rest_bot(
             bot,
             declare_global_commands=False if config.hot_reload else config.declare_global_commands,
             bot_managed=True,
         )
-        .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open)
-        .add_client_callback(tanjun.ClientCallbackNames.CLOSING, component_client.close)
-        .set_type_dependency(yuyo.ComponentClient, component_client),
+        .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open, modal_client.open)
+        .add_client_callback(tanjun.ClientCallbackNames.CLOSING, component_client.close, modal_client.close)
+        .set_type_dependency(yuyo.ComponentClient, component_client)
+        .set_type_dependency(yuyo.modals.ModalClient, modal_client),
         config,
     )
 
