@@ -93,13 +93,15 @@ async def about(
     else:
         name = "Reinhard: REST Server"
 
-    if alluka_rust and isinstance(ctx.injection_client, alluka_rust.Client):
+    if alluka_rust and isinstance(
+        ctx.injection_client, alluka_rust.Client  # pyright: ignore [ reportUnknownMemberType ]
+    ):
         alluka_ver = f"Rust ({alluka_rust_ver})"
 
     else:
         alluka_ver = f"Pure-Python ({ALLUKA_VER})"
 
-    if bot and rukari and isinstance(bot, rukari.Bot):
+    if bot and rukari and isinstance(bot, rukari.Bot):  # pyright: ignore [ reportUnknownMemberType ]
         hikari_ver = f"Rukari ({rukari_ver})"
 
     else:

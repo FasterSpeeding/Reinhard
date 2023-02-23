@@ -58,7 +58,9 @@ def _rukari(config: config_.FullConfig | None) -> tuple[hikari.Runnable, tanjun.
     if config is None:
         config = config_.FullConfig.from_env()
 
-    bot: hikari.ShardAware = rukari.Bot(config.tokens.bot, intents=config.intents)
+    bot: hikari.ShardAware = rukari.Bot(  # pyright: ignore [ reportUnknownMemberType ]
+        config.tokens.bot, intents=config.intents
+    )
     assert isinstance(bot, hikari.RESTAware)
     assert isinstance(bot, hikari.EventManagerAware)
     assert isinstance(bot, hikari.Runnable)

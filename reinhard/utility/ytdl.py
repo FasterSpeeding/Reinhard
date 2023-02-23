@@ -49,7 +49,7 @@ def _download(url: str, /) -> tuple[pathlib.Path, dict[str, typing.Any]]:
     thread_local = threading.local()
     client = thread_local.__dict__.get(_CLIENT_ATTRIBUTE)
 
-    if not client or not isinstance(client, youtube_dl.YoutubeDL):
+    if not client or not isinstance(client, youtube_dl.YoutubeDL):  # pyright: ignore [ reportUnknownMemberType ]
         client = youtube_dl.YoutubeDL(  # type: ignore
             # TODO: noplaylist isn't actually respected
             # not sure quiet is respected either
@@ -62,8 +62,11 @@ def _download(url: str, /) -> tuple[pathlib.Path, dict[str, typing.Any]]:
         )
         thread_local.__dict__[_CLIENT_ATTRIBUTE] = client
 
-    data: dict[str, typing.Any] = client.extract_info(url)
-    return pathlib.Path(client.prepare_filename(data)), data
+    data: dict[str, typing.Any] = client.extract_info(url)  # pyright: ignore [ reportUnknownMemberType ]
+    path = pathlib.Path(
+        client.prepare_filename(data)  # pyright: ignore [ reportUnknownMemberType, reportUnknownArgumentType ]
+    )
+    return (path, data)
 
 
 class YoutubeDownloader:
