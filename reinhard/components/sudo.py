@@ -218,7 +218,7 @@ async def eval_command(
     )
     first_response = await paginator.get_next_entry()
     executor = utility.paginator_with_to_file(
-        ctx, paginator, make_files=lambda: [_bytes_from_io(stdout, "stdout.py"), _bytes_from_io(stderr, "stderr.py")]
+        paginator, make_files=lambda: [_bytes_from_io(stdout, "stdout.py"), _bytes_from_io(stderr, "stderr.py")]
     )
 
     assert first_response is not None

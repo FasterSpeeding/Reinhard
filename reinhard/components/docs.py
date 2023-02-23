@@ -188,7 +188,6 @@ async def _docs_command(
             iterator, author=None if public else ctx.author, timeout=datetime.timedelta(days=99999), full=True
         )
         executor = utility.paginator_with_to_file(
-            ctx,
             paginator,
             make_files=lambda: [hikari.Bytes("\n".join(m.title for m in index.search(str(path))), "results.txt")],
         )

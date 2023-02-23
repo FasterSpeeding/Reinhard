@@ -291,32 +291,30 @@ class FileCallback:
         pressed.
     """
 
-    __slots__ = ("_ctx", "_files", "_make_files", "_post_components")
+    __slots__ = ("_files", "_make_files", "_post_components", "__weakref__")
 
     def __init__(
         self,
-        ctx: tanjun_abc.Context,
-        /,
         *,
         files: collections.Sequence[hikari.Resourceish] = (),
         make_files: collections.Callable[[], collections.Sequence[hikari.Resourceish]] | None = None,
         post_components: hikari.UndefinedOr[collections.Sequence[hikari.api.ComponentBuilder]] = hikari.UNDEFINED,
     ) -> None:
-        self._ctx = ctx
         self._files = files
         self._make_files = make_files
         self._post_components = post_components
 
     async def __call__(self, ctx: yuyo.ComponentContext) -> None:
         if self._post_components is not hikari.UNDEFINED:
-            await self._ctx.respond(components=self._post_components)
+            await ctx.create_initial_response(
+                components=self._post_components, response_type=hikari.ResponseType.MESSAGE_UPDATE
+            )
 
         files = self._make_files() if self._make_files else self._files
         await ctx.respond(attachments=files, component=delete_row_from_authors(ctx.interaction.user.id))
 
 
 def paginator_with_to_file(
-    ctx: tanjun_abc.Context,
     paginator: yuyo.ComponentPaginator,
     /,
     *,
@@ -330,8 +328,6 @@ def paginator_with_to_file(
 
     Parameters
     ----------
-    ctx
-        The context to use.
     paginator
         The paginator to wrap.
     files
@@ -349,7 +345,7 @@ def paginator_with_to_file(
     (
         row.add_button(
             hikari.ButtonStyle.SECONDARY,
-            FileCallback(ctx, files=files, make_files=make_files, post_components=[paginator]),
+            FileCallback(files=files, make_files=make_files, post_components=[paginator]),
             emoji=constants.FILE_EMOJI,
         )
     )

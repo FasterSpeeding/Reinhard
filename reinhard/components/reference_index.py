@@ -664,7 +664,7 @@ class _IndexCommand:
         )
 
         executor = utility.paginator_with_to_file(
-            ctx, paginator, make_files=lambda: [hikari.Bytes("\n".join(uses), "results.txt")]
+            paginator, make_files=lambda: [hikari.Bytes("\n".join(uses), "results.txt")]
         )
 
         first_response = await paginator.get_next_entry()
