@@ -217,7 +217,7 @@ class FullConfig(Config):
     hot_reload: bool = False
 
     @classmethod
-    def from_env(cls) -> FullConfig:
+    def from_env(cls) -> Self:
         dotenv.load_dotenv()
 
         return cls(

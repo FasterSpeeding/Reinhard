@@ -61,6 +61,9 @@ from tanjun.annotations import Str
 from .. import config as config_
 from .. import utility
 
+if typing.TYPE_CHECKING:
+    from typing_extensions import Self
+
 YOUTUBE_TYPES = {
     "youtube#video": ("videoId", "https://youtube.com/watch?v="),
     "youtube#channel": ("channelId", "https://www.youtube.com/channel/"),
@@ -74,21 +77,24 @@ SPOTIFY_RESOURCE_TYPES = ("track", "album", "artist", "playlist")
 
 
 class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType]]):
-    __slots__ = ("_session", "_buffer", "_next_page_token", "_parameters")
+    __slots__ = ("_author", "_session", "_buffer", "_next_page_token", "_parameters")
 
-    def __init__(self, session: aiohttp.ClientSession, parameters: dict[str, str | int]) -> None:
+    def __init__(
+        self, author: hikari.Snowflakeish, session: aiohttp.ClientSession, parameters: dict[str, str | int]
+    ) -> None:
+        self._author = author
         self._session = session
         self._buffer: list[dict[str, typing.Any]] = []
         self._next_page_token: str | None = ""
         self._parameters = parameters
 
-    def __aiter__(self) -> YoutubePaginator:
+    def __aiter__(self) -> Self:
         return self
 
     async def __anext__(self) -> tuple[str, hikari.UndefinedType]:
         if not self._next_page_token and self._next_page_token is not None:
             retry = yuyo.Backoff(max_retries=5)
-            error_manager = utility.AIOHTTPStatusHandler(retry, break_on=(404,))
+            error_manager = utility.AIOHTTPStatusHandler(self._author, retry, break_on=(404,))
 
             parameters = self._parameters.copy()
             parameters["pageToken"] = self._next_page_token
@@ -128,23 +134,25 @@ class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
 
 
 class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType]]):
-    __slots__ = ("_acquire_authorization", "_session", "_buffer", "_offset", "_parameters")
+    __slots__ = ("_acquire_authorization", "_author", "_session", "_buffer", "_offset", "_parameters")
 
     _limit: typing.Final[int] = 50
 
     def __init__(
         self,
+        author: hikari.Snowflakeish,
         acquire_authorization: collections.Callable[[aiohttp.ClientSession], collections.Awaitable[str]],
         session: aiohttp.ClientSession,
         parameters: dict[str, str | int],
     ) -> None:
         self._acquire_authorization = acquire_authorization
+        self._author = author
         self._session = session
         self._buffer: list[dict[str, typing.Any]] = []
         self._offset: int | None = 0
         self._parameters = parameters
 
-    def __aiter__(self) -> SpotifyPaginator:
+    def __aiter__(self) -> Self:
         return self
 
     async def __anext__(self) -> tuple[str, hikari.UndefinedType]:
@@ -152,7 +160,9 @@ class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
             retry = yuyo.Backoff(max_retries=5)
             resource_type = self._parameters["type"]
             assert isinstance(resource_type, str)
-            error_manager = utility.AIOHTTPStatusHandler(retry, on_404=utility.raise_error(None, StopAsyncIteration))
+            error_manager = utility.AIOHTTPStatusHandler(
+                self._author, retry, on_404=utility.raise_error(None, StopAsyncIteration)
+            )
             parameters = self._parameters.copy()
             parameters["offset"] = self._offset
             self._offset += self._limit
@@ -168,7 +178,9 @@ class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
                     break
 
             else:
-                raise tanjun.CommandError(f"Couldn't fetch {resource_type} in time") from None
+                raise tanjun.CommandError(
+                    f"Couldn't fetch {resource_type} in time", component=utility.delete_row_from_authors(self._author)
+                ) from None
 
             try:
                 data = await response.json()
@@ -263,8 +275,7 @@ async def youtube(
             safe_search = not channel_is_nsfw
 
         elif not safe_search and not channel_is_nsfw:
-            # TODO: delete row
-            raise tanjun.CommandError("Cannot disable safe search in a sfw channel")
+            raise tanjun.CommandError("Cannot disable safe search in a sfw channel", component=utility.delete_row(ctx))
 
     parameters: dict[str, str | int] = {
         "key": tokens.google,
@@ -282,12 +293,12 @@ async def youtube(
     if language is not None:
         parameters["relevanceLanguage"] = language
 
-    paginator = utility.make_paginator(YoutubePaginator(session, parameters), author=ctx.author)
+    paginator = utility.make_paginator(YoutubePaginator(ctx.author.id, session, parameters), author=ctx.author)
     try:
         first_response = await paginator.get_next_entry()
 
     except RuntimeError as exc:
-        raise tanjun.CommandError(str(exc)) from None  # TODO: delete row
+        raise tanjun.CommandError(str(exc), component=utility.delete_row(ctx)) from None
 
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError) as exc:
         _LOGGER.exception("Youtube returned invalid data", exc_info=exc)
@@ -298,7 +309,7 @@ async def youtube(
         if not first_response:
             # data["pageInfo"]["totalResults"] will not reliably be `0` when no data is returned and they don't use 404
             # for that so we'll just check to see if nothing is being returned.
-            raise tanjun.CommandError(f"Couldn't find `{query}`.")  # TODO: delete row
+            raise tanjun.CommandError(f"Couldn't find `{query}`.", component=utility.delete_row(ctx))
 
         message = await ctx.respond(**first_response.to_kwargs(), component=paginator, ensure_result=True)
         component_client.set_executor(message, paginator)
@@ -318,7 +329,9 @@ async def moe_command(
 
     retry = yuyo.Backoff(max_retries=5)
     error_manager = utility.AIOHTTPStatusHandler(
-        retry, on_404=f"Couldn't find source `{source[:1970]}`" if source is not None else "couldn't access api"
+        ctx.author.id,
+        retry,
+        on_404=f"Couldn't find source `{source[:1970]}`" if source is not None else "couldn't access api",
     )
     async for _ in retry:
         with error_manager:
@@ -327,7 +340,7 @@ async def moe_command(
             break
 
     else:
-        raise tanjun.CommandError("Couldn't get an image in time") from None  # TODO: delete row
+        raise tanjun.CommandError("Couldn't get an image in time", component=utility.delete_row(ctx)) from None
 
     try:
         data = (await response.json())["data"]
@@ -340,7 +353,9 @@ async def moe_command(
     )
 
 
-async def query_nekos_life(endpoint: str, response_key: str, session: alluka.Injected[aiohttp.ClientSession]) -> str:
+async def query_nekos_life(
+    ctx: tanjun.abc.Context, endpoint: str, response_key: str, session: alluka.Injected[aiohttp.ClientSession]
+) -> str:
     # TODO: retries
     response = await session.get(url="https://nekos.life/api/v2" + endpoint)
 
@@ -361,28 +376,32 @@ async def query_nekos_life(endpoint: str, response_key: str, session: alluka.Inj
         status_code = response.status
 
     if status_code == 404:
-        raise tanjun.CommandError("Query not found.") from None  # TODO: delete row
+        raise tanjun.CommandError("Query not found.", component=utility.delete_row(ctx)) from None
 
     if status_code >= 500 or data is None or response_key not in data:
         raise tanjun.CommandError(
-            "Unable to fetch image at the moment due to server error or malformed response."
-        ) from None  # TODO: delete row
+            "Unable to fetch image at the moment due to server error or malformed response.",
+            component=utility.delete_row(ctx),
+        ) from None
 
     if status_code >= 300:
-        # TODO: delete row
-        raise tanjun.CommandError(f"Unable to fetch image due to unexpected error {status_code}") from None
+        raise tanjun.CommandError(
+            f"Unable to fetch image due to unexpected error {status_code}", component=utility.delete_row(ctx)
+        ) from None
 
     result = data[response_key]
     assert isinstance(result, str)
     return result
 
 
-def _build_spotify_auth(config: alluka.Injected[config_.Tokens]) -> utility.ClientCredentialsOauth2:
+def _build_spotify_auth(
+    config: alluka.Injected[config_.Tokens], ctx: alluka.Injected[tanjun.abc.Context]
+) -> utility.ClientCredentialsOauth2:
     if not config.spotify_id or not config.spotify_secret:
         raise tanjun.MissingDependencyError("Missing spotify secret and/or client id", None)
 
     return utility.ClientCredentialsOauth2(
-        "https://accounts.spotify.com/api/token", config.spotify_id, config.spotify_secret
+        ctx.author.id, "https://accounts.spotify.com/api/token", config.spotify_id, config.spotify_secret
     )
 
 
@@ -415,7 +434,9 @@ async def spotify(
         Type of resource to search for. Defaults to track.
     """
     paginator = utility.make_paginator(
-        SpotifyPaginator(spotify_auth.acquire_token, session, {"query": query, "type": resource_type.value}),
+        SpotifyPaginator(
+            ctx.author.id, spotify_auth.acquire_token, session, {"query": query, "type": resource_type.value}
+        ),
         author=ctx.author,
     )
 
@@ -423,7 +444,7 @@ async def spotify(
         first_response = await paginator.get_next_entry()
 
     except RuntimeError as exc:
-        raise tanjun.CommandError(str(exc)) from None  # TODO: delete row
+        raise tanjun.CommandError(str(exc), component=utility.delete_row(ctx)) from None
 
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError) as exc:
         _LOGGER.exception("Spotify returned invalid data", exc_info=exc)
@@ -432,7 +453,9 @@ async def spotify(
 
     else:
         if not first_response:
-            raise tanjun.CommandError(f"Couldn't find {resource_type.value}") from None  # TODO: delete row
+            raise tanjun.CommandError(
+                f"Couldn't find {resource_type.value}", component=utility.delete_row(ctx)
+            ) from None
 
         message = await ctx.respond(**first_response.to_kwargs(), component=paginator, ensure_result=True)
         component_client.set_executor(message, paginator)

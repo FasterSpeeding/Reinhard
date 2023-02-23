@@ -72,8 +72,7 @@ async def color(
         color = role.color
 
     elif color is None:
-        # TODO: delete row
-        raise tanjun.CommandError("Either role or color must be provided")
+        raise tanjun.CommandError("Either role or color must be provided", component=utility.delete_row(ctx))
 
     embed = (
         hikari.Embed(colour=color)
@@ -168,7 +167,7 @@ async def role(ctx: tanjun.abc.Context, role: Role) -> None:
         The role to get information about.
     """
     if role.guild_id != ctx.guild_id:
-        raise tanjun.CommandError("Role not found")
+        raise tanjun.CommandError("Role not found", component=utility.delete_row(ctx))
 
     permissions = utility.basic_name_grid(role.permissions) or "None"
     role_information = [f"Created: {tanjun.conversion.from_datetime(role.created_at)}", f"Position: {role.position}"]
@@ -267,7 +266,7 @@ async def mentions(
     try:
         message_ = await ctx.rest.fetch_message(channel_id, message)
     except hikari.NotFoundError:
-        raise tanjun.CommandError("Message not found") from None
+        raise tanjun.CommandError("Message not found", component=utility.delete_row(ctx)) from None
 
     mentions: str | None = None
     if message_.user_mentions:

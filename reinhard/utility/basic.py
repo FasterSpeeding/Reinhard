@@ -51,15 +51,13 @@ import enum
 import typing
 
 import hikari
+import tanjun
 import yuyo
-from tanjun import errors
 
 from . import constants
 
 if typing.TYPE_CHECKING:
     from collections import abc as collections
-
-    from tanjun import abc as tanjun_abc
 
     _ValueT = typing.TypeVar("_ValueT")
 
@@ -126,7 +124,7 @@ class _ErrorRaiserT(typing.Protocol):
 
 
 def raise_error(
-    message: str | None, /, error_type: type[BaseException] = errors.CommandError
+    message: str | None, /, error_type: type[BaseException] = tanjun.CommandError
 ) -> _ErrorRaiserT:  # TODO: better typing for the callable return
     def raise_command_error_(_: typing.Any = None) -> typing.NoReturn:
         if message:
@@ -200,7 +198,7 @@ def make_paginator(
     *,
     author: typing.Optional[hikari.SnowflakeishOr[hikari.User]] = None,
     ephemeral_default: bool = False,
-    timeout: datetime.timedelta = datetime.timedelta(seconds=30),
+    timeout: typing.Optional[datetime.timedelta] = datetime.timedelta(seconds=30),
     full: bool = False,
 ) -> yuyo.ComponentPaginator:
     authors = [author] if author else []
@@ -226,7 +224,9 @@ def _make_delete_id(*authors: hikari.SnowflakeishOr[hikari.User]) -> str:
     return DELETE_CUSTOM_ID + ",".join(str(int(author)) for author in authors)
 
 
-def delete_row(ctx: tanjun_abc.Context, /) -> hikari.impl.MessageActionRowBuilder:
+def delete_row(
+    ctx: typing.Union[tanjun.abc.Context, tanjun.abc.AutocompleteContext], /
+) -> hikari.impl.MessageActionRowBuilder:
     """Make an action row builder with a delete button from a context.
 
     Parameters

@@ -134,7 +134,9 @@ class DocIndex:
         """
         return self._autocomplete_refs.get(path)
 
-    def search(self, search_path: str, /) -> collections.Iterator[DocEntry]:
+    def search(
+        self, ctx: typing.Union[tanjun.abc.Context, tanjun.abc.AutocompleteContext], search_path: str, /
+    ) -> collections.Iterator[DocEntry]:
         """Search the index for an entry.
 
         Parameters
@@ -155,7 +157,7 @@ class DocIndex:
             )
         except lunr.exceptions.QueryParseError as exc:  # type: ignore
             reason: str = exc.args[0]  # pyright: ignore [ reportUnknownMemberType ]
-            raise tanjun.CommandError(f"Invalid query: `{reason}`") from None
+            raise tanjun.CommandError(f"Invalid query: `{reason}`", component=utility.delete_row(ctx)) from None
 
         return (self._data[entry["ref"]] for entry in results)
 
@@ -178,23 +180,20 @@ async def _docs_command(
 
     if kwargs["list"]:
         iterator = utility.embed_iterator(
-            utility.chunk((f"[{m.title}]({m.url})" for m in index.search(path)), 10),
+            utility.chunk((f"[{m.title}]({m.url})" for m in index.search(ctx, path)), 10),
             lambda entries: "\n".join(entries),
             title=f"{index.name} Documentation",
             url=index.docs_url,
         )
-        # TODO: switch to passing None for `timeout`
-        paginator = utility.make_paginator(
-            iterator, author=None if public else ctx.author, timeout=datetime.timedelta(days=99999), full=True
-        )
+        paginator = utility.make_paginator(iterator, author=None if public else ctx.author, timeout=None, full=True)
         executor = utility.paginator_with_to_file(
             paginator,
-            make_files=lambda: [hikari.Bytes("\n".join(m.title for m in index.search(str(path))), "results.txt")],
+            make_files=lambda: [hikari.Bytes("\n".join(m.title for m in index.search(ctx, str(path))), "results.txt")],
         )
         components = executor.rows
 
     else:
-        iterator = ((hikari.UNDEFINED, metadata.to_embed()) for metadata in index.search(path))
+        iterator = ((hikari.UNDEFINED, metadata.to_embed()) for metadata in index.search(ctx, path))
         executor = paginator = utility.make_paginator(iterator, author=None if public else ctx.author, full=True)
         components = executor.builder()
 
@@ -222,7 +221,7 @@ def make_autocomplete(get_index: collections.Callable[..., _CoroT[_DocIndexT]]) 
             # A hash of the location is used as the raw partial paths can easily get over 100 characters
             # (the value length limit).
             await ctx.set_choices(
-                {entry.title: entry.hashed_location for entry, _ in zip(index.search(value), range(25))}
+                {entry.title: entry.hashed_location for entry, _ in zip(index.search(ctx, value), range(25))}
             )
         except tanjun.CommandError:
             await ctx.set_choices()

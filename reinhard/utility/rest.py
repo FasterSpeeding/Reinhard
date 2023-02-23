@@ -42,15 +42,21 @@ import alluka
 import tanjun
 from yuyo import backoff
 
+from . import basic
+
+if typing.TYPE_CHECKING:
+    import hikari
+
 _ValueT = typing.TypeVar("_ValueT")
 _LOGGER = logging.getLogger("hikari.reinhard.rest_utility")
 
 
 class AIOHTTPStatusHandler(backoff.ErrorManager):
-    __slots__ = ("_backoff_handler", "_break_on", "_on_404")
+    __slots__ = ("_author", "_backoff_handler", "_break_on", "_on_404")
 
     def __init__(
         self,
+        author: hikari.Snowflakeish,
         backoff_handler: backoff.Backoff,
         /,
         *,
@@ -58,6 +64,7 @@ class AIOHTTPStatusHandler(backoff.ErrorManager):
         on_404: str | collections.Callable[[], None] | None = None,
     ) -> None:
         super().__init__()
+        self._author = author
         self._backoff_handler = backoff_handler
         self._break_on: collections.Set[int] = set()
         self._on_404: str | collections.Callable[[], None] | None = None
@@ -83,7 +90,7 @@ class AIOHTTPStatusHandler(backoff.ErrorManager):
 
         if self._on_404 is not None and exception.status == 404:
             if isinstance(self._on_404, str):
-                raise tanjun.CommandError(self._on_404) from None
+                raise tanjun.CommandError(self._on_404, component=basic.delete_row_from_authors(self._author)) from None
 
             else:
                 self._on_404()
@@ -123,9 +130,12 @@ class FetchedResource(typing.Generic[_ValueT]):
 
 
 class ClientCredentialsOauth2:
-    __slots__ = ("_authorization", "_expire_at", "_path", "_prefix", "_token")
+    __slots__ = ("_author", "_authorization", "_expire_at", "_path", "_prefix", "_token")
 
-    def __init__(self, path: str, client_id: str, client_secret: str, *, prefix: str = "Bearer ") -> None:
+    def __init__(
+        self, author: hikari.Snowflakeish, path: str, client_id: str, client_secret: str, *, prefix: str = "Bearer "
+    ) -> None:
+        self._author = author
         self._authorization = aiohttp.BasicAuth(client_id, client_secret)
         self._expire_at = 0
         self._path = path
@@ -165,4 +175,4 @@ class ClientCredentialsOauth2:
             _LOGGER.warning(
                 "Received %r from %s while trying to authenticate as client credentials", response.status, self._path
             )
-        raise tanjun.CommandError("Couldn't authenticate")
+        raise tanjun.CommandError("Couldn't authenticate", component=basic.delete_row_from_authors(self._author))

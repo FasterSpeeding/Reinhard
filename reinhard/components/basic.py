@@ -165,8 +165,7 @@ def cache_check(ctx: tanjun.abc.Context) -> bool:
     if ctx.cache:
         return True
 
-    # TODO: delete row
-    raise tanjun.CommandError("Client is cache-less")
+    raise tanjun.CommandError("Client is cache-less", component=utility.delete_row(ctx))
 
 
 @tanjun.with_check(cache_check, follow_wrapped=True)

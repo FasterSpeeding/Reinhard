@@ -49,6 +49,9 @@ from tanjun.annotations import Ranged
 
 from .. import utility
 
+if typing.TYPE_CHECKING:
+    from typing_extensions import Self
+
 MAX_MESSAGE_BULK_DELETE = datetime.timedelta(weeks=2) - datetime.timedelta(minutes=2)
 _MessageCommandT = typing.TypeVar("_MessageCommandT", bound=tanjun.MessageCommand[typing.Any])
 _SlashCommandT = typing.TypeVar("_SlashCommandT", bound=tanjun.SlashCommand[typing.Any])
@@ -67,16 +70,17 @@ def iter_messages(
     users: collections.Collection[hikari.Snowflake] | None,
 ) -> hikari.LazyIterator[hikari.Message]:
     if human_only and bot_only:
-        # TODO: delete row
-        raise tanjun.CommandError("Can only specify one of `human_only` or `user_only`")
+        raise tanjun.CommandError(
+            "Can only specify one of `human_only` or `user_only`", component=utility.delete_row(ctx)
+        )
 
     if count is None and after is None:
-        # TODO: delete row
-        raise tanjun.CommandError("Must specify `count` when `after` is not specified")
+        raise tanjun.CommandError(
+            "Must specify `count` when `after` is not specified", component=utility.delete_row(ctx)
+        )
 
     elif count is not None and count <= 0:
-        # TODO: delete row
-        raise tanjun.CommandError("Count must be greater than 0.")
+        raise tanjun.CommandError("Count must be greater than 0.", component=utility.delete_row(ctx))
 
     if before is None and after is None:
         before = hikari.Snowflake.from_datetime(ctx.created_at)
@@ -108,8 +112,7 @@ def iter_messages(
 
     if users is not None:
         if not users:
-            # TODO: delete row
-            raise tanjun.CommandError("Must specify at least one user.")
+            raise tanjun.CommandError("Must specify at least one user.", component=utility.delete_row(ctx))
 
         iterator = iterator.filter(lambda message: message.author.id in users)
 
@@ -197,8 +200,7 @@ async def clear_command(
     before_too_old = before and now - before.created_at >= MAX_MESSAGE_BULK_DELETE
 
     if after_too_old or before_too_old:
-        # TODO: delete row
-        raise tanjun.CommandError("Cannot delete messages that are over 14 days old")
+        raise tanjun.CommandError("Cannot delete messages that are over 14 days old", component=utility.delete_row(ctx))
 
     iterator = (
         iter_messages(ctx, after=after, before=before, **kwargs)
@@ -255,7 +257,7 @@ class _MultiBanner:
     @classmethod
     async def build(
         cls, ctx: tanjun.abc.Context, reason: str, delete_message_days: int, members_only: bool
-    ) -> _MultiBanner:
+    ) -> Self:
         assert ctx.member is not None
 
         guild = ctx.get_guild() or await ctx.fetch_guild()
@@ -265,8 +267,7 @@ class _MultiBanner:
         if not ctx.member.role_ids and not is_owner:
             # If they have no role and aren't the guild owner then the role
             # hierarchy would never let them ban anyone.
-            # TODO: delete row
-            raise tanjun.CommandError("You cannot ban any of these members")
+            raise tanjun.CommandError("You cannot ban any of these members", component=utility.delete_row(ctx))
 
         if is_owner:
             # If the author is the owner then we don't actually check the role

@@ -34,7 +34,6 @@ from __future__ import annotations
 __slots__: list[str] = ["load_reference"]
 
 import dataclasses
-import datetime
 import importlib.metadata
 import inspect
 import logging
@@ -639,14 +638,16 @@ class _IndexCommand:
     ) -> None:
         if absolute:
             if not (result := self.index.get_references(path)):
-                raise tanjun.CommandError(f"No references found for the absolute path `{path}`")
+                raise tanjun.CommandError(
+                    f"No references found for the absolute path `{path}`", component=utility.delete_row(ctx)
+                )
 
             full_path = path
             uses = result
 
         else:
             if not (result := self.index.search(path)):
-                raise tanjun.CommandError(f"No references found for `{path}`")
+                raise tanjun.CommandError(f"No references found for `{path}`", component=utility.delete_row(ctx))
 
             full_path, uses = result
 
@@ -656,12 +657,7 @@ class _IndexCommand:
             title=f"{len(uses)} references found for {full_path}",
             cast_embed=lambda e: e.set_footer(text=self.library_repr),
         )
-        paginator = utility.make_paginator(
-            iterator,
-            author=None if public else ctx.author,
-            timeout=datetime.timedelta(days=99999),  # TODO: switch to passing None here
-            full=True,
-        )
+        paginator = utility.make_paginator(iterator, author=None if public else ctx.author, timeout=None, full=True)
 
         executor = utility.paginator_with_to_file(
             paginator, make_files=lambda: [hikari.Bytes("\n".join(uses), "results.txt")]

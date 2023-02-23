@@ -35,7 +35,6 @@ __all__: list[str] = ["load_sudo"]
 import ast
 import asyncio
 import contextlib
-import datetime
 import inspect
 import io
 import json
@@ -179,7 +178,7 @@ async def eval_command(
     assert ctx.message.content is not None  # This shouldn't ever be the case in a command client.
     code = re.findall(r"```(?:[\w]*\n?)([\s\S(^\\`{3})]*?)\n*```", ctx.message.content)
     if not code:
-        raise tanjun.CommandError("Expected a python code block.")
+        raise tanjun.CommandError("Expected a python code block.", component=utility.delete_row(ctx))
 
     if suppress_response:
         await eval_python_code_no_capture(ctx, component, "<string>", code[0])
@@ -210,12 +209,7 @@ async def eval_command(
         )
         for page, text in enumerate(string_paginator)
     )
-    paginator = utility.make_paginator(
-        embed_generator,
-        author=ctx.author,
-        timeout=datetime.timedelta(days=99999),  # TODO: switch to passing None here
-        full=True,
-    )
+    paginator = utility.make_paginator(embed_generator, author=ctx.author, timeout=None, full=True)
     first_response = await paginator.get_next_entry()
     executor = utility.paginator_with_to_file(
         paginator, make_files=lambda: [_bytes_from_io(stdout, "stdout.py"), _bytes_from_io(stderr, "stderr.py")]
