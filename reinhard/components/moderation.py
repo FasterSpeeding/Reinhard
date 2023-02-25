@@ -255,9 +255,7 @@ class _MultiBanner:
     failed: dict[hikari.Snowflake, str] = dataclasses.field(default_factory=dict)
 
     @classmethod
-    async def build(
-        cls, ctx: tanjun.abc.Context, reason: str, delete_message_days: int, members_only: bool
-    ) -> Self:
+    async def build(cls, ctx: tanjun.abc.Context, reason: str, delete_message_days: int, members_only: bool) -> Self:
         assert ctx.member is not None
 
         guild = ctx.get_guild() or await ctx.fetch_guild()
