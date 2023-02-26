@@ -103,7 +103,15 @@ def build_gateway_bot(*, config: config_.FullConfig | None = None) -> tuple[_Gat
             # Staging url = https://staging.discord.co/api/v8
         )
 
-    return bot, build_from_gateway_bot(bot, config=config)
+    client = _build(
+        tanjun.Client.from_gateway_bot(
+            bot,
+            mention_prefix=config.mention_prefix,
+            declare_global_commands=False if config.hot_reload else config.declare_global_commands,
+        ),
+        config,
+    )
+    return bot, client
 
 
 def build_rest_bot(*, config: config_.FullConfig | None = None) -> tuple[hikari.impl.RESTBot, tanjun.Client]:
@@ -123,7 +131,7 @@ def build_rest_bot(*, config: config_.FullConfig | None = None) -> tuple[hikari.
         config = config_.FullConfig.from_env()
 
     bot = hikari.impl.RESTBot(config.tokens.bot, hikari.TokenType.BOT)
-    return bot, build_from_rest_bot(bot, config=config)
+    return bot, _build_from_rest_bot(config, bot)
 
 
 def _build(client: tanjun.Client, config: config_.FullConfig) -> tanjun.Client:
@@ -172,37 +180,7 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> tanjun.Client:
     return client
 
 
-def build_from_gateway_bot(bot: _GatewayBotProto, /, *, config: config_.FullConfig | None = None) -> tanjun.Client:
-    """Build a Reinhard client from a gateway bot.
-
-    Parameters
-    ----------
-    bot
-        The gateway bot to use.
-    config
-        The configuration to use.
-
-    Returns
-    -------
-    tanjun.Client
-        The Reinhard client.
-    """
-    if config is None:
-        config = config_.FullConfig.from_env()
-
-    return _build(
-        tanjun.Client.from_gateway_bot(
-            bot,
-            mention_prefix=config.mention_prefix,
-            declare_global_commands=False if config.hot_reload else config.declare_global_commands,
-        ),
-        config,
-    )
-
-
-def build_from_rest_bot(
-    bot: hikari_traits.RESTBotAware, /, *, config: config_.FullConfig | None = None
-) -> tanjun.Client:
+def _build_from_rest_bot(config: config_.FullConfig, bot: hikari_traits.RESTBotAware, /) -> tanjun.Client:
     """Build a Reinhard client from a REST bot.
 
     Parameters
@@ -217,9 +195,6 @@ def build_from_rest_bot(
     tanjun.Client
         The Reinhard client.
     """
-    if config is None:
-        config = config_.FullConfig.from_env()
-
     return _build(
         tanjun.Client.from_rest_bot(
             bot,
@@ -272,5 +247,5 @@ def make_asgi_app(*, config: config_.FullConfig | None = None) -> yuyo.AsgiBot:
         config = config_.FullConfig.from_env()
 
     bot = yuyo.AsgiBot(config.tokens.bot, hikari.TokenType.BOT)
-    build_from_rest_bot(bot, config=config)
+    _build_from_rest_bot(config, bot)
     return bot
