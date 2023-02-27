@@ -31,6 +31,7 @@
 from __future__ import annotations
 
 import datetime
+import logging
 import pathlib
 import typing
 
@@ -46,8 +47,13 @@ from . import utility
 if typing.TYPE_CHECKING:
     from hikari import traits as hikari_traits
 
+    class _GatewayBotProto(
+        hikari.EventManagerAware, hikari.RESTAware, hikari.ShardAware, hikari.Runnable, typing.Protocol
+    ):
+        """Protocol of a cacheless Hikari Gateway bot."""
 
-def _rukari(config: config_.FullConfig | None) -> tuple[hikari.Runnable, tanjun.Client] | None:
+
+def _rukari(config: config_.FullConfig | None) -> _GatewayBotProto | None:
     try:
         import rukari  # type: ignore
 
@@ -65,38 +71,11 @@ def _rukari(config: config_.FullConfig | None) -> tuple[hikari.Runnable, tanjun.
     assert isinstance(bot, hikari.EventManagerAware)
     assert isinstance(bot, hikari.Runnable)
 
-    import logging
-
     logging.basicConfig(level=config.log_level or logging.INFO)
-
-    component_client = yuyo.ComponentClient(event_manager=bot.event_manager, event_managed=False).set_constant_id(
-        utility.DELETE_CUSTOM_ID, utility.delete_button_callback, prefix_match=True
-    )
-    modal_client = yuyo.modals.ModalClient.from_gateway_bot(bot, event_managed=False)
-    reaction_client = yuyo.ReactionClient(rest=bot.rest, event_manager=bot.event_manager, event_managed=False)
-    return bot, _build(
-        tanjun.Client(
-            bot.rest,
-            events=bot.event_manager,
-            shards=bot,
-            event_managed=True,
-            mention_prefix=config.mention_prefix,
-            declare_global_commands=False if config.hot_reload else config.declare_global_commands,
-        )
-        .add_client_callback(
-            tanjun.ClientCallbackNames.STARTING, component_client.open, modal_client.open, reaction_client.open
-        )
-        .add_client_callback(
-            tanjun.ClientCallbackNames.CLOSING, component_client.close, modal_client.close, reaction_client.close
-        )
-        .set_type_dependency(yuyo.ReactionClient, reaction_client)
-        .set_type_dependency(yuyo.ComponentClient, component_client)
-        .set_type_dependency(yuyo.modals.ModalClient, modal_client),
-        config,
-    )
+    return bot
 
 
-def build_gateway_bot(*, config: config_.FullConfig | None = None) -> tuple[hikari.Runnable, tanjun.Client]:
+def build_gateway_bot(*, config: config_.FullConfig | None = None) -> tuple[_GatewayBotProto, tanjun.Client]:
     """Build a gateway bot with a bound Reinhard client.
 
     Parameters
@@ -112,18 +91,27 @@ def build_gateway_bot(*, config: config_.FullConfig | None = None) -> tuple[hika
     if config is None:
         config = config_.FullConfig.from_env()
 
-    if result := _rukari(config):
-        return result
+    bot = _rukari(config)
 
-    print("Initiating with standard Hikari impl")  # noqa: T201
-    bot = hikari.GatewayBot(
-        config.tokens.bot,
-        logs=config.log_level,
-        intents=config.intents,
-        cache_settings=hikari.impl.CacheSettings(components=config.cache),
-        # Staging url = https://staging.discord.co/api/v8
+    if not bot:
+        print("Initiating with standard Hikari impl")  # noqa: T201
+        bot = hikari.GatewayBot(
+            config.tokens.bot,
+            logs=config.log_level,
+            intents=config.intents,
+            cache_settings=hikari.impl.CacheSettings(components=config.cache),
+            # Staging url = https://staging.discord.co/api/v8
+        )
+
+    client = _build(
+        tanjun.Client.from_gateway_bot(
+            bot,
+            mention_prefix=config.mention_prefix,
+            declare_global_commands=False if config.hot_reload else config.declare_global_commands,
+        ),
+        config,
     )
-    return bot, build_from_gateway_bot(bot, config=config)
+    return bot, client
 
 
 def build_rest_bot(*, config: config_.FullConfig | None = None) -> tuple[hikari.impl.RESTBot, tanjun.Client]:
@@ -143,7 +131,7 @@ def build_rest_bot(*, config: config_.FullConfig | None = None) -> tuple[hikari.
         config = config_.FullConfig.from_env()
 
     bot = hikari.impl.RESTBot(config.tokens.bot, hikari.TokenType.BOT)
-    return bot, build_from_rest_bot(bot, config=config)
+    return bot, _build_from_rest_bot(config, bot)
 
 
 def _build(client: tanjun.Client, config: config_.FullConfig) -> tanjun.Client:
@@ -182,56 +170,17 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> tanjun.Client:
     if config.owner_only:
         client.add_check(tanjun.checks.OwnerCheck())
 
+    if client.shards:
+        yuyo.ReactionClient.from_tanjun(client)
+
+    yuyo.ComponentClient.from_tanjun(client).set_constant_id(
+        utility.DELETE_CUSTOM_ID, utility.delete_button_callback, prefix_match=True
+    )
+    yuyo.ModalClient.from_tanjun(client)
     return client
 
 
-def build_from_gateway_bot(
-    bot: hikari_traits.GatewayBotAware, /, *, config: config_.FullConfig | None = None
-) -> tanjun.Client:
-    """Build a Reinhard client from a gateway bot.
-
-    Parameters
-    ----------
-    bot
-        The gateway bot to use.
-    config
-        The configuration to use.
-
-    Returns
-    -------
-    tanjun.Client
-        The Reinhard client.
-    """
-    if config is None:
-        config = config_.FullConfig.from_env()
-
-    component_client = yuyo.ComponentClient.from_gateway_bot(bot, event_managed=False).set_constant_id(
-        utility.DELETE_CUSTOM_ID, utility.delete_button_callback, prefix_match=True
-    )
-    modal_client = yuyo.modals.ModalClient.from_gateway_bot(bot, event_managed=False)
-    reaction_client = yuyo.ReactionClient.from_gateway_bot(bot, event_managed=False)
-    return _build(
-        tanjun.Client.from_gateway_bot(
-            bot,
-            mention_prefix=config.mention_prefix,
-            declare_global_commands=False if config.hot_reload else config.declare_global_commands,
-        )
-        .add_client_callback(
-            tanjun.ClientCallbackNames.STARTING, component_client.open, modal_client.open, reaction_client.open
-        )
-        .add_client_callback(
-            tanjun.ClientCallbackNames.CLOSING, component_client.close, modal_client.close, reaction_client.close
-        )
-        .set_type_dependency(yuyo.ReactionClient, reaction_client)
-        .set_type_dependency(yuyo.ComponentClient, component_client)
-        .set_type_dependency(yuyo.modals.ModalClient, modal_client),
-        config,
-    )
-
-
-def build_from_rest_bot(
-    bot: hikari_traits.RESTBotAware, /, *, config: config_.FullConfig | None = None
-) -> tanjun.Client:
+def _build_from_rest_bot(config: config_.FullConfig, bot: hikari_traits.RESTBotAware, /) -> tanjun.Client:
     """Build a Reinhard client from a REST bot.
 
     Parameters
@@ -246,23 +195,12 @@ def build_from_rest_bot(
     tanjun.Client
         The Reinhard client.
     """
-    if config is None:
-        config = config_.FullConfig.from_env()
-
-    component_client = yuyo.ComponentClient.from_rest_bot(bot).set_constant_id(
-        utility.DELETE_CUSTOM_ID, utility.delete_button_callback, prefix_match=True
-    )
-    modal_client = yuyo.modals.ModalClient.from_rest_bot(bot)
     return _build(
         tanjun.Client.from_rest_bot(
             bot,
             declare_global_commands=False if config.hot_reload else config.declare_global_commands,
             bot_managed=True,
-        )
-        .add_client_callback(tanjun.ClientCallbackNames.STARTING, component_client.open, modal_client.open)
-        .add_client_callback(tanjun.ClientCallbackNames.CLOSING, component_client.close, modal_client.close)
-        .set_type_dependency(yuyo.ComponentClient, component_client)
-        .set_type_dependency(yuyo.modals.ModalClient, modal_client),
+        ),
         config,
     )
 
@@ -309,5 +247,5 @@ def make_asgi_app(*, config: config_.FullConfig | None = None) -> yuyo.AsgiBot:
         config = config_.FullConfig.from_env()
 
     bot = yuyo.AsgiBot(config.tokens.bot, hikari.TokenType.BOT)
-    build_from_rest_bot(bot, config=config)
+    _build_from_rest_bot(config, bot)
     return bot
