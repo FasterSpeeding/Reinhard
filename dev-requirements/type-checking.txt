@@ -986,9 +986,9 @@ six==1.16.0 ; python_version >= "3.10" and python_version < "3.12" \
 soupsieve==2.4 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:49e5368c2cda80ee7e84da9dbe3e110b70a4575f196efb74e51b94549d921955 \
     --hash=sha256:e28dba9ca6c7c00173e34e4ba57448f0688bb681b7c5e8bf4971daafc093d69a
-tanchan==0.2.2 ; python_version >= "3.10" and python_version < "3.12" \
-    --hash=sha256:552895a28ba2deea374fe08cf0d3157003aa807246bfc826597dae3911b14482 \
-    --hash=sha256:5c6eb45eba1645d0393e0925e962b2d06096c4f7f9ef2dda549e3166bf9ef139
+tanchan==0.2.2.post0 ; python_version >= "3.10" and python_version < "3.12" \
+    --hash=sha256:12929321e4c4a303936cb664f522906fa4dc3704671205c91cef0007f9febb50 \
+    --hash=sha256:c130f702fd24fbe046567dcc1c093bd58525f16ef51c09b71d31f9a0bfa3ee4f
 tomli==2.0.1 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:939de3e7a6161af0c887ef91b7d41a53e7c5a1ca976325f429cb46ea9bc30ecc \
     --hash=sha256:de526c12914f0c550d15924c62d72abc48d6fe7364aa87328337a31007fe8a4f
