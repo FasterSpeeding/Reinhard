@@ -835,9 +835,9 @@ six==1.16.0 ; python_version >= "3.10" and python_version < "3.12" \
 soupsieve==2.4 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:49e5368c2cda80ee7e84da9dbe3e110b70a4575f196efb74e51b94549d921955 \
     --hash=sha256:e28dba9ca6c7c00173e34e4ba57448f0688bb681b7c5e8bf4971daafc093d69a
-tanchan==0.2.1 ; python_version >= "3.10" and python_version < "3.12" \
-    --hash=sha256:1f8ac6bdf62e87964125f05b23e95e309fd6ced3a97a5d04f31585403d4e35e3 \
-    --hash=sha256:5a8fcd5c9bf4989bea48969ec568ba81521e4c22c6e138889f9e03fc1c920d67
+tanchan==0.2.2 ; python_version >= "3.10" and python_version < "3.12" \
+    --hash=sha256:552895a28ba2deea374fe08cf0d3157003aa807246bfc826597dae3911b14482 \
+    --hash=sha256:5c6eb45eba1645d0393e0925e962b2d06096c4f7f9ef2dda549e3166bf9ef139
 typing-extensions==4.5.0 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:5cb5f4a79139d699607b3ef622a1dedafa84e115ab0024e0d9c044a9479ca7cb \
     --hash=sha256:fb33085c39dd998ac16d1431ebc293a8b3eedd00fd4a32de0ff79002c19511b4
