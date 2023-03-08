@@ -331,7 +331,7 @@ class _MultiBanner:
                 return
 
         try:
-            await self.guild.ban(target, reason=self.reason, delete_message_days=self.delete_message_days)
+            await self.guild.ban(target, reason=self.reason, delete_message_seconds=datetime.timedelta(days=self.delete_message_days))
 
         except Exception as exc:
             self.failed[target] = str(exc)
