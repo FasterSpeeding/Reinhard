@@ -29,7 +29,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """Commands used to search Tanjun's docs."""
-from __future__ import annotations as _
+from __future__ import annotations
 
 __all__: list[str] = ["load_docs"]
 
