@@ -57,7 +57,7 @@ from .. import utility
 @tanjun.as_message_command("color", "colour")
 @doc_parse.as_slash_command()
 async def color(
-    ctx: tanjun.abc.Context, color: Annotated[Color | None, Flag(aliases=("-r",))] = None, role: Role | None = None
+    ctx: tanjun.abc.Context, color: Annotated[Color | None, Flag(aliases=["-r"])] = None, role: Role | None = None
 ) -> None:
     """Get a visual representation of a color or role's color.
 
@@ -251,7 +251,7 @@ async def avatar(ctx: tanjun.abc.Context, user: User | None = None) -> None:
 async def mentions(
     ctx: tanjun.abc.Context,
     message: Snowflake,
-    channel: Annotated[SnowflakeOr[Channel | None], Flag(aliases=("-c",))] = None,
+    channel: Annotated[SnowflakeOr[Channel | None], Flag(aliases=["-c"])] = None,
 ) -> None:
     """Get a list of the users who were pinged by a message.
 
@@ -319,7 +319,7 @@ def _format_char_line(char: str, to_file: bool) -> str:
 async def char(
     ctx: tanjun.abc.Context,
     characters: Greedy[Str],
-    file: Annotated[Bool, Flag(aliases=("-f",), empty_value=True)] = False,
+    file: Annotated[Bool, Flag(aliases=["-f"], empty_value=True)] = False,
 ) -> None:
     """Get information about the UTF-8 characters in the executing message.
 
