@@ -46,6 +46,7 @@ import lunr  # type: ignore
 import lunr.exceptions  # type: ignore
 import lunr.index  # type: ignore
 import tanjun as tanjun
+import typing_extensions
 import yuyo as yuyo
 from tanchan import doc_parse
 from tanjun.annotations import Bool
@@ -263,7 +264,7 @@ def sake_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
     index: Annotated[DocIndex, alluka.inject(callback=sake_index)],
-    **kwargs: typing.Unpack[_DocsOptions],
+    **kwargs: typing_extensions.Unpack[_DocsOptions],
 ) -> _CoroT[None]:
     """Search Sake's documentation."""
     return _docs_command(ctx, component_client, index, **kwargs)
@@ -284,7 +285,7 @@ def tanjun_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
     index: Annotated[DocIndex, alluka.inject(callback=tanjun_index)],
-    **kwargs: typing.Unpack[_DocsOptions],
+    **kwargs: typing_extensions.Unpack[_DocsOptions],
 ) -> _CoroT[None]:
     """Search Tanjun's documentation."""
     return _docs_command(ctx, component_client, index, **kwargs)
@@ -305,7 +306,7 @@ def yuyo_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
     index: Annotated[DocIndex, alluka.inject(callback=yuyo_index)],
-    **kwargs: typing.Unpack[_DocsOptions],
+    **kwargs: typing_extensions.Unpack[_DocsOptions],
 ) -> _CoroT[None]:
     """Search Yuyo's documentation."""
     return _docs_command(ctx, component_client, index, **kwargs)

@@ -42,6 +42,7 @@ from typing import Annotated
 
 import hikari
 import tanjun
+import typing_extensions
 from tanchan import doc_parse
 from tanjun.annotations import Bool
 from tanjun.annotations import Converted
@@ -182,7 +183,7 @@ _CLEAR_PERMS = (
 async def clear(
     ctx: tanjun.abc.Context,
     users: collections.Collection[hikari.Snowflake] | None,
-    **kwargs: typing.Unpack[_IterMessageOptions],
+    **kwargs: typing_extensions.Unpack[_IterMessageOptions],
 ) -> None:
     """Clear new messages from chat as a moderator.
 
@@ -404,7 +405,7 @@ async def ban_authors_command(
     ctx: tanjun.abc.Context,
     clear_message_days: Annotated[Ranged[0, 7], Flag(aliases=["-c"])] = 0,
     members_only: Annotated[Bool, Flag(empty_value=True, aliases=["-m"])] = False,
-    **kwargs: typing.Unpack[_IterMessageOptions],
+    **kwargs: typing_extensions.Unpack[_IterMessageOptions],
 ) -> None:
     """Ban the authors of recent messages.
 
