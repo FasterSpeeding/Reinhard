@@ -45,9 +45,9 @@ import hikari
 import lunr  # type: ignore
 import lunr.exceptions  # type: ignore
 import lunr.index  # type: ignore
-import tanjun as tanjun
+import tanjun
 import typing_extensions
-import yuyo as yuyo
+import yuyo
 from tanchan import doc_parse
 from tanjun.annotations import Bool
 from tanjun.annotations import Flag
