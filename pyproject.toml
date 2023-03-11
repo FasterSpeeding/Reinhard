@@ -2,7 +2,7 @@
 include         = ".*py$"
 line-length     = 120
 skip-magic-trailing-comma = true
-target-version  = ["py311"]
+target-version  = ["py310"]
 
 [tool.flake8]
 count = true
@@ -40,10 +40,10 @@ codespell_ignore = "nd|swith"
 default_sessions = ["reformat", "verify-markup", "flake8", "spell-check", "type-check"]
 hide = ["build", "generate_docs", "publish", "slot-check", "test", "test_coverage", "test_publish", "verify_types"]
 top_level_targets = ["./noxfile.py", "./reinhard"]
-version_constraint = "3.11,<3.12"
+version_constraint = "3.10,<3.12"
 
 [tool.piped.github_actions."*"]
-default_py_ver = "3.11"
+default_py_ver = "3.10"
 
 [tool.piped.github_actions.freeze_for_pr]
 [tool.piped.github_actions.lint]
@@ -60,7 +60,7 @@ include = ["reinhard"]
 reportMissingImports = true
 reportMissingTypeStubs = true
 
-pythonVersion = "3.11"
+pythonVersion = "3.10"
 typeCheckingMode = "strict"
 reportIncompatibleMethodOverride = "warning"  # This relies on ordering for key-word only arguments which is annoying
                                            # than it's worth
