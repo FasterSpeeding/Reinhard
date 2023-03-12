@@ -94,7 +94,7 @@ class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
     async def __anext__(self) -> tuple[str, hikari.UndefinedType]:
         if not self._next_page_token and self._next_page_token is not None:
             retry = yuyo.Backoff(max_retries=5)
-            error_manager = utility.AIOHTTPStatusHandler(self._author, retry, break_on=(404,))
+            error_manager = utility.AIOHTTPStatusHandler(self._author, retry, break_on=[404])
 
             parameters = self._parameters.copy()
             parameters["pageToken"] = self._next_page_token
@@ -226,9 +226,9 @@ async def youtube(
     tokens: alluka.Injected[config_.Tokens],
     component_client: alluka.Injected[yuyo.ComponentClient],
     query: Greedy[Str],
-    resource_type: Annotated[Choices[YtResource], Name("type"), Flag(aliases=("-t",))] = YtResource.Video,
-    region: Annotated[Str | None, Flag(aliases=("-r",))] = None,
-    language: Annotated[Str | None, Flag(aliases=("-l",))] = None,
+    resource_type: Annotated[Choices[YtResource], Name("type"), Flag(aliases=["-t"])] = YtResource.Video,
+    region: Annotated[Str | None, Flag(aliases=["-r"])] = None,
+    language: Annotated[Str | None, Flag(aliases=["-l"])] = None,
     order: Choices[YtOrder] = YtOrder.Relevance,
     safe_search: Bool | None = None,
 ) -> None:
@@ -422,7 +422,7 @@ async def spotify(
     session: alluka.Injected[aiohttp.ClientSession],
     component_client: alluka.Injected[yuyo.ComponentClient],
     spotify_auth: Annotated[utility.ClientCredentialsOauth2, tanjun.cached_inject(_build_spotify_auth)],
-    resource_type: Annotated[Choices[SpotifyType], Name("type"), Flag(aliases=("-t",))] = SpotifyType.Track,
+    resource_type: Annotated[Choices[SpotifyType], Name("type"), Flag(aliases=["-t"])] = SpotifyType.Track,
 ) -> None:
     """Search for a resource on spotify.
 

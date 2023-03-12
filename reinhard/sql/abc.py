@@ -70,8 +70,6 @@ BotGuildBanFields = Literal["guild_id", "reason", "expires_at"]
 
 
 class SQLError(Exception):
-    __slots__: tuple[str, ...] = ("message",)
-
     def __init__(self, message: str, /) -> None:
         self.message = message
 
@@ -83,15 +81,15 @@ class SQLError(Exception):
 # TODO: Remove this as we shouldn't be expecting sql to raise anything other than field already exists errors
 # as validation should catch other stuff
 class DataError(SQLError):
-    __slots__: tuple[str, ...] = ()
+    ...
 
 
 class AlreadyExistsError(SQLError):
-    __slots__: tuple[str, ...] = ()
+    ...
 
 
 class DatabaseCollection(typing.Protocol[_FieldT_co, _ValueT_co]):
-    __slots__: tuple[str, ...] = ()
+    __slots__ = ()
 
     async def collect(self) -> collections.Collection[_ValueT_co]:
         raise NotImplementedError
@@ -122,14 +120,14 @@ class DatabaseCollection(typing.Protocol[_FieldT_co, _ValueT_co]):
 
 
 class DatabaseIterator(DatabaseCollection[_FieldT_co, _ValueT_co], typing.Protocol[_FieldT_co, _ValueT_co]):
-    __slots__: tuple[str, ...] = ()
+    __slots__ = ()
 
     def __await__(self) -> collections.Generator[typing.Any, None, collections.Iterable[_ValueT_co]]:
         raise NotImplementedError
 
 
 class FilteredClear(DatabaseCollection[_FieldT_co, _ValueT_co], typing.Protocol[_FieldT_co, _ValueT_co]):
-    __slots__: tuple[str, ...] = ()
+    __slots__ = ()
 
     def __await__(self) -> collections.Generator[typing.Any, None, int]:
         raise NotImplementedError

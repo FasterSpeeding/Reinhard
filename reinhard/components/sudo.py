@@ -168,8 +168,8 @@ async def eval_command(
     ctx: tanjun.abc.MessageContext,
     component: alluka.Injected[tanjun.abc.Component],
     component_client: alluka.Injected[yuyo.ComponentClient],
-    file_output: Annotated[Bool, Flag(empty_value=True, aliases=("-f", "--file-out", "--file"))] = False,
-    suppress_response: Annotated[Bool, Flag(empty_value=True, aliases=("-s", "--suppress"))] = False,
+    file_output: Annotated[Bool, Flag(empty_value=True, aliases=["-f", "--file-out", "--file"])] = False,
+    suppress_response: Annotated[Bool, Flag(empty_value=True, aliases=["-s", "--suppress"])] = False,
 ) -> None:
     """Dynamically evaluate a script in the bot's environment.
 

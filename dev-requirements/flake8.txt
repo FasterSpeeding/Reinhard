@@ -10,9 +10,9 @@ astor==0.8.1 ; python_version >= "3.10" and python_version < "3.12" \
 attrs==22.2.0 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:29e95c7f6778868dbd49170f98f8818f78f3dc5e0e37c0b1f474e3561b240836 \
     --hash=sha256:c9227bfc2f01993c03f68db37d1d15c9690188323c067c641f1a35ca58185f99
-bandit==1.7.4 ; python_version >= "3.10" and python_version < "3.12" \
-    --hash=sha256:2d63a8c573417bae338962d4b9b06fbc6080f74ecd955a092849e1e65c717bd2 \
-    --hash=sha256:412d3f259dab4077d0e7f0c11f50f650cc7d10db905d98f6520a95a18049658a
+bandit==1.7.5 ; python_version >= "3.10" and python_version < "3.12" \
+    --hash=sha256:75665181dc1e0096369112541a056c59d1c5f66f9bb74a8d686c3c362b83f549 \
+    --hash=sha256:bdfc739baa03b880c2d15d0431b31c658ffc348e907fe197e54e0389dd59e11e
 black==23.1.0 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:0052dba51dec07ed029ed61b18183942043e00008ec65d5028814afaab9a22fd \
     --hash=sha256:0680d4380db3719ebcfb2613f34e86c8e6d15ffeabcf8ec59355c5e7b85bb555 \
@@ -161,9 +161,9 @@ pbr==5.11.1 ; python_version >= "3.10" and python_version < "3.12" \
 pep8-naming==0.13.3 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:1705f046dfcd851378aac3be1cd1551c7c1e5ff363bacad707d43007877fa971 \
     --hash=sha256:1a86b8c71a03337c97181917e2b472f0f5e4ccb06844a0d6f0a33522549e7a80
-platformdirs==3.1.0 ; python_version >= "3.10" and python_version < "3.12" \
-    --hash=sha256:13b08a53ed71021350c9e300d4ea8668438fb0046ab3937ac9a29913a1a1350a \
-    --hash=sha256:accc3665857288317f32c7bebb5a8e482ba717b474f3fc1d18ca7f9214be0cef
+platformdirs==3.1.1 ; python_version >= "3.10" and python_version < "3.12" \
+    --hash=sha256:024996549ee88ec1a9aa99ff7f8fc819bb59e2c3477b410d90a16d32d6e707aa \
+    --hash=sha256:e5986afb596e4bb5bde29a79ac9061aa955b94fca2399b7aaac4090860920dd8
 pycodestyle==2.9.1 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:2c9607871d58c76354b697b42f5d57e1ada7d261c261efac224b664affdc5785 \
     --hash=sha256:d1735fc58b418fd7c5f658d28d943854f8a849b01a5d0a1e6f3f3fdd0166804b
