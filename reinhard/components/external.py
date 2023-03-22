@@ -504,24 +504,33 @@ async def ytdl_command(
     await ctx.respond(content=file_path)
 
 
-def _parse_hashes(data: typing.Any) -> list[str]:
+def _parse_hashes(data: typing.Any) -> set[str]:
     if isinstance(data := json.loads(data), list):
-        return typing.cast("list[str]", data)
+        return set(typing.cast("list[str]", data))
 
     raise ValueError("Got response of type {}, expected a list of strings", type(data))
 
 
-domain_hashes = tanjun.cached_inject(
-    utility.FetchedResource("https://cdn.discordapp.com/bad-domains/hashes.json", _parse_hashes),
-    expire_after=datetime.timedelta(hours=12),
-)
+async def _fetch_hashes(session: alluka.Injected[aiohttp.ClientSession]) -> set[str]:
+    # Original list.
+    response = await session.get("https://cdn.discordapp.com/bad-domains/hashes.json")
+    response.raise_for_status()
+    # Used by the client, longer list.
+    other_response = await session.get("https://cdn.discordapp.com/bad-domains/updated_hashes.json")
+    other_response.raise_for_status()
+    hashes = set(await response.json())
+    hashes.update(await other_response.json())
+    return hashes
+
+
+domain_hashes = tanjun.cached_inject(_fetch_hashes, expire_after=datetime.timedelta(hours=12))
 
 
 @doc_parse.with_annotated_args(follow_wrapped=True)
 @tanjun.as_message_command("check_domain", "check domain")
 @doc_parse.as_slash_command()
 async def check_domain(
-    ctx: tanjun.abc.Context, url: Converted[urllib.parse.urlparse], bad_domains: Annotated[list[str], domain_hashes]
+    ctx: tanjun.abc.Context, url: Converted[urllib.parse.urlparse], bad_domains: Annotated[set[str], domain_hashes]
 ) -> None:
     """Check whether a domain is on Discord's "bad" domain list.
 
@@ -530,9 +539,20 @@ async def check_domain(
     url
         The domain to check.
     """
-    domain = url.netloc or url.path
+    if url.netloc:
+        domain = url.netloc
+
+    else:
+        domain = url.path.split("/", 1)[0]
+
+    base_domain = ".".join(domain.rsplit(".", 2)[1:])
     domain_hash = hashlib.sha256(domain.encode("utf-8")).hexdigest()
-    if domain_hash in bad_domains:
+    if base_domain != domain:
+        base_domain_hash = hashlib.sha256(base_domain.encode("utf-8")).hexdigest()
+    else:
+        base_domain_hash = b"@"  # This will always return False as @ isn't a valid hex char
+
+    if domain_hash in bad_domains or base_domain_hash in bad_domains:
         await ctx.respond(
             content="\N{LARGE RED SQUARE} Domain is on the bad domains list.", component=utility.delete_row(ctx)
         )
