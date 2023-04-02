@@ -170,9 +170,7 @@ async def delete_button_callback(ctx: yuyo.ComponentContext, /) -> None:
         The context that triggered this delete.
     """
     # Filter is needed as "".split(",") will give [""] which is not a valid snowflake.
-    author_ids = set(
-        map(hikari.Snowflake, filter(None, ctx.interaction.custom_id.removeprefix(DELETE_CUSTOM_ID).split(",")))
-    )
+    author_ids = set(map(hikari.Snowflake, filter(None, ctx.id_metadata.split(","))))
     if (
         not author_ids  # no IDs == public
         or ctx.interaction.user.id in author_ids
@@ -216,12 +214,12 @@ def make_paginator(
     return paginator
 
 
-DELETE_CUSTOM_ID = "AUTHOR_DELETE_BUTTON:"
+DELETE_CUSTOM_ID = "AUTHOR_DELETE_BUTTON"
 """Prefix ID used for delete buttons."""
 
 
 def _make_delete_id(*authors: hikari.SnowflakeishOr[hikari.User]) -> str:
-    return DELETE_CUSTOM_ID + ",".join(str(int(author)) for author in authors)
+    return DELETE_CUSTOM_ID + ":" + ",".join(str(int(author)) for author in authors)
 
 
 def delete_row(
@@ -241,11 +239,8 @@ def delete_row(
     hikari.impl.ActionRowBuilder
         Action row builder with a delete button.
     """
-    return (
-        hikari.impl.MessageActionRowBuilder()
-        .add_button(hikari.ButtonStyle.DANGER, _make_delete_id(ctx.author))
-        .set_emoji(constants.DELETE_EMOJI)
-        .add_to_container()
+    return hikari.impl.MessageActionRowBuilder().add_interactive_button(
+        hikari.ButtonStyle.DANGER, _make_delete_id(ctx.author), emoji=constants.DELETE_EMOJI
     )
 
 
@@ -266,11 +261,8 @@ def delete_row_from_authors(*authors: hikari.Snowflakeish) -> hikari.impl.Messag
         Action row builder with a delete button.
     """
 
-    return (
-        hikari.impl.MessageActionRowBuilder()
-        .add_button(hikari.ButtonStyle.DANGER, _make_delete_id(*authors))
-        .set_emoji(constants.DELETE_EMOJI)
-        .add_to_container()
+    return hikari.impl.MessageActionRowBuilder().add_interactive_button(
+        hikari.ButtonStyle.DANGER, _make_delete_id(*authors), emoji=constants.DELETE_EMOJI
     )
 
 
@@ -341,12 +333,13 @@ def paginator_with_to_file(
     yuyo.MultiComponentExecutor
         Executor with both the paginator and to file button.
     """
-    row = yuyo.components.ActionColumnExecutor().add_row(paginator)  # TODO: add authors here
+    column = yuyo.components.ActionColumnExecutor()
+    paginator.add_to_column(column)  # pyright: ignore [ reportDeprecated ]
     (
-        row.add_button(
+        column.add_interative_button(
             hikari.ButtonStyle.SECONDARY,
             FileCallback(files=files, make_files=make_files, post_components=[paginator]),
             emoji=constants.FILE_EMOJI,
         )
     )
-    return row
+    return column

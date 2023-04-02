@@ -666,7 +666,7 @@ class _IndexCommand:
         first_response = await paginator.get_next_entry()
         assert first_response
         message = await ctx.respond(**first_response.to_kwargs(), components=executor.rows, ensure_result=True)
-        component_client.set_executor(message, executor)
+        component_client.register_executor(executor, message=message)
 
 
 @dataclasses.dataclass(eq=False, slots=True)

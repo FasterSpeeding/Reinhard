@@ -36,7 +36,6 @@ __all__: list[str] = ["load_external"]
 import datetime
 import enum
 import hashlib
-import json
 import logging
 import time
 import typing
@@ -312,7 +311,7 @@ async def youtube(
             raise tanjun.CommandError(f"Couldn't find `{query}`.", component=utility.delete_row(ctx))
 
         message = await ctx.respond(**first_response.to_kwargs(), component=paginator, ensure_result=True)
-        component_client.set_executor(message, paginator)
+        component_client.register_executor(paginator, message=message)
 
 
 # This API is currently dead (always returning 5xxs)
@@ -458,7 +457,7 @@ async def spotify(
             ) from None
 
         message = await ctx.respond(**first_response.to_kwargs(), component=paginator, ensure_result=True)
-        component_client.set_executor(message, paginator)
+        component_client.register_executor(paginator, message=message)
 
 
 @tanjun.annotations.with_annotated_args
@@ -502,13 +501,6 @@ async def ytdl_command(
         path.unlink(missing_ok=True)
 
     await ctx.respond(content=file_path)
-
-
-def _parse_hashes(data: typing.Any) -> set[str]:
-    if isinstance(data := json.loads(data), list):
-        return set(typing.cast("list[str]", data))
-
-    raise ValueError("Got response of type {}, expected a list of strings", type(data))
 
 
 async def _fetch_hashes(session: alluka.Injected[aiohttp.ClientSession]) -> set[str]:

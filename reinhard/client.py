@@ -173,8 +173,8 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> tanjun.Client:
     if client.shards:
         yuyo.ReactionClient.from_tanjun(client)
 
-    yuyo.ComponentClient.from_tanjun(client).set_constant_id(
-        utility.DELETE_CUSTOM_ID, utility.delete_button_callback, prefix_match=True
+    yuyo.ComponentClient.from_tanjun(client).register_executor(
+        yuyo.components.SingleExecutor(utility.DELETE_CUSTOM_ID, utility.delete_button_callback)
     )
     yuyo.ModalClient.from_tanjun(client)
     return client

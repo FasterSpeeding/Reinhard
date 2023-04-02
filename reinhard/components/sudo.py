@@ -217,7 +217,7 @@ async def eval_command(
 
     assert first_response is not None
     message = await ctx.respond(**first_response.to_kwargs(), components=executor.rows, ensure_result=True)
-    component_client.set_executor(message, executor)
+    component_client.register_executor(executor, message=message)
 
 
 load_sudo = (
