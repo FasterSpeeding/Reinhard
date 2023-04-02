@@ -174,7 +174,7 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> tanjun.Client:
         yuyo.ReactionClient.from_tanjun(client)
 
     yuyo.ComponentClient.from_tanjun(client).register_executor(
-        yuyo.components.SingleExecutor(utility.DELETE_CUSTOM_ID, utility.delete_button_callback)
+        yuyo.components.SingleExecutor(utility.DELETE_CUSTOM_ID, utility.delete_button_callback), timeout=None
     )
     yuyo.ModalClient.from_tanjun(client)
     return client
