@@ -203,7 +203,7 @@ async def _docs_command(
 
     if first_response := await paginator.get_next_entry():
         message = await ctx.respond(components=components, **first_response.to_kwargs(), ensure_result=True)
-        component_client.set_executor(message, executor)
+        component_client.register_executor(executor, message=message)
         return
 
     await ctx.respond("Entry not found", component=utility.delete_row(ctx))

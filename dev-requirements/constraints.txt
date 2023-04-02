@@ -601,15 +601,15 @@ hikari-sake==1.0.7 ; python_version >= "3.10" and python_version < "3.12" \
 hikari-tanjun==2.12.0 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:01c070aa8d7b68274a392f07c76ead722bbf88e988b2ef05f4953c7921894748 \
     --hash=sha256:7abda579eaacec5dde51cece01c462339f3181ee5ef990f346e2cabeee660bd4
-hikari-yuyo==1.10.1a1 ; python_version >= "3.10" and python_version < "3.12" \
-    --hash=sha256:9ca8967dae4811cee38be5462ff415e44e163a0c6f51624527f523070a912b64 \
-    --hash=sha256:a903e5d0a40659a500493671e1920a8cc0aa887e1a2ba9d8f80aa34fec442a61
-hikari==2.0.0.dev117 ; python_version >= "3.10" and python_version < "3.12" \
-    --hash=sha256:1d1828d1b16687badac1c882ac40d6ead2299c16ca7937065b8fced0fd4ef028 \
-    --hash=sha256:4f2c30d60ebbff37635a80ac788a2c9715ee6f2df626239180e96e65815d9958
-hikari==2.0.0.dev117 ; python_version >= "3.10" and python_version < "3.12" \
-    --hash=sha256:1d1828d1b16687badac1c882ac40d6ead2299c16ca7937065b8fced0fd4ef028 \
-    --hash=sha256:4f2c30d60ebbff37635a80ac788a2c9715ee6f2df626239180e96e65815d9958
+hikari-yuyo==1.11.0a1 ; python_version >= "3.10" and python_version < "3.12" \
+    --hash=sha256:162e47aa6ce50451e35ce9afad04a173ab22093d8f16f8c979cc5958acc37c4d \
+    --hash=sha256:ac64baada7e77758f8765d18134f79ad52f1962c543be4d346182bdecf9dbcf2
+hikari==2.0.0.dev118 ; python_version >= "3.10" and python_version < "3.12" \
+    --hash=sha256:56f442f73969eeaf7c1cddd96d4f0cd90d8e8100cd17b8f5f2758382d8a07442 \
+    --hash=sha256:e221fb70f9166764255c5331457d5aef51e091e89eecc5c6d408d85a4d3590e8
+hikari==2.0.0.dev118 ; python_version >= "3.10" and python_version < "3.12" \
+    --hash=sha256:56f442f73969eeaf7c1cddd96d4f0cd90d8e8100cd17b8f5f2758382d8a07442 \
+    --hash=sha256:e221fb70f9166764255c5331457d5aef51e091e89eecc5c6d408d85a4d3590e8
 idna==3.4 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:814f528e8dead7d329833b91c5faa87d60bf71824cd12a7530b5526063d02cb4 \
     --hash=sha256:90b77e79eaa3eba6de819a0c442c0b4ceefc341a7a2ab77d7562bf49f425c5c2
