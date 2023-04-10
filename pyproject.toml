@@ -5,7 +5,7 @@ skip-magic-trailing-comma = true
 target-version  = ["py310"]
 
 [tool.codespell]
-ignore = "nd"
+ignore-regex = "nd"
 
 [tool.flake8]
 count = true
