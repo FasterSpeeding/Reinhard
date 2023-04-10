@@ -336,7 +336,7 @@ def paginator_with_to_file(
     column = yuyo.components.ActionColumnExecutor()
     paginator.add_to_column(column)  # pyright: ignore [ reportDeprecated ]
     (
-        column.add_interative_button(
+        column.add_interactive_button(
             hikari.ButtonStyle.SECONDARY,
             FileCallback(files=files, make_files=make_files, post_components=[paginator]),
             emoji=constants.FILE_EMOJI,

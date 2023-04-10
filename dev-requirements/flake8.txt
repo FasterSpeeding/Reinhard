@@ -81,9 +81,9 @@ flake8-executable==2.1.3 ; python_version >= "3.10" and python_version < "3.12" 
 flake8-fixme==1.1.1 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:226a6f2ef916730899f29ac140bed5d4a17e5aba79f00a0e3ae1eff1997cb1ac \
     --hash=sha256:50cade07d27a4c30d4f12351478df87339e67640c83041b664724bda6d16f33a
-flake8-functions==0.0.7 ; python_version >= "3.10" and python_version < "3.12" \
-    --hash=sha256:40584b05d57e5ab185545bcfa08aa0edca52b04646d0df266e2b1667d6437184 \
-    --hash=sha256:f2f75545c2b0df9eeba0ad316e2ac38c101676970b4441300fc07af3226a44f6
+flake8-functions==0.0.8 ; python_version >= "3.10" and python_version < "3.12" \
+    --hash=sha256:5446626673a9faecbf389fb411b90bdc87b002c387b72dc097b208e7a58f2a1c \
+    --hash=sha256:e1a88aa634d1aff6973f8c9dd64f30ab2beaac661e52eea96929ccc7ee7f64df
 flake8-if-statements==1.0.0 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:4de1a05c6840ed7ca419a0de6038a343317fe327401a91c887cd8661730662c9 \
     --hash=sha256:7a247fab5f409e3f2c18c3d92e1f7a9a9d1a8e0cd3aa1d446a17097e16ecddab
@@ -170,9 +170,9 @@ pycodestyle==2.9.1 ; python_version >= "3.10" and python_version < "3.12" \
 pyflakes==2.5.0 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:4579f67d887f804e67edb544428f264b7b24f435b263c4614f384135cea553d2 \
     --hash=sha256:491feb020dca48ccc562a8c0cbe8df07ee13078df59813b83959cbdada312ea3
-pygments==2.14.0 ; python_version >= "3.10" and python_version < "3.12" \
-    --hash=sha256:b3ed06a9e8ac9a9aae5a6f5dbe78a8a58655d17b43b93c078f094ddc476ae297 \
-    --hash=sha256:fa7bd7bd2771287c0de303af8bfdfc731f51bd2c6a47ab69d117138893b82717
+pygments==2.15.0 ; python_version >= "3.10" and python_version < "3.12" \
+    --hash=sha256:77a3299119af881904cd5ecd1ac6a66214b6e9bed1f2db16993b54adede64094 \
+    --hash=sha256:f7e36cffc4c517fbc252861b9a6e4644ca0e5abadf9a113c72d1358ad09b9500
 pyproject-flake8==5.0.4.post1 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:457e52dde1b7a1f84b5230c70d61afa58ced64a44b81a609f19e972319fa68ed \
     --hash=sha256:c2dfdf1064f47efbb2e4faf1a32b0b6a6ea67dc4d1debb98d862b0cdee377941
