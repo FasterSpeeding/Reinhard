@@ -4,6 +4,9 @@ line-length     = 120
 skip-magic-trailing-comma = true
 target-version  = ["py310"]
 
+[tool.codespell]
+ignore = "nd"
+
 [tool.flake8]
 count = true
 max-complexity = 20
@@ -36,7 +39,6 @@ profile = "black"
 force_single_line = true
 
 [tool.piped]
-codespell_ignore = "nd|swith"
 default_sessions = ["reformat", "verify-markup", "flake8", "spell-check", "type-check"]
 hide = ["build", "generate_docs", "publish", "slot-check", "test", "test_coverage", "test_publish", "verify_types"]
 top_level_targets = ["./noxfile.py", "./reinhard"]
