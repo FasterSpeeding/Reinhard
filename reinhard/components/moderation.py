@@ -149,7 +149,7 @@ class _IterMessageOptions(typing.TypedDict, total=False):
     """
 
     count: Annotated[Int, Flag(aliases=["-c"])]
-    regex: Annotated[Converted[re.compile], Flag(aliases=["-r"])]
+    regex: Annotated[re.Pattern[str], Converted(re.compile), Flag(aliases=["-r"])]
     has_embeds: Bool
     has_attachments: Bool
     human_only: Bool
@@ -372,7 +372,7 @@ class _MultiBanner:
 async def multi_ban_command(
     ctx: tanjun.abc.SlashContext | tanjun.abc.MessageContext,
     users: collections.Collection[hikari.Snowflake],
-    clear_message_days: Annotated[Ranged[0, 7], Flag(aliases=["--clear", "-c"])] = 0,
+    clear_message_days: Annotated[Int, Ranged(0, 7), Flag(aliases=["--clear", "-c"])] = 0,
     members_only: Annotated[Bool, Flag(empty_value=True, aliases=["-m"])] = False,
 ) -> None:
     """Ban one or more members.
@@ -403,7 +403,7 @@ async def multi_ban_command(
 @ban_group.as_sub_command("authors")
 async def ban_authors_command(
     ctx: tanjun.abc.Context,
-    clear_message_days: Annotated[Ranged[0, 7], Flag(aliases=["-c"])] = 0,
+    clear_message_days: Annotated[Int, Ranged(0, 7), Flag(aliases=["-c"])] = 0,
     members_only: Annotated[Bool, Flag(empty_value=True, aliases=["-m"])] = False,
     **kwargs: typing_extensions.Unpack[_IterMessageOptions],
 ) -> None:

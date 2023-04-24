@@ -196,13 +196,10 @@ def make_paginator(
     *,
     author: typing.Optional[hikari.SnowflakeishOr[hikari.User]] = None,
     ephemeral_default: bool = False,
-    timeout: typing.Optional[datetime.timedelta] = datetime.timedelta(seconds=30),
     full: bool = False,
 ) -> yuyo.ComponentPaginator:
     authors = [author] if author else []
-    paginator = yuyo.ComponentPaginator(
-        iterator, authors=authors, triggers=[], ephemeral_default=ephemeral_default, timeout=timeout
-    )
+    paginator = yuyo.ComponentPaginator(iterator, authors=authors, triggers=[], ephemeral_default=ephemeral_default)
     if full:
         paginator.add_first_button()
 

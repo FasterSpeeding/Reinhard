@@ -354,7 +354,11 @@ class ReferenceIndex:
 
     def _recurse_module(
         self,
-        obj: types.MethodType | types.FunctionType | type[typing.Any] | classmethod[typing.Any] | property,
+        obj: types.MethodType
+        | types.FunctionType
+        | type[typing.Any]
+        | classmethod[typing.Any, typing.Any, typing.Any]
+        | property,
         /,
         *,
         path: str | None = None,
@@ -657,7 +661,7 @@ class _IndexCommand:
             title=f"{len(uses)} references found for {full_path}",
             cast_embed=lambda e: e.set_footer(text=self.library_repr),
         )
-        paginator = utility.make_paginator(iterator, author=None if public else ctx.author, timeout=None, full=True)
+        paginator = utility.make_paginator(iterator, author=None if public else ctx.author, full=True)
 
         executor = utility.paginator_with_to_file(
             paginator, make_files=lambda: [hikari.Bytes("\n".join(uses), "results.txt")]
