@@ -190,20 +190,18 @@ async def _docs_command(
             url=index.docs_url,
         )
         paginator = utility.make_paginator(iterator, author=None if public else ctx.author, full=True)
-        executor = utility.paginator_with_to_file(
+        utility.add_file_button(
             paginator,
             make_files=lambda: [hikari.Bytes("\n".join(m.title for m in index.search(ctx, str(path))), "results.txt")],
         )
-        components = executor.rows
 
     else:
         iterator = ((hikari.UNDEFINED, metadata.to_embed()) for metadata in index.search(ctx, path))
-        executor = paginator = utility.make_paginator(iterator, author=None if public else ctx.author, full=True)
-        components = executor.builder()
+        paginator = utility.make_paginator(iterator, author=None if public else ctx.author, full=True)
 
     if first_response := await paginator.get_next_entry():
-        message = await ctx.respond(components=components, **first_response.to_kwargs(), ensure_result=True)
-        component_client.register_executor(executor, message=message)
+        message = await ctx.respond(components=paginator.rows, **first_response.to_kwargs(), ensure_result=True)
+        component_client.register_executor(paginator, message=message)
         return
 
     await ctx.respond("Entry not found", component=utility.delete_row(ctx))

@@ -211,13 +211,13 @@ async def eval_command(
     )
     paginator = utility.make_paginator(embed_generator, author=ctx.author, full=True)
     first_response = await paginator.get_next_entry()
-    executor = utility.paginator_with_to_file(
+    utility.add_file_button(
         paginator, make_files=lambda: [_bytes_from_io(stdout, "stdout.py"), _bytes_from_io(stderr, "stderr.py")]
     )
 
     assert first_response is not None
-    message = await ctx.respond(**first_response.to_kwargs(), components=executor.rows, ensure_result=True)
-    component_client.register_executor(executor, message=message)
+    message = await ctx.respond(**first_response.to_kwargs(), components=paginator.rows, ensure_result=True)
+    component_client.register_executor(paginator, message=message)
 
 
 load_sudo = (

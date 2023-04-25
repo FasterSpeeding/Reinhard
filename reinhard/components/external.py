@@ -314,7 +314,7 @@ async def youtube(
             # for that so we'll just check to see if nothing is being returned.
             raise tanjun.CommandError(f"Couldn't find `{query}`.", component=utility.delete_row(ctx))
 
-        message = await ctx.respond(**first_response.to_kwargs(), component=paginator, ensure_result=True)
+        message = await ctx.respond(**first_response.to_kwargs(), components=paginator.rows, ensure_result=True)
         component_client.register_executor(paginator, message=message)
 
 
@@ -466,7 +466,7 @@ async def spotify(
                 f"Couldn't find {resource_type.value}", component=utility.delete_row(ctx)
             ) from None
 
-        message = await ctx.respond(**first_response.to_kwargs(), component=paginator, ensure_result=True)
+        message = await ctx.respond(**first_response.to_kwargs(), components=paginator.rows, ensure_result=True)
         component_client.register_executor(paginator, message=message)
 
 
