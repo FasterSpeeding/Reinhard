@@ -111,7 +111,7 @@ class DocIndex:
         self.docs_url = docs_url
         self._autocomplete_refs: dict[str, DocEntry] = {entry.hashed_location: entry for entry in self._data.values()}
         self.name = name
-        self._search_index: lunr.index.Index = lunr.lunr(  # pyright: ignore [ reportUnknownMemberType ]
+        self._search_index: lunr.index.Index = lunr.lunr(  # pyright: ignore[reportUnknownMemberType]
             "location", ("title", "location"), data
         )
 
@@ -156,14 +156,14 @@ class DocIndex:
             An iterator of the matching entries.
         """
         try:
-            results: list[dict[str, str]] = self._search_index.search(  # pyright: ignore [ reportUnknownMemberType ]
+            results: list[dict[str, str]] = self._search_index.search(  # pyright: ignore[reportUnknownVariableType]
                 search_path
             )
         except lunr.exceptions.QueryParseError as exc:  # type: ignore
-            reason: str = exc.args[0]  # pyright: ignore [ reportUnknownMemberType ]
+            reason: str = exc.args[0]  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             raise tanjun.CommandError(f"Invalid query: `{reason}`", component=utility.delete_row(ctx)) from None
 
-        return (self._data[entry["ref"]] for entry in results)
+        return (self._data[entry["ref"]] for entry in results)  # pyright: ignore[reportUnknownVariableType]
 
 
 async def _docs_command(

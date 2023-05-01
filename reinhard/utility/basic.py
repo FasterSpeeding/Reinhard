@@ -139,7 +139,7 @@ def basic_name_grid(flags: enum.IntFlag, /) -> str:  # TODO: actually deal with 
     names = [
         name
         for name, flag in type(flags).__members__.items()
-        if flag != 0 and (flag & flags) == flag  # pyright: ignore [reportUnnecessaryComparison]
+        if flag != 0 and (flag & flags) == flag  # pyright: ignore[reportUnnecessaryComparison]
     ]
     names.sort()
     if not names:
