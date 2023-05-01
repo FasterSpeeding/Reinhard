@@ -50,12 +50,10 @@ import tanjun
 import yuyo
 from tanchan import doc_parse
 from tanjun.annotations import Bool
-from tanjun.annotations import Choices
-from tanjun.annotations import Converted
 from tanjun.annotations import Flag
 from tanjun.annotations import Greedy
-from tanjun.annotations import Name
 from tanjun.annotations import Str
+from tanjun.annotations import str_field
 
 from .. import config as config_
 from .. import utility
@@ -128,7 +126,7 @@ class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
             if response_type := YOUTUBE_TYPES.get(page["id"]["kind"].lower()):
                 return f"{response_type[1]}{page['id'][response_type[0]]}", hikari.UNDEFINED
 
-        kind: str = page["id"]["kind"]  # pyright: ignore [ reportUnboundVariable ]
+        kind: str = page["id"]["kind"]  # pyright: ignore[reportUnboundVariable]
         raise RuntimeError(f"Got unexpected 'kind' from youtube {kind}")
 
 
@@ -224,11 +222,21 @@ async def youtube(
     session: alluka.Injected[aiohttp.ClientSession],
     tokens: alluka.Injected[config_.Tokens],
     component_client: alluka.Injected[yuyo.ComponentClient],
-    query: Greedy[Str],
-    resource_type: Annotated[Choices[YtResource], Name("type"), Flag(aliases=["-t"])] = YtResource.Video,
+    query: Annotated[Str, Greedy()],
+    resource_type: YtResource = str_field(
+        choices=YtResource.__members__,
+        converters=YtResource,  # pyright: ignore[reportGeneralTypeIssues]
+        slash_name="type",
+        message_names=["--type", "-t"],
+        default=YtResource.Video,
+    ),
     region: Annotated[Str | None, Flag(aliases=["-r"])] = None,
     language: Annotated[Str | None, Flag(aliases=["-l"])] = None,
-    order: Choices[YtOrder] = YtOrder.Relevance,
+    order: YtOrder = str_field(
+        choices=YtOrder.__members__,
+        converters=YtOrder,  # pyright: ignore[reportGeneralTypeIssues]
+        default=YtOrder.Relevance,
+    ),
     safe_search: Bool | None = None,
 ) -> None:
     """Search for a resource on youtube.
@@ -310,7 +318,7 @@ async def youtube(
             # for that so we'll just check to see if nothing is being returned.
             raise tanjun.CommandError(f"Couldn't find `{query}`.", component=utility.delete_row(ctx))
 
-        message = await ctx.respond(**first_response.to_kwargs(), component=paginator, ensure_result=True)
+        message = await ctx.respond(**first_response.to_kwargs(), components=paginator.rows, ensure_result=True)
         component_client.register_executor(paginator, message=message)
 
 
@@ -421,7 +429,13 @@ async def spotify(
     session: alluka.Injected[aiohttp.ClientSession],
     component_client: alluka.Injected[yuyo.ComponentClient],
     spotify_auth: Annotated[utility.ClientCredentialsOauth2, tanjun.cached_inject(_build_spotify_auth)],
-    resource_type: Annotated[Choices[SpotifyType], Name("type"), Flag(aliases=["-t"])] = SpotifyType.Track,
+    resource_type: SpotifyType = str_field(
+        converters=SpotifyType,  # pyright: ignore[reportGeneralTypeIssues]
+        choices=SpotifyType.__members__,
+        default=SpotifyType.Track,
+        message_names=["--type", "-t"],
+        slash_name="type",
+    ),
 ) -> None:
     """Search for a resource on spotify.
 
@@ -456,7 +470,7 @@ async def spotify(
                 f"Couldn't find {resource_type.value}", component=utility.delete_row(ctx)
             ) from None
 
-        message = await ctx.respond(**first_response.to_kwargs(), component=paginator, ensure_result=True)
+        message = await ctx.respond(**first_response.to_kwargs(), components=paginator.rows, ensure_result=True)
         component_client.register_executor(paginator, message=message)
 
 
@@ -465,7 +479,8 @@ async def spotify(
 @tanjun.as_message_command("ytdl")
 async def ytdl_command(
     ctx: tanjun.abc.Context,
-    url: Converted[tanjun.conversion.parse_url],
+    *,
+    url: urllib.parse.ParseResult = str_field(converters=tanjun.conversion.parse_url),
     session: alluka.Injected[aiohttp.ClientSession],
     config: alluka.Injected[config_.PTFConfig],
     ytdl_client: Annotated[utility.YoutubeDownloader, tanjun.cached_inject(utility.YoutubeDownloader.spawn)],
@@ -522,7 +537,10 @@ domain_hashes = tanjun.cached_inject(_fetch_hashes, expire_after=datetime.timede
 @tanjun.as_message_command("check_domain", "check domain")
 @doc_parse.as_slash_command()
 async def check_domain(
-    ctx: tanjun.abc.Context, url: Converted[urllib.parse.urlparse], bad_domains: Annotated[set[str], domain_hashes]
+    ctx: tanjun.abc.Context,
+    *,
+    url: urllib.parse.ParseResult = str_field(converters=tanjun.conversion.parse_url),
+    bad_domains: Annotated[set[str], domain_hashes],
 ) -> None:
     """Check whether a domain is on Discord's "bad" domain list.
 

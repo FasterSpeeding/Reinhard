@@ -64,11 +64,12 @@ def _rukari(config: config_.FullConfig | None) -> _GatewayBotProto | None:
     if config is None:
         config = config_.FullConfig.from_env()
 
-    bot: hikari.ShardAware = rukari.Bot(  # pyright: ignore [ reportUnknownMemberType ]
+    bot: hikari.ShardAware = rukari.Bot(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         config.tokens.bot, intents=config.intents
     )
-    assert isinstance(bot, hikari.RESTAware)
     assert isinstance(bot, hikari.EventManagerAware)
+    assert isinstance(bot, hikari.RESTAware)
+    assert isinstance(bot, hikari.ShardAware)
     assert isinstance(bot, hikari.Runnable)
 
     logging.basicConfig(level=config.log_level or logging.INFO)

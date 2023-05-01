@@ -221,10 +221,16 @@ class FullConfig(Config):
         dotenv.load_dotenv()
 
         return cls(
-            cache=_cast_or_else(os.environ, "CACHE", hikari.api.CacheComponents, DEFAULT_CACHE),
+            cache=_cast_or_else(
+                os.environ, "CACHE", hikari.api.CacheComponents, DEFAULT_CACHE
+            ),  # pyright: ignore[reportGeneralTypeIssues]
             database=DatabaseConfig.from_env(),
-            emoji_guild=_cast_or_else(os.environ, "EMOJI_GUILD", hikari.Snowflake, None),
-            intents=_cast_or_else(os.environ, "INTENTS", hikari.Intents, DEFAULT_INTENTS),
+            emoji_guild=_cast_or_else(
+                os.environ, "EMOJI_GUILD", hikari.Snowflake, None
+            ),  # pyright: ignore[reportGeneralTypeIssues]
+            intents=_cast_or_else(
+                os.environ, "INTENTS", hikari.Intents, DEFAULT_INTENTS
+            ),  # pyright: ignore[reportGeneralTypeIssues]
             log_level=_cast_or_else(os.environ, "LOG_LEVEL", lambda v: int(v) if v.isdigit() else v, logging.INFO),
             mention_prefix=_cast_or_else(os.environ, "MENTION_PREFIX", _str_to_bool, True),
             owner_only=_cast_or_else(os.environ, "OWNER_ONLY", _str_to_bool, False),
@@ -254,10 +260,16 @@ class FullConfig(Config):
             declare_global_commands = hikari.Snowflake(declare_global_commands)
 
         return cls(
-            cache=_cast_or_else(mapping, "cache", hikari.api.CacheComponents, DEFAULT_CACHE),
+            cache=_cast_or_else(
+                mapping, "cache", hikari.api.CacheComponents, DEFAULT_CACHE
+            ),  # pyright: ignore[reportGeneralTypeIssues]
             database=DatabaseConfig.from_mapping(mapping["database"]),
-            emoji_guild=_cast_or_else(mapping, "emoji_guild", hikari.Snowflake, None),
-            intents=_cast_or_else(mapping, "intents", hikari.Intents, DEFAULT_INTENTS),
+            emoji_guild=_cast_or_else(
+                mapping, "emoji_guild", hikari.Snowflake, None
+            ),  # pyright: ignore[reportGeneralTypeIssues]
+            intents=_cast_or_else(
+                mapping, "intents", hikari.Intents, DEFAULT_INTENTS
+            ),  # pyright: ignore[reportGeneralTypeIssues]
             log_level=log_level,
             mention_prefix=bool(mapping.get("mention_prefix", True)),
             owner_only=bool(mapping.get("owner_only", False)),
