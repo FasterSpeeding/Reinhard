@@ -37,7 +37,6 @@ import datetime
 import hashlib
 import json
 import typing
-import markdownify  # pyright: ignore[reportMissingTypeStubs]
 from collections import abc as collections
 from typing import Annotated
 
@@ -46,6 +45,7 @@ import hikari
 import lunr  # type: ignore
 import lunr.exceptions  # type: ignore
 import lunr.index  # type: ignore
+import markdownify  # pyright: ignore[reportMissingTypeStubs]
 import tanjun
 import typing_extensions
 import yuyo
@@ -86,7 +86,7 @@ class DocEntry:
         assert isinstance(title, str)
         self.hashed_location = hash_path(location)
         self.text: str = markdownify.markdownify(text)  # pyright: ignore[reportUnknownMemberType]
-        self.title: str = markdownify.markdownify(title) # pyright: ignore[reportUnknownMemberType]
+        self.title: str = markdownify.markdownify(title)  # pyright: ignore[reportUnknownMemberType]
         self.url = f"{base_url}/{location}"
 
     def to_embed(self) -> hikari.Embed:
