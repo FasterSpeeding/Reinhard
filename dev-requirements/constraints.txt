@@ -601,9 +601,9 @@ hikari-sake==1.0.7 ; python_version >= "3.10" and python_version < "3.12" \
 hikari-tanjun==2.14.0 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:439279df2c549c1f88975675a8a9c391f578a02d623c5da2c35c74f661c8cfc3 \
     --hash=sha256:6ff7d3414d16db393dd936fb83529bce2e7b406e5faafb81997a069fa70f3a7a
-hikari-yuyo==1.13.0a1 ; python_version >= "3.10" and python_version < "3.12" \
-    --hash=sha256:dc87fa56b018439939f59076a122022f5d83cc7fd9601bc1bd19b1d1788747db \
-    --hash=sha256:fb5b3dbe368eca75c22d80fee77bcb362cfe93ff2cd28ed59d2fcee2c47b2220
+hikari-yuyo==1.14.1 ; python_version >= "3.10" and python_version < "3.12" \
+    --hash=sha256:0bdba0b1876b35e6b880635c86f68b9153eb243b8ebcf2818dab200f33796b83 \
+    --hash=sha256:c1eb7e37b8839873d91ac97efa146182cc70725aac12e99d458b2ab6a4c9e778
 hikari==2.0.0.dev118 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:56f442f73969eeaf7c1cddd96d4f0cd90d8e8100cd17b8f5f2758382d8a07442 \
     --hash=sha256:e221fb70f9166764255c5331457d5aef51e091e89eecc5c6d408d85a4d3590e8

@@ -65,9 +65,7 @@ def _download(url: str, /) -> tuple[pathlib.Path, dict[str, typing.Any]]:
         )
         thread_local.__dict__[_CLIENT_ATTRIBUTE] = client
 
-    data: dict[str, typing.Any] = client.extract_info(  # pyright: ignore[reportUnknownVariableType]
-        url
-    )  # pyright: ignore[reportUnknownMemberType]
+    data: typing.Any = client.extract_info(url)  # pyright: ignore[reportUnknownMemberType]
     path = pathlib.Path(
         client.prepare_filename(data)  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
     )
