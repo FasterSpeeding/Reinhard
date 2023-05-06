@@ -79,23 +79,31 @@ class DocEntry:
     __slots__ = ("hashed_location", "text", "title", "url")
 
     def __init__(self, base_url: str, location: str, entry: dict[str, typing.Any], /) -> None:
-        text = entry["text"]
-        title = entry["title"]
+        text: typing.Any = entry["text"]
+        title: typing.Any = entry["title"]
         assert isinstance(location, str)
         assert isinstance(text, str)
         assert isinstance(title, str)
+        text = markdownify.markdownify(text)  # pyright: ignore[reportUnknownMemberType]
+        title = markdownify.markdownify(title, escape_underscores=False)  # pyright: ignore[reportUnknownMemberType]
+        assert isinstance(text, str)
+        assert isinstance(title, str)
+
+        split_text = text.split("\n", 10)
+        text = "\n".join(split_text[:10]).rstrip()
+        if len(text) >= 500:
+            text = text[:497] + "..."
+
+        elif len(split_text) == 11:
+            text = text + "\n..."
+
         self.hashed_location = hash_path(location)
-        self.text: str = markdownify.markdownify(text)  # pyright: ignore[reportUnknownMemberType]
-        self.title: str = markdownify.markdownify(title)  # pyright: ignore[reportUnknownMemberType]
+        self.text = text
+        self.title = title
         self.url = f"{base_url}/{location}"
 
     def to_embed(self) -> hikari.Embed:
-        return hikari.Embed(
-            description=self.text[:87] + "..." if len(self.text) > 90 else self.text,
-            color=utility.embed_colour(),
-            title=self.title,
-            url=self.url,
-        )
+        return hikari.Embed(description=self.text, color=utility.embed_colour(), title=self.title, url=self.url)
 
 
 class DocIndex:
