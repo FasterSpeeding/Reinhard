@@ -75,7 +75,9 @@ async def echo_command(
     entity_factory: alluka.Injected[traits.EntityFactoryAware],
     # TODO: Greedy should implicitly mark arguments as positional.
     content: typing.Annotated[hikari.UndefinedOr[Str], Positional(), Greedy()] = hikari.UNDEFINED,
-    raw_embed: typing.Annotated[hikari.UndefinedOr[typing.Any], Converted(json.loads)] = hikari.UNDEFINED,
+    raw_embed: typing.Annotated[
+        hikari.UndefinedOr[typing.Any], Flag(aliases=["--embed", "-e"]), Converted(json.loads)
+    ] = hikari.UNDEFINED,
 ) -> None:
     """Command used for getting the bot to mirror a response."""
     embed: hikari.UndefinedOr[hikari.Embed] = hikari.UNDEFINED
