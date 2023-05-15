@@ -109,10 +109,9 @@ class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
 
                 raise StopAsyncIteration from None
 
-            try:
-                data = await response.json()
-            except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError):
-                raise
+            # TODO: Used to be catching (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError)
+            # here and logging it
+            data = await response.json()
 
             self._next_page_token = data.get("nextPageToken")
             # TODO: only store urls?
@@ -179,10 +178,9 @@ class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
                     f"Couldn't fetch {resource_type} in time", component=utility.delete_row_from_authors(self._author)
                 ) from None
 
-            try:
-                data = await response.json()
-            except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError):
-                raise
+            # TODO: Used to be catching (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError)
+            # here and logging it
+            data = await response.json()
 
             # TODO: only store urls?
             self._buffer.extend(data[resource_type + "s"]["items"])
