@@ -827,9 +827,9 @@ soupsieve==2.4.1 ; python_version >= "3.10" and python_version < "3.12" \
 tanchan==0.3.0 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:462c6f5fa5e7b957f24f1bb2386543f95eaa76fd4f69723e182d6568a87ac949 \
     --hash=sha256:9ff2d23a6699b462344e9be779e69b0db68f630931b1f1d61c134f2b107ce182
-typing-extensions==4.5.0 ; python_version >= "3.10" and python_version < "3.12" \
-    --hash=sha256:5cb5f4a79139d699607b3ef622a1dedafa84e115ab0024e0d9c044a9479ca7cb \
-    --hash=sha256:fb33085c39dd998ac16d1431ebc293a8b3eedd00fd4a32de0ff79002c19511b4
+typing-extensions==4.6.0 ; python_version >= "3.10" and python_version < "3.12" \
+    --hash=sha256:6ad00b63f849b7dcc313b70b6b304ed67b2b2963b3098a33efe18056b1a9a223 \
+    --hash=sha256:ff6b238610c747e44c268aa4bb23c8c735d665a63726df3f9431ce707f2aa768
 uvicorn==0.22.0 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:79277ae03db57ce7d9aa0567830bbb51d7a612f54d6e1e3e92da3ef24c2c8ed8 \
     --hash=sha256:e9434d3bbf05f310e762147f769c9f21235ee118ba2d2bf1155a7196448bd996
