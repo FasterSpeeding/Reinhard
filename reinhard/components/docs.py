@@ -165,9 +165,7 @@ class DocIndex:
             An iterator of the matching entries.
         """
         try:
-            results: list[dict[str, str]] = self._search_index.search(
-                search_path
-            )
+            results: list[dict[str, str]] = self._search_index.search(search_path)
         except lunr.exceptions.QueryParseError as exc:
             reason: str = exc.args[0]
             raise tanjun.CommandError(f"Invalid query: `{reason}`", component=utility.delete_row(ctx)) from None
