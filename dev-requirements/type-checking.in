@@ -3,5 +3,6 @@
 -r ./constraints.in
 
 asyncpg-stubs>=0.27
+PyYAML>=6.0
 types-PyYAML>=6.0.12.2
 types-psutil>=5.9.5.6
