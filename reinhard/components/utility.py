@@ -46,9 +46,9 @@ from tanjun.annotations import Greedy
 from tanjun.annotations import Member
 from tanjun.annotations import Role
 from tanjun.annotations import Snowflake
-from tanjun.annotations import SnowflakeOr
 from tanjun.annotations import Str
 from tanjun.annotations import User
+from tanjun.annotations import channel_field
 
 from .. import utility
 
@@ -57,7 +57,7 @@ from .. import utility
 @tanjun.as_message_command("color", "colour")
 @doc_parse.as_slash_command()
 async def color(
-    ctx: tanjun.abc.Context, color: Annotated[Color | None, Flag(aliases=("-r",))] = None, role: Role | None = None
+    ctx: tanjun.abc.Context, color: Annotated[Color | None, Flag(aliases=["-r"])] = None, role: Role | None = None
 ) -> None:
     """Get a visual representation of a color or role's color.
 
@@ -251,7 +251,9 @@ async def avatar(ctx: tanjun.abc.Context, user: User | None = None) -> None:
 async def mentions(
     ctx: tanjun.abc.Context,
     message: Snowflake,
-    channel: Annotated[SnowflakeOr[Channel | None], Flag(aliases=("-c",))] = None,
+    channel: Channel
+    | None
+    | hikari.Snowflake = channel_field(or_snowflake=True, message_names=["--channel", "-c"], default=None),
 ) -> None:
     """Get a list of the users who were pinged by a message.
 
@@ -282,7 +284,7 @@ async def mentions(
 @tanjun.with_guild_check(follow_wrapped=True)
 @tanjun.as_message_command("members")
 @doc_parse.as_slash_command(dm_enabled=False)
-async def members(ctx: tanjun.abc.Context, name: Greedy[Str]) -> None:
+async def members(ctx: tanjun.abc.Context, name: Annotated[Str, Greedy()]) -> None:
     """Search for a member in the current guild.
 
     Parameters
@@ -318,8 +320,8 @@ def _format_char_line(char: str, to_file: bool) -> str:
 @doc_parse.as_slash_command()
 async def char(
     ctx: tanjun.abc.Context,
-    characters: Greedy[Str],
-    file: Annotated[Bool, Flag(aliases=("-f",), empty_value=True)] = False,
+    characters: Annotated[Str, Greedy()],
+    file: Annotated[Bool, Flag(aliases=["-f"], empty_value=True)] = False,
 ) -> None:
     """Get information about the UTF-8 characters in the executing message.
 

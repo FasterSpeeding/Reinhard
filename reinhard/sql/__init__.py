@@ -33,7 +33,7 @@ from __future__ import annotations
 import pathlib
 import re
 
-import asyncpg  # pyright: reportMissingTypeStubs=warning
+import asyncpg  # pyright: ignore[reportMissingTypeStubs]
 
 
 def script_getter_factory(key: str) -> property:  # Could just make this retrieve the file.
@@ -115,5 +115,5 @@ async def initialise_schema(sql_scripts: CachedScripts, conn: asyncpg.Connection
     """
     try:
         await conn.execute(sql_scripts.schema)
-    except asyncpg.PostgresError as exc:  # pyright: reportUnknownVariableType=warning
+    except asyncpg.PostgresError as exc:  # pyright: ignore[reportUnknownVariableType]
         raise RuntimeError("Failed to initialise database.") from exc

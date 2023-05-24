@@ -74,8 +74,10 @@ async def echo_command(
     ctx: tanjun.abc.Context,
     entity_factory: alluka.Injected[traits.EntityFactoryAware],
     # TODO: Greedy should implicitly mark arguments as positional.
-    content: Positional[Greedy[hikari.UndefinedOr[Str]]] = hikari.UNDEFINED,
-    raw_embed: hikari.UndefinedOr[Converted[json.loads]] = hikari.UNDEFINED,
+    content: typing.Annotated[hikari.UndefinedOr[Str], Positional(), Greedy()] = hikari.UNDEFINED,
+    raw_embed: typing.Annotated[
+        hikari.UndefinedOr[typing.Any], Flag(aliases=["--embed", "-e"]), Converted(json.loads)
+    ] = hikari.UNDEFINED,
 ) -> None:
     """Command used for getting the bot to mirror a response."""
     embed: hikari.UndefinedOr[hikari.Embed] = hikari.UNDEFINED
@@ -168,8 +170,8 @@ async def eval_command(
     ctx: tanjun.abc.MessageContext,
     component: alluka.Injected[tanjun.abc.Component],
     component_client: alluka.Injected[yuyo.ComponentClient],
-    file_output: Annotated[Bool, Flag(empty_value=True, aliases=("-f", "--file-out", "--file"))] = False,
-    suppress_response: Annotated[Bool, Flag(empty_value=True, aliases=("-s", "--suppress"))] = False,
+    file_output: Annotated[Bool, Flag(empty_value=True, aliases=["-f", "--file-out", "--file"])] = False,
+    suppress_response: Annotated[Bool, Flag(empty_value=True, aliases=["-s", "--suppress"])] = False,
 ) -> None:
     """Dynamically evaluate a script in the bot's environment.
 
@@ -209,15 +211,15 @@ async def eval_command(
         )
         for page, text in enumerate(string_paginator)
     )
-    paginator = utility.make_paginator(embed_generator, author=ctx.author, timeout=None, full=True)
+    paginator = utility.make_paginator(embed_generator, author=ctx.author, full=True)
     first_response = await paginator.get_next_entry()
-    executor = utility.paginator_with_to_file(
+    utility.add_file_button(
         paginator, make_files=lambda: [_bytes_from_io(stdout, "stdout.py"), _bytes_from_io(stderr, "stderr.py")]
     )
 
     assert first_response is not None
-    message = await ctx.respond(**first_response.to_kwargs(), components=executor.rows, ensure_result=True)
-    component_client.set_executor(message, executor)
+    message = await ctx.respond(**first_response.to_kwargs(), components=paginator.rows, ensure_result=True)
+    component_client.register_executor(paginator, message=message)
 
 
 load_sudo = (

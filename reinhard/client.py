@@ -64,11 +64,12 @@ def _rukari(config: config_.FullConfig | None) -> _GatewayBotProto | None:
     if config is None:
         config = config_.FullConfig.from_env()
 
-    bot: hikari.ShardAware = rukari.Bot(  # pyright: ignore [ reportUnknownMemberType ]
+    bot: hikari.ShardAware = rukari.Bot(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         config.tokens.bot, intents=config.intents
     )
-    assert isinstance(bot, hikari.RESTAware)
     assert isinstance(bot, hikari.EventManagerAware)
+    assert isinstance(bot, hikari.RESTAware)
+    assert isinstance(bot, hikari.ShardAware)
     assert isinstance(bot, hikari.Runnable)
 
     logging.basicConfig(level=config.log_level or logging.INFO)
@@ -173,8 +174,8 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> tanjun.Client:
     if client.shards:
         yuyo.ReactionClient.from_tanjun(client)
 
-    yuyo.ComponentClient.from_tanjun(client).set_constant_id(
-        utility.DELETE_CUSTOM_ID, utility.delete_button_callback, prefix_match=True
+    yuyo.ComponentClient.from_tanjun(client).register_executor(
+        yuyo.components.SingleExecutor(utility.DELETE_CUSTOM_ID, utility.delete_button_callback), timeout=None
     )
     yuyo.ModalClient.from_tanjun(client)
     return client

@@ -45,6 +45,7 @@ __all__: list[str] = [
     "SessionManager",
     "WHITE",
     "YoutubeDownloader",
+    "add_file_button",
     "basic",
     "basic_name_grid",
     "chunk",
@@ -59,7 +60,6 @@ __all__: list[str] = [
     "make_paginator",
     "on_error",
     "on_parser_error",
-    "paginator_with_to_file",
     "prettify_date",
     "prettify_index",
     "raise_error",
@@ -75,6 +75,7 @@ from . import rest
 from . import ytdl
 from .basic import DELETE_CUSTOM_ID
 from .basic import FileCallback
+from .basic import add_file_button
 from .basic import basic_name_grid
 from .basic import chunk
 from .basic import delete_button_callback
@@ -82,7 +83,6 @@ from .basic import delete_row
 from .basic import delete_row_from_authors
 from .basic import embed_iterator
 from .basic import make_paginator
-from .basic import paginator_with_to_file
 from .basic import prettify_date
 from .basic import prettify_index
 from .basic import raise_error

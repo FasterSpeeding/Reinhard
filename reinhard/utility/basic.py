@@ -33,6 +33,7 @@ from __future__ import annotations
 __all__: list[str] = [
     "DELETE_CUSTOM_ID",
     "FileCallback",
+    "add_file_button",
     "basic_name_grid",
     "chunk",
     "delete_button_callback",
@@ -40,7 +41,6 @@ __all__: list[str] = [
     "delete_row_from_authors",
     "embed_iterator",
     "make_paginator",
-    "paginator_with_to_file",
     "prettify_date",
     "prettify_index",
     "raise_error",
@@ -139,7 +139,7 @@ def basic_name_grid(flags: enum.IntFlag, /) -> str:  # TODO: actually deal with 
     names = [
         name
         for name, flag in type(flags).__members__.items()
-        if flag != 0 and (flag & flags) == flag  # pyright: ignore [reportUnnecessaryComparison]
+        if flag != 0 and (flag & flags) == flag  # pyright: ignore[reportUnnecessaryComparison]
     ]
     names.sort()
     if not names:
@@ -170,9 +170,7 @@ async def delete_button_callback(ctx: yuyo.ComponentContext, /) -> None:
         The context that triggered this delete.
     """
     # Filter is needed as "".split(",") will give [""] which is not a valid snowflake.
-    author_ids = set(
-        map(hikari.Snowflake, filter(None, ctx.interaction.custom_id.removeprefix(DELETE_CUSTOM_ID).split(",")))
-    )
+    author_ids = set(map(hikari.Snowflake, filter(None, ctx.id_metadata.split(","))))
     if (
         not author_ids  # no IDs == public
         or ctx.interaction.user.id in author_ids
@@ -198,13 +196,10 @@ def make_paginator(
     *,
     author: typing.Optional[hikari.SnowflakeishOr[hikari.User]] = None,
     ephemeral_default: bool = False,
-    timeout: typing.Optional[datetime.timedelta] = datetime.timedelta(seconds=30),
     full: bool = False,
 ) -> yuyo.ComponentPaginator:
     authors = [author] if author else []
-    paginator = yuyo.ComponentPaginator(
-        iterator, authors=authors, triggers=[], ephemeral_default=ephemeral_default, timeout=timeout
-    )
+    paginator = yuyo.ComponentPaginator(iterator, authors=authors, triggers=[], ephemeral_default=ephemeral_default)
     if full:
         paginator.add_first_button()
 
@@ -216,12 +211,12 @@ def make_paginator(
     return paginator
 
 
-DELETE_CUSTOM_ID = "AUTHOR_DELETE_BUTTON:"
+DELETE_CUSTOM_ID = "AUTHOR_DELETE_BUTTON"
 """Prefix ID used for delete buttons."""
 
 
 def _make_delete_id(*authors: hikari.SnowflakeishOr[hikari.User]) -> str:
-    return DELETE_CUSTOM_ID + ",".join(str(int(author)) for author in authors)
+    return DELETE_CUSTOM_ID + ":" + ",".join(str(int(author)) for author in authors)
 
 
 def delete_row(
@@ -241,11 +236,8 @@ def delete_row(
     hikari.impl.ActionRowBuilder
         Action row builder with a delete button.
     """
-    return (
-        hikari.impl.MessageActionRowBuilder()
-        .add_button(hikari.ButtonStyle.DANGER, _make_delete_id(ctx.author))
-        .set_emoji(constants.DELETE_EMOJI)
-        .add_to_container()
+    return hikari.impl.MessageActionRowBuilder().add_interactive_button(
+        hikari.ButtonStyle.DANGER, _make_delete_id(ctx.author), emoji=constants.DELETE_EMOJI
     )
 
 
@@ -266,11 +258,8 @@ def delete_row_from_authors(*authors: hikari.Snowflakeish) -> hikari.impl.Messag
         Action row builder with a delete button.
     """
 
-    return (
-        hikari.impl.MessageActionRowBuilder()
-        .add_button(hikari.ButtonStyle.DANGER, _make_delete_id(*authors))
-        .set_emoji(constants.DELETE_EMOJI)
-        .add_to_container()
+    return hikari.impl.MessageActionRowBuilder().add_interactive_button(
+        hikari.ButtonStyle.DANGER, _make_delete_id(*authors), emoji=constants.DELETE_EMOJI
     )
 
 
@@ -314,39 +303,31 @@ class FileCallback:
         await ctx.respond(attachments=files, component=delete_row_from_authors(ctx.interaction.user.id))
 
 
-def paginator_with_to_file(
-    paginator: yuyo.ComponentPaginator,
+def add_file_button(
+    column: yuyo.components.ActionColumnExecutor,
     /,
     *,
     files: collections.Sequence[hikari.Resourceish] = (),
     make_files: collections.Callable[[], collections.Sequence[hikari.Resourceish]] | None = None,
-) -> yuyo.components.ActionColumnExecutor:
-    """Wrap a paginator with a "to file" button.
+) -> None:
+    """ADd a file button to a component column.
 
     .. note::
         `files` and `make_files` are mutually exclusive.
 
     Parameters
     ----------
-    paginator
-        The paginator to wrap.
+    column
+        The column to add the button to.
     files
         Collection of the files to send when the to file button is pressed.
     make_files
-        A callback which returns the files tosend when the to file button is
+        A callback which returns the files to send when the to file button is
         pressed.
-
-    Returns
-    -------
-    yuyo.MultiComponentExecutor
-        Executor with both the paginator and to file button.
     """
-    row = yuyo.components.ActionColumnExecutor().add_row(paginator)  # TODO: add authors here
-    (
-        row.add_button(
-            hikari.ButtonStyle.SECONDARY,
-            FileCallback(files=files, make_files=make_files, post_components=[paginator]),
-            emoji=constants.FILE_EMOJI,
-        )
+    # TODO: remove this button from the column after it's used or disable it.
+    column.add_interactive_button(
+        hikari.ButtonStyle.SECONDARY,
+        FileCallback(files=files, make_files=make_files, post_components=column.rows),
+        emoji=constants.FILE_EMOJI,
     )
-    return row

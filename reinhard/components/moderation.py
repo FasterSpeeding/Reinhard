@@ -42,10 +42,14 @@ from typing import Annotated
 
 import hikari
 import tanjun
+import typing_extensions
 from tanchan import doc_parse
 from tanjun.annotations import Bool
+from tanjun.annotations import Converted
 from tanjun.annotations import Flag
+from tanjun.annotations import Int
 from tanjun.annotations import Ranged
+from tanjun.annotations import Snowflake
 
 from .. import utility
 
@@ -53,21 +57,19 @@ if typing.TYPE_CHECKING:
     from typing_extensions import Self
 
 MAX_MESSAGE_BULK_DELETE = datetime.timedelta(weeks=2) - datetime.timedelta(minutes=2)
-_MessageCommandT = typing.TypeVar("_MessageCommandT", bound=tanjun.MessageCommand[typing.Any])
-_SlashCommandT = typing.TypeVar("_SlashCommandT", bound=tanjun.SlashCommand[typing.Any])
 
 
 def iter_messages(
     ctx: tanjun.abc.Context,
-    count: int | None,
-    after: hikari.Snowflake | None,
-    before: hikari.Snowflake | None,
-    bot_only: bool,
-    human_only: bool,
-    has_attachments: bool,
-    has_embeds: bool,
-    regex: re.Pattern[str] | None,
-    users: collections.Collection[hikari.Snowflake] | None,
+    count: int | None = None,
+    after: hikari.Snowflake | None = None,
+    before: hikari.Snowflake | None = None,
+    bot_only: bool = False,
+    human_only: bool = False,
+    has_attachments: bool = False,
+    has_embeds: bool = False,
+    regex: re.Pattern[str] | None = None,
+    users: collections.Collection[hikari.Snowflake] | None = None,
 ) -> hikari.LazyIterator[hikari.Message]:
     if human_only and bot_only:
         raise tanjun.CommandError(
@@ -123,43 +125,37 @@ def iter_messages(
     return iterator
 
 
-def _with_filter_slash_options(command: _SlashCommandT, /) -> _SlashCommandT:
-    return (
-        command.add_int_option("count", "The amount of entities to target.", default=None)  # TODO: max, min
-        .add_str_option(
-            "regex", "A regular expression to match against message contents.", converters=re.compile, default=None
-        )
-        .add_bool_option("has_embeds", "Whether this should only target messages which have embeds.", default=False)
-        .add_bool_option(
-            "has_attachments", "Whether this should only delete messages which have attachments.", default=False
-        )
-        .add_bool_option("human_only", "Whether this should only target messages sent by actual users.", default=False)
-        .add_bool_option(
-            "bot_only", "Whether this should only target messages sent by bots and webhooks.", default=False
-        )
-        .add_str_option(
-            "before", "Target messages sent before this message.", converters=tanjun.to_snowflake, default=None
-        )
-        .add_str_option(
-            "after", "Target messages sent after this message.", converters=tanjun.to_snowflake, default=None
-        )
-    )
+class _IterMessageOptions(typing.TypedDict, total=False):
+    """Options used for iterating over messages.
 
+    Parameters
+    ----------
+    count
+        The amount of entities to target.
+    regex
+        A regular expression to match against message contents.
+    has_embeds
+        Whether this should only target messages which have embeds.
+    has_attachments
+        Whether this should only delete messages which have attachments.
+    human_only
+        Whether this should only target messages sent by actual users.
+    bot_only
+        Whether this should only target messages sent by bots and webhooks.
+    before
+        Target messages sent before this message.
+    after
+        Target messages sent after this message.
+    """
 
-def _with_filter_message_options(command: _MessageCommandT, /) -> _MessageCommandT:
-    return command.set_parser(
-        tanjun.ShlexParser()
-        .add_option("count", "-c", "--count", converters=int, default=None)
-        .add_option("regex", "-r", "--regex", converters=re.compile, default=None)
-        .add_option("has_embeds", "-e", "--has-embeds", default=False, converters=tanjun.to_bool, empty_value=True)
-        .add_option(
-            "has_attachments", "-a", "--has-attachments", default=False, converters=tanjun.to_bool, empty_value=True
-        )
-        .add_option("human_only", "-u", "--human-only", default=False, converters=tanjun.to_bool, empty_value=True)
-        .add_option("bot_only", "-b", "--bot-only", default=False, converters=tanjun.to_bool, empty_value=True)
-        .add_option("before", "-B", "--before", converters=tanjun.to_snowflake, default=None)
-        .add_option("after", "-A", "--after", converters=tanjun.to_snowflake, default=None)
-    )
+    count: Annotated[Int, Flag(aliases=["-c"])]
+    regex: Annotated[re.Pattern[str], Converted(re.compile), Flag(aliases=["-r"])]
+    has_embeds: Bool
+    has_attachments: Bool
+    human_only: Bool
+    bot_only: Bool
+    before: Snowflake
+    after: Snowflake
 
 
 def _now() -> datetime.datetime:
@@ -171,11 +167,11 @@ _CLEAR_PERMS = (
 )
 
 
+@doc_parse.with_annotated_args(follow_wrapped=True)
 @tanjun.with_guild_check(follow_wrapped=True)
 @tanjun.with_own_permission_check(_CLEAR_PERMS, follow_wrapped=True)
 @tanjun.with_author_permission_check(_CLEAR_PERMS, follow_wrapped=True)
 @tanjun.with_multi_option("users", "--user", "-u", converters=tanjun.conversion.parse_user_id, default=())
-@_with_filter_message_options
 @tanjun.as_message_command("clear")
 @tanjun.with_str_slash_option(
     "users",
@@ -183,27 +179,26 @@ _CLEAR_PERMS = (
     converters=lambda value: list(map(tanjun.conversion.parse_user_id, value.split())),
     default=None,
 )
-@_with_filter_slash_options
-@tanjun.as_slash_command(
-    "clear", "Clear new messages from chat as a moderator.", default_member_permissions=_CLEAR_PERMS, dm_enabled=False
-)
-async def clear_command(
-    ctx: tanjun.abc.Context, after: hikari.Snowflake | None, before: hikari.Snowflake | None, **kwargs: typing.Any
+@doc_parse.as_slash_command(default_member_permissions=_CLEAR_PERMS, dm_enabled=False)
+async def clear(
+    ctx: tanjun.abc.Context,
+    users: collections.Collection[hikari.Snowflake] | None,
+    **kwargs: typing_extensions.Unpack[_IterMessageOptions],
 ) -> None:
-    """Clear new messages from chat.
+    """Clear new messages from chat as a moderator.
 
     !!! note
         This can only be used on messages under 14 days old.
     """
     now = _now()
-    after_too_old = after and now - after.created_at >= MAX_MESSAGE_BULK_DELETE
-    before_too_old = before and now - before.created_at >= MAX_MESSAGE_BULK_DELETE
+    after_too_old = (after := kwargs.get("after")) and now - after.created_at >= MAX_MESSAGE_BULK_DELETE
+    before_too_old = (before := kwargs.get("before")) and now - before.created_at >= MAX_MESSAGE_BULK_DELETE
 
     if after_too_old or before_too_old:
         raise tanjun.CommandError("Cannot delete messages that are over 14 days old", component=utility.delete_row(ctx))
 
     iterator = (
-        iter_messages(ctx, after=after, before=before, **kwargs)
+        iter_messages(ctx, **kwargs, users=users)
         .take_while(lambda message: _now() - message.created_at < MAX_MESSAGE_BULK_DELETE)
         .map(lambda x: x.id)
         .chunk(100)
@@ -221,7 +216,7 @@ async def clear_command(
 
 
 ban_group = (
-    tanjun.slash_command_group(
+    doc_parse.slash_command_group(
         "ban", "Ban commands", default_member_permissions=hikari.Permissions.BAN_MEMBERS, dm_enabled=False
     )
     .add_check(tanjun.checks.GuildCheck())
@@ -331,7 +326,9 @@ class _MultiBanner:
                 return
 
         try:
-            await self.guild.ban(target, reason=self.reason, delete_message_days=self.delete_message_days)
+            await self.guild.ban(
+                target, reason=self.reason, delete_message_seconds=datetime.timedelta(days=self.delete_message_days)
+            )
 
         except Exception as exc:
             self.failed[target] = str(exc)
@@ -371,14 +368,14 @@ class _MultiBanner:
     "Space separated sequence of users to ban",
     converters=lambda value: set(map(tanjun.conversion.parse_user_id, value.split())),
 )
-@ban_group.as_sub_command("members", "Ban one or more members")
+@ban_group.as_sub_command("members")
 async def multi_ban_command(
     ctx: tanjun.abc.SlashContext | tanjun.abc.MessageContext,
     users: collections.Collection[hikari.Snowflake],
-    clear_message_days: Annotated[Ranged[0, 7], Flag(aliases=("--clear", "-c"))] = 0,
-    members_only: Annotated[Bool, Flag(empty_value=True, aliases=("-m",))] = False,
+    clear_message_days: Annotated[Int, Ranged(0, 7), Flag(aliases=["--clear", "-c"])] = 0,
+    members_only: Annotated[Bool, Flag(empty_value=True, aliases=["-m"])] = False,
 ) -> None:
-    """Ban multiple users from using the bot.
+    """Ban one or more members.
 
     Parameters
     ----------
@@ -402,15 +399,13 @@ async def multi_ban_command(
 @doc_parse.with_annotated_args(follow_wrapped=True)
 @tanjun.with_author_permission_check(hikari.Permissions.BAN_MEMBERS)
 @tanjun.with_own_permission_check(hikari.Permissions.BAN_MEMBERS)
-@_with_filter_message_options
 @tanjun.as_message_command("ban authors")
-@_with_filter_slash_options
-@ban_group.as_sub_command("authors", "Ban the authors of recent messages.")
+@ban_group.as_sub_command("authors")
 async def ban_authors_command(
     ctx: tanjun.abc.Context,
-    clear_message_days: Annotated[Ranged[0, 7], Flag(aliases=("--clear", "-c"))] = 0,
-    members_only: Annotated[Bool, Flag(empty_value=True, aliases=("--members-only", "-m"))] = False,
-    **kwargs: typing.Any,
+    clear_message_days: Annotated[Int, Ranged(0, 7), Flag(aliases=["-c"])] = 0,
+    members_only: Annotated[Bool, Flag(empty_value=True, aliases=["-m"])] = False,
+    **kwargs: typing_extensions.Unpack[_IterMessageOptions],
 ) -> None:
     """Ban the authors of recent messages.
 

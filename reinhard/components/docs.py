@@ -45,21 +45,26 @@ import hikari
 import lunr  # type: ignore
 import lunr.exceptions  # type: ignore
 import lunr.index  # type: ignore
+import markdownify  # pyright: ignore[reportMissingTypeStubs]
 import tanjun
+import typing_extensions
 import yuyo
+from tanchan import doc_parse
+from tanjun.annotations import Bool
+from tanjun.annotations import Flag
+from tanjun.annotations import Name
+from tanjun.annotations import Str
 
 from .. import utility
 
 if typing.TYPE_CHECKING:
     from typing_extensions import Self
 
-docs_group = tanjun.slash_command_group("docs", "Search relevant document sites.")
+docs_group = doc_parse.slash_command_group("docs", "Search relevant document sites.")
 
 _T = typing.TypeVar("_T")
 _CoroT = collections.Coroutine[typing.Any, typing.Any, _T]
 _DocIndexT = typing.TypeVar("_DocIndexT", bound="DocIndex")
-_MessageCommandT = typing.TypeVar("_MessageCommandT", bound=tanjun.MessageCommand[typing.Any])
-_SlashCommandT = typing.TypeVar("_SlashCommandT", bound=tanjun.SlashCommand[typing.Any])
 HIKARI_PAGES = "https://www.hikari-py.dev"
 SAKE_PAGES = "https://sake.cursed.solutions"
 TANJUN_PAGES = "https://tanjun.cursed.solutions"
@@ -74,23 +79,31 @@ class DocEntry:
     __slots__ = ("hashed_location", "text", "title", "url")
 
     def __init__(self, base_url: str, location: str, entry: dict[str, typing.Any], /) -> None:
-        text = entry["text"]
-        title = entry["title"]
+        text: typing.Any = entry["text"]
+        title: typing.Any = entry["title"]
         assert isinstance(location, str)
         assert isinstance(text, str)
         assert isinstance(title, str)
+        text = markdownify.markdownify(text)  # pyright: ignore[reportUnknownMemberType]
+        title = markdownify.markdownify(title, escape_underscores=False)  # pyright: ignore[reportUnknownMemberType]
+        assert isinstance(text, str)
+        assert isinstance(title, str)
+
+        split_text = text.split("\n", 10)
+        text = "\n".join(split_text[:10]).rstrip()
+        if len(text) >= 500:
+            text = text[:497] + "..."
+
+        elif len(split_text) == 11:
+            text = text + "\n..."
+
         self.hashed_location = hash_path(location)
         self.text = text
         self.title = title
         self.url = f"{base_url}/{location}"
 
     def to_embed(self) -> hikari.Embed:
-        return hikari.Embed(
-            description=self.text[:87] + "..." if len(self.text) > 90 else self.text,
-            color=utility.embed_colour(),
-            title=self.title,
-            url=self.url,
-        )
+        return hikari.Embed(description=self.text, color=utility.embed_colour(), title=self.title, url=self.url)
 
 
 class DocIndex:
@@ -107,7 +120,7 @@ class DocIndex:
         self.docs_url = docs_url
         self._autocomplete_refs: dict[str, DocEntry] = {entry.hashed_location: entry for entry in self._data.values()}
         self.name = name
-        self._search_index: lunr.index.Index = lunr.lunr(  # pyright: ignore [ reportUnknownMemberType ]
+        self._search_index: lunr.index.Index = lunr.lunr(  # pyright: ignore[reportUnknownMemberType]
             "location", ("title", "location"), data
         )
 
@@ -152,23 +165,23 @@ class DocIndex:
             An iterator of the matching entries.
         """
         try:
-            results: list[dict[str, str]] = self._search_index.search(  # pyright: ignore [ reportUnknownMemberType ]
+            results: list[dict[str, str]] = self._search_index.search(  # pyright: ignore[reportUnknownVariableType]
                 search_path
             )
         except lunr.exceptions.QueryParseError as exc:  # type: ignore
-            reason: str = exc.args[0]  # pyright: ignore [ reportUnknownMemberType ]
+            reason: str = exc.args[0]  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             raise tanjun.CommandError(f"Invalid query: `{reason}`", component=utility.delete_row(ctx)) from None
 
-        return (self._data[entry["ref"]] for entry in results)
+        return (self._data[entry["ref"]] for entry in results)  # pyright: ignore[reportUnknownVariableType]
 
 
 async def _docs_command(
     ctx: tanjun.abc.Context,
     component_client: yuyo.ComponentClient,
     index: DocIndex,
-    path: str | None,
-    public: bool,
-    **kwargs: typing.Any,
+    path: str | None = None,
+    public: bool = False,
+    return_list: bool = False,
 ) -> None:
     if not path:
         await ctx.respond(index.docs_url, component=utility.delete_row(ctx))
@@ -178,28 +191,26 @@ async def _docs_command(
         await ctx.respond(embed=autocomplete_result.to_embed())
         return
 
-    if kwargs["list"]:
+    if return_list:
         iterator = utility.embed_iterator(
             utility.chunk((f"[{m.title}]({m.url})" for m in index.search(ctx, path)), 10),
             lambda entries: "\n".join(entries),
             title=f"{index.name} Documentation",
             url=index.docs_url,
         )
-        paginator = utility.make_paginator(iterator, author=None if public else ctx.author, timeout=None, full=True)
-        executor = utility.paginator_with_to_file(
+        paginator = utility.make_paginator(iterator, author=None if public else ctx.author, full=True)
+        utility.add_file_button(
             paginator,
             make_files=lambda: [hikari.Bytes("\n".join(m.title for m in index.search(ctx, str(path))), "results.txt")],
         )
-        components = executor.rows
 
     else:
         iterator = ((hikari.UNDEFINED, metadata.to_embed()) for metadata in index.search(ctx, path))
-        executor = paginator = utility.make_paginator(iterator, author=None if public else ctx.author, full=True)
-        components = executor.builder()
+        paginator = utility.make_paginator(iterator, author=None if public else ctx.author, full=True)
 
     if first_response := await paginator.get_next_entry():
-        message = await ctx.respond(components=components, **first_response.to_kwargs(), ensure_result=True)
-        component_client.set_executor(message, executor)
+        message = await ctx.respond(components=paginator.rows, **first_response.to_kwargs(), ensure_result=True)
+        component_client.register_executor(paginator, message=message)
         return
 
     await ctx.respond("Entry not found", component=utility.delete_row(ctx))
@@ -229,35 +240,22 @@ def make_autocomplete(get_index: collections.Callable[..., _CoroT[_DocIndexT]]) 
     return _autocomplete
 
 
-def _with_docs_slash_options(
-    get_index: collections.Callable[..., _CoroT[_DocIndexT]], /
-) -> collections.Callable[[_SlashCommandT], _SlashCommandT]:
-    def decorator(command: _SlashCommandT, /) -> _SlashCommandT:
-        return (
-            command.add_str_option(
-                "path",
-                "Optional path to query the documentation by.",
-                default=None,
-                autocomplete=make_autocomplete(get_index),
-            )
-            .add_bool_option(
-                "public",
-                "Whether other people should be able to interact with the response. Defaults to False",
-                default=False,
-            )
-            .add_bool_option("list", "Whether this should return a list of links. Defaults to False.", default=False)
-        )
+class _DocsOptions(typing.TypedDict, total=False):
+    """Reused options for doc commands.
 
-    return decorator
+    Parameters
+    ----------
+    path
+        Optional path to query the documentation by.
+    public
+        Whether other people should be able to itneract with the response. Defaults to False.
+    return_list
+        Whether this should return a list of links. Defaults to False.
+    """
 
-
-def _with_docs_message_options(command: _MessageCommandT, /) -> _MessageCommandT:
-    return command.set_parser(
-        tanjun.ShlexParser()
-        .add_argument("path", default=None)
-        .add_option("public", "-p", "--public", converters=tanjun.to_bool, default=False, empty_value=True)
-        .add_option("list", "-l", "--list", converters=tanjun.to_bool, default=False, empty_value=True)
-    )
+    path: Str
+    public: Annotated[Bool, Flag(aliases=["-p"], empty_value=True)]
+    return_list: Annotated[Bool, Name("list"), Flag(aliases=["-l"], empty_value=True)]
 
 
 sake_index = tanjun.dependencies.data.cache_callback(
@@ -266,18 +264,20 @@ sake_index = tanjun.dependencies.data.cache_callback(
 )
 
 
-@_with_docs_message_options
+@doc_parse.with_annotated_args(follow_wrapped=True)
+@docs_group.as_sub_command("sake")
 @tanjun.as_message_command("docs sake")
-@_with_docs_slash_options(sake_index)
-@docs_group.as_sub_command("sake", "Search Sake's documentation")
 def sake_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
     index: Annotated[DocIndex, alluka.inject(callback=sake_index)],
-    **kwargs: typing.Any,
+    **kwargs: typing_extensions.Unpack[_DocsOptions],
 ) -> _CoroT[None]:
+    """Search Sake's documentation."""
     return _docs_command(ctx, component_client, index, **kwargs)
 
+
+sake_docs_command.set_str_autocomplete("path", make_autocomplete(sake_index))
 
 tanjun_index = tanjun.dependencies.data.cache_callback(
     utility.FetchedResource(TANJUN_PAGES + "/search/search_index.json", DocIndex.from_json("Tanjun", TANJUN_PAGES)),
@@ -285,18 +285,20 @@ tanjun_index = tanjun.dependencies.data.cache_callback(
 )
 
 
-@_with_docs_message_options
+@doc_parse.with_annotated_args(follow_wrapped=True)
+@docs_group.as_sub_command("tanjun")
 @tanjun.as_message_command("docs tanjun")
-@_with_docs_slash_options(tanjun_index)
-@docs_group.as_sub_command("tanjun", "Search Tanjun's documentation")
 def tanjun_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
     index: Annotated[DocIndex, alluka.inject(callback=tanjun_index)],
-    **kwargs: typing.Any,
+    **kwargs: typing_extensions.Unpack[_DocsOptions],
 ) -> _CoroT[None]:
+    """Search Tanjun's documentation."""
     return _docs_command(ctx, component_client, index, **kwargs)
 
+
+tanjun_docs_command.set_str_autocomplete("path", make_autocomplete(tanjun_index))
 
 yuyo_index = tanjun.dependencies.data.cache_callback(
     utility.FetchedResource(YUYO_PAGES + "/search/search_index.json", DocIndex.from_json("Yuyo", YUYO_PAGES)),
@@ -304,17 +306,19 @@ yuyo_index = tanjun.dependencies.data.cache_callback(
 )
 
 
-@_with_docs_message_options
+@doc_parse.with_annotated_args(follow_wrapped=True)
+@docs_group.as_sub_command("yuyo")
 @tanjun.as_message_command("docs yuyo")
-@_with_docs_slash_options(yuyo_index)
-@docs_group.as_sub_command("yuyo", "Search Yuyo's documentation")
 def yuyo_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
     index: Annotated[DocIndex, alluka.inject(callback=yuyo_index)],
-    **kwargs: typing.Any,
+    **kwargs: typing_extensions.Unpack[_DocsOptions],
 ) -> _CoroT[None]:
+    """Search Yuyo's documentation."""
     return _docs_command(ctx, component_client, index, **kwargs)
 
+
+yuyo_docs_command.set_str_autocomplete("path", make_autocomplete(yuyo_index))
 
 load_docs = tanjun.Component(name="docs").load_from_scope().make_loader()

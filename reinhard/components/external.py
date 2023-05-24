@@ -36,7 +36,6 @@ __all__: list[str] = ["load_external"]
 import datetime
 import enum
 import hashlib
-import json
 import logging
 import time
 import typing
@@ -51,12 +50,10 @@ import tanjun
 import yuyo
 from tanchan import doc_parse
 from tanjun.annotations import Bool
-from tanjun.annotations import Choices
-from tanjun.annotations import Converted
 from tanjun.annotations import Flag
 from tanjun.annotations import Greedy
-from tanjun.annotations import Name
 from tanjun.annotations import Str
+from tanjun.annotations import str_field
 
 from .. import config as config_
 from .. import utility
@@ -94,7 +91,7 @@ class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
     async def __anext__(self) -> tuple[str, hikari.UndefinedType]:
         if not self._next_page_token and self._next_page_token is not None:
             retry = yuyo.Backoff(max_retries=5)
-            error_manager = utility.AIOHTTPStatusHandler(self._author, retry, break_on=(404,))
+            error_manager = utility.AIOHTTPStatusHandler(self._author, retry, break_on=[404])
 
             parameters = self._parameters.copy()
             parameters["pageToken"] = self._next_page_token
@@ -112,10 +109,9 @@ class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
 
                 raise StopAsyncIteration from None
 
-            try:
-                data = await response.json()
-            except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError):
-                raise
+            # TODO: Used to be catching (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError)
+            # here and logging it
+            data = await response.json()
 
             self._next_page_token = data.get("nextPageToken")
             # TODO: only store urls?
@@ -129,7 +125,7 @@ class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
             if response_type := YOUTUBE_TYPES.get(page["id"]["kind"].lower()):
                 return f"{response_type[1]}{page['id'][response_type[0]]}", hikari.UNDEFINED
 
-        kind: str = page["id"]["kind"]  # pyright: ignore [ reportUnboundVariable ]
+        kind: str = page["id"]["kind"]  # pyright: ignore[reportUnboundVariable]
         raise RuntimeError(f"Got unexpected 'kind' from youtube {kind}")
 
 
@@ -182,10 +178,9 @@ class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
                     f"Couldn't fetch {resource_type} in time", component=utility.delete_row_from_authors(self._author)
                 ) from None
 
-            try:
-                data = await response.json()
-            except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError):
-                raise
+            # TODO: Used to be catching (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError)
+            # here and logging it
+            data = await response.json()
 
             # TODO: only store urls?
             self._buffer.extend(data[resource_type + "s"]["items"])
@@ -225,11 +220,21 @@ async def youtube(
     session: alluka.Injected[aiohttp.ClientSession],
     tokens: alluka.Injected[config_.Tokens],
     component_client: alluka.Injected[yuyo.ComponentClient],
-    query: Greedy[Str],
-    resource_type: Annotated[Choices[YtResource], Name("type"), Flag(aliases=("-t",))] = YtResource.Video,
-    region: Annotated[Str | None, Flag(aliases=("-r",))] = None,
-    language: Annotated[Str | None, Flag(aliases=("-l",))] = None,
-    order: Choices[YtOrder] = YtOrder.Relevance,
+    query: Annotated[Str, Greedy()],
+    resource_type: YtResource = str_field(
+        choices=YtResource.__members__,
+        converters=YtResource,  # pyright: ignore[reportGeneralTypeIssues]
+        slash_name="type",
+        message_names=["--type", "-t"],
+        default=YtResource.Video,
+    ),
+    region: Annotated[Str | None, Flag(aliases=["-r"])] = None,
+    language: Annotated[Str | None, Flag(aliases=["-l"])] = None,
+    order: YtOrder = str_field(
+        choices=YtOrder.__members__,
+        converters=YtOrder,  # pyright: ignore[reportGeneralTypeIssues]
+        default=YtOrder.Relevance,
+    ),
     safe_search: Bool | None = None,
 ) -> None:
     """Search for a resource on youtube.
@@ -311,8 +316,8 @@ async def youtube(
             # for that so we'll just check to see if nothing is being returned.
             raise tanjun.CommandError(f"Couldn't find `{query}`.", component=utility.delete_row(ctx))
 
-        message = await ctx.respond(**first_response.to_kwargs(), component=paginator, ensure_result=True)
-        component_client.set_executor(message, paginator)
+        message = await ctx.respond(**first_response.to_kwargs(), components=paginator.rows, ensure_result=True)
+        component_client.register_executor(paginator, message=message)
 
 
 # This API is currently dead (always returning 5xxs)
@@ -422,7 +427,13 @@ async def spotify(
     session: alluka.Injected[aiohttp.ClientSession],
     component_client: alluka.Injected[yuyo.ComponentClient],
     spotify_auth: Annotated[utility.ClientCredentialsOauth2, tanjun.cached_inject(_build_spotify_auth)],
-    resource_type: Annotated[Choices[SpotifyType], Name("type"), Flag(aliases=("-t",))] = SpotifyType.Track,
+    resource_type: SpotifyType = str_field(
+        converters=SpotifyType,  # pyright: ignore[reportGeneralTypeIssues]
+        choices=SpotifyType.__members__,
+        default=SpotifyType.Track,
+        message_names=["--type", "-t"],
+        slash_name="type",
+    ),
 ) -> None:
     """Search for a resource on spotify.
 
@@ -457,8 +468,8 @@ async def spotify(
                 f"Couldn't find {resource_type.value}", component=utility.delete_row(ctx)
             ) from None
 
-        message = await ctx.respond(**first_response.to_kwargs(), component=paginator, ensure_result=True)
-        component_client.set_executor(message, paginator)
+        message = await ctx.respond(**first_response.to_kwargs(), components=paginator.rows, ensure_result=True)
+        component_client.register_executor(paginator, message=message)
 
 
 @tanjun.annotations.with_annotated_args
@@ -466,7 +477,8 @@ async def spotify(
 @tanjun.as_message_command("ytdl")
 async def ytdl_command(
     ctx: tanjun.abc.Context,
-    url: Converted[tanjun.conversion.parse_url],
+    *,
+    url: urllib.parse.ParseResult = str_field(converters=tanjun.conversion.parse_url),
     session: alluka.Injected[aiohttp.ClientSession],
     config: alluka.Injected[config_.PTFConfig],
     ytdl_client: Annotated[utility.YoutubeDownloader, tanjun.cached_inject(utility.YoutubeDownloader.spawn)],
@@ -504,24 +516,29 @@ async def ytdl_command(
     await ctx.respond(content=file_path)
 
 
-def _parse_hashes(data: typing.Any) -> list[str]:
-    if isinstance(data := json.loads(data), list):
-        return typing.cast("list[str]", data)
+async def _fetch_hashes(session: alluka.Injected[aiohttp.ClientSession]) -> set[str]:
+    # Original list.
+    response = await session.get("https://cdn.discordapp.com/bad-domains/hashes.json")
+    response.raise_for_status()
+    # Used by the client, longer list.
+    other_response = await session.get("https://cdn.discordapp.com/bad-domains/updated_hashes.json")
+    other_response.raise_for_status()
+    hashes = set(await response.json())
+    hashes.update(await other_response.json())
+    return hashes
 
-    raise ValueError("Got response of type {}, expected a list of strings", type(data))
 
-
-domain_hashes = tanjun.cached_inject(
-    utility.FetchedResource("https://cdn.discordapp.com/bad-domains/hashes.json", _parse_hashes),
-    expire_after=datetime.timedelta(hours=12),
-)
+domain_hashes = tanjun.cached_inject(_fetch_hashes, expire_after=datetime.timedelta(hours=12))
 
 
 @doc_parse.with_annotated_args(follow_wrapped=True)
 @tanjun.as_message_command("check_domain", "check domain")
 @doc_parse.as_slash_command()
 async def check_domain(
-    ctx: tanjun.abc.Context, url: Converted[urllib.parse.urlparse], bad_domains: Annotated[list[str], domain_hashes]
+    ctx: tanjun.abc.Context,
+    *,
+    url: urllib.parse.ParseResult = str_field(converters=tanjun.conversion.parse_url),
+    bad_domains: Annotated[set[str], domain_hashes],
 ) -> None:
     """Check whether a domain is on Discord's "bad" domain list.
 
@@ -530,9 +547,20 @@ async def check_domain(
     url
         The domain to check.
     """
-    domain = url.netloc or url.path
+    if url.netloc:
+        domain = url.netloc
+
+    else:
+        domain = url.path.split("/", 1)[0]
+
+    base_domain = ".".join(domain.rsplit(".", 2)[1:])
     domain_hash = hashlib.sha256(domain.encode("utf-8")).hexdigest()
-    if domain_hash in bad_domains:
+    if base_domain != domain:
+        base_domain_hash = hashlib.sha256(base_domain.encode("utf-8")).hexdigest()
+    else:
+        base_domain_hash = b"@"  # This will always return False as @ isn't a valid hex char
+
+    if domain_hash in bad_domains or base_domain_hash in bad_domains:
         await ctx.respond(
             content="\N{LARGE RED SQUARE} Domain is on the bad domains list.", component=utility.delete_row(ctx)
         )
