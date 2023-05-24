@@ -59,11 +59,21 @@ default_py_ver = "3.10"
 [tool.pyright]
 include = ["reinhard"]
 
-reportMissingImports = true
-reportMissingTypeStubs = true
-
 pythonVersion = "3.10"
 typeCheckingMode = "strict"
+reportMissingModuleSource = "error"  # Is only "warning" on strict mode.
+
+# Error code which are disabled even when general strict.
+reportShadowedImports = "error"
+reportCallInDefaultInitializer = "none"  # Ended up just complaining about cases where this was fine (e.g. timedeltas).
+reportImplicitStringConcatenation = "none"  # Conflicts with flake8 config.
+reportMissingSuperCall = "none"  # Way too strict (requires calls to `object.__init__`).
+reportPropertyTypeMismatch = "error"
+reportUninitializedInstanceVariable = "error"
+reportUnnecessaryTypeIgnoreComment = "error"
+reportUnusedCallResult = "none"  # Enforces doing `_ = ...`.
+
+# Error codes which lead to too many false-positives.
 reportIncompatibleMethodOverride = "warning"  # This relies on ordering for key-word only arguments which is annoying
                                            # than it's worth
 reportUnknownMemberType = "warning"  # This messes with instance checking generic objects
