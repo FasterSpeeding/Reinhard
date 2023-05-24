@@ -165,14 +165,14 @@ class DocIndex:
             An iterator of the matching entries.
         """
         try:
-            results: list[dict[str, str]] = self._search_index.search(  # pyright: ignore[reportUnknownVariableType]
+            results: list[dict[str, str]] = self._search_index.search(
                 search_path
             )
-        except lunr.exceptions.QueryParseError as exc:  # type: ignore
-            reason: str = exc.args[0]  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        except lunr.exceptions.QueryParseError as exc:
+            reason: str = exc.args[0]
             raise tanjun.CommandError(f"Invalid query: `{reason}`", component=utility.delete_row(ctx)) from None
 
-        return (self._data[entry["ref"]] for entry in results)  # pyright: ignore[reportUnknownVariableType]
+        return (self._data[entry["ref"]] for entry in results)
 
 
 async def _docs_command(
