@@ -43,6 +43,7 @@ import yuyo.modals
 
 from . import config as config_
 from . import utility
+from .components import sudo
 
 if typing.TYPE_CHECKING:
     from hikari import traits as hikari_traits
@@ -174,10 +175,12 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> tanjun.Client:
     if client.shards:
         yuyo.ReactionClient.from_tanjun(client)
 
-    yuyo.ComponentClient.from_tanjun(client).register_executor(
-        yuyo.components.SingleExecutor(utility.DELETE_CUSTOM_ID, utility.delete_button_callback), timeout=None
+    (
+        yuyo.ComponentClient.from_tanjun(client)
+        .register_executor(utility.on_delete_button, timeout=None)
+        .register_executor(sudo.on_edit_button, timeout=None)
     )
-    yuyo.ModalClient.from_tanjun(client)
+    yuyo.ModalClient.from_tanjun(client).register_modal(sudo.EVAL_MODAL_ID, sudo.eval_modal, timeout=None)
     return client
 
 
