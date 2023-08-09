@@ -75,7 +75,7 @@ async def on_parser_error(ctx: tanjun.abc.Context, exception: tanjun.ParserError
 
     if isinstance(exception, tanjun.ConversionError) and exception.errors:
         if len(exception.errors) > 1:
-            message += ":\n* " + "\n* ".join(map("`{}`".format, exception.errors))  # noqa: FS002
+            message += ":\n* " + "\n* ".join(map("`{}`".format, exception.errors))  # noqa: FS002  # pyright: ignore
 
         else:
             message = f"{message}: `{exception.errors[0]}`"
