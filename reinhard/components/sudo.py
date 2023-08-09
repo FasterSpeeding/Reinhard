@@ -342,6 +342,7 @@ async def eval_command(
                 hikari.ButtonStyle.SECONDARY, EVAL_MODAL_ID, emoji=EDIT_BUTTON_EMOJI
             ),
             **kwargs,
+            ensure_result=True,
         )
         _try_deregister(component_client, message)
         return
@@ -370,7 +371,10 @@ async def eval_command(
 
     assert first_response is not None
     message = await ctx.respond(
-        **first_response.to_kwargs() | {"attachments": attachments}, components=paginator.rows, **kwargs
+        **first_response.to_kwargs() | {"attachments": attachments},
+        components=paginator.rows,
+        **kwargs,
+        ensure_result=True,
     )
     _try_deregister(component_client, message)
     component_client.register_executor(paginator, message=message)
