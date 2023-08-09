@@ -188,10 +188,13 @@ async def _check_owner(
     tanjun_client: tanjun.abc.Client,
     authors: tanjun.dependencies.AbstractOwners,
     ctx: yuyo.ComponentContext | yuyo.ModalContext,
-) -> None:
-    if not await authors.check_ownership(tanjun_client, ctx.interaction.user):
+) -> bool:
+    state = await authors.check_ownership(tanjun_client, ctx.interaction.user)
+    if not state:
         # TODO: yuyo needs an equiv of CommandError
         await ctx.respond("You cannot use this button")
+
+    return state
 
 
 @yuyo.modals.as_modal(parse_signature=True)
@@ -214,7 +217,9 @@ async def eval_modal(
         await ctx.create_initial_response("Invalid value passed for File output", ephemeral=True)
         return
 
-    await _check_owner(tanjun_client, authors, ctx)
+    if not await _check_owner(tanjun_client, authors, ctx):
+        return
+
     await ctx.create_initial_response(response_type=hikari.ResponseType.DEFERRED_MESSAGE_UPDATE)
     await eval_command(
         ctx,
@@ -246,7 +251,9 @@ async def on_edit_button(
     tanjun_client: alluka.Injected[tanjun.abc.Client],
     authors: alluka.Injected[tanjun.dependencies.AbstractOwners],
 ) -> None:
-    await _check_owner(tanjun_client, authors, ctx)
+    if not await _check_owner(tanjun_client, authors, ctx):
+        return
+
     rows = eval_modal.rows
 
     # Try to get the old eval call's code
