@@ -220,7 +220,7 @@ async def eval_modal(
     if not await _check_owner(tanjun_client, authors, ctx):
         return
 
-    await ctx.create_initial_response(response_type=hikari.ResponseType.DEFERRED_MESSAGE_UPDATE)
+    await ctx.defer(defer_type=hikari.ResponseType.DEFERRED_MESSAGE_UPDATE)
     await eval_command(
         ctx,
         bot,
@@ -306,7 +306,6 @@ async def eval_command(
     if isinstance(ctx, tanjun.abc.MessageContext):
         author = ctx.author.id
         code = CODEBLOCK_REGEX.findall(ctx.content)
-        respond = ctx.respond
         kwargs: dict[str, typing.Any] = {"reply": ctx.message.id}
 
         if not code:
@@ -321,7 +320,6 @@ async def eval_command(
         # TODO: need an author field for the yuyo contexts
         author = ctx.interaction.user.id
         code = content
-        respond = ctx.edit_initial_response
         kwargs = {}
 
     if suppress_response:
@@ -334,7 +332,7 @@ async def eval_command(
 
     if file_output:
         # Wants the output to be attached as two files, avoid building a paginator.
-        message = await respond(
+        message = await ctx.respond(
             attachments=[
                 hikari.Bytes(stdout, "stdout.py", mimetype="text/x-python;charset=utf-8"),
                 hikari.Bytes(stderr, "stderr.py", mimetype="text/x-python;charset=utf-8"),
@@ -371,7 +369,7 @@ async def eval_command(
     )
 
     assert first_response is not None
-    message = await respond(
+    message = await ctx.respond(
         **first_response.to_kwargs() | {"attachments": attachments}, components=paginator.rows, **kwargs
     )
     _try_deregister(component_client, message)
