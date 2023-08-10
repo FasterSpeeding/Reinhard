@@ -306,21 +306,18 @@ async def eval_command(
     This can only be used by the bot's owner.
     """
     if isinstance(ctx, tanjun.abc.MessageContext):
-        author = ctx.author.id
         code = CODEBLOCK_REGEX.findall(ctx.content)
         kwargs: dict[str, typing.Any] = {"reply": ctx.message.id}
 
         if not code:
             raise tanjun.CommandError(
-                "Expected a python code block.", component=utility.delete_row_from_authors(author)
+                "Expected a python code block.", component=utility.delete_row_from_authors(ctx.author.id)
             )
 
         code = code[0]
 
     else:
         assert content is not None
-        # TODO: need an author field for the yuyo contexts
-        author = ctx.interaction.user.id
         code = content
         kwargs = {}
 
@@ -340,7 +337,7 @@ async def eval_command(
                 hikari.Bytes(stderr, "stderr.py", mimetype="text/x-python;charset=utf-8"),
                 *attachments,
             ],
-            component=utility.delete_row_from_authors(author).add_interactive_button(
+            component=utility.delete_row_from_authors(ctx.author.id).add_interactive_button(
                 hikari.ButtonStyle.SECONDARY, EVAL_MODAL_ID, emoji=EDIT_BUTTON_EMOJI
             ),
             **kwargs,
@@ -362,7 +359,7 @@ async def eval_command(
         )
         for page, text in enumerate(string_paginator)
     )
-    paginator = utility.make_paginator(embed_generator, author=author, full=True)
+    paginator = utility.make_paginator(embed_generator, author=ctx.author.id, full=True)
     first_response = await paginator.get_next_entry()
     utility.add_file_button(
         paginator, make_files=lambda: [_bytes_from_io(stdout, "stdout.py"), _bytes_from_io(stderr, "stderr.py")]
