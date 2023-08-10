@@ -107,7 +107,12 @@ def _yields_results(*args: io.StringIO) -> collections.Iterator[str]:
 
 
 async def eval_python_code(
-    ctx: tanjun.abc.Context, component: tanjun.abc.Component, code: str
+    client: tanjun.abc.Client,
+    ctx: tanjun.abc.Context | yuyo.ComponentContext | yuyo.ModalContext,
+    code: str,
+    /,
+    *,
+    component: tanjun.abc.Component | None = None,
 ) -> tuple[io.StringIO, io.StringIO, int, bool]:
     stdout = io.StringIO()
     stderr = io.StringIO()
@@ -119,7 +124,7 @@ async def eval_python_code(
     start_time = time.perf_counter()
     try:
         with stack:
-            await eval_python_code_no_capture(ctx, component, "<string>", code)
+            await eval_python_code_no_capture(client, ctx, code, component=component)
 
         failed = False
     except Exception:
@@ -134,13 +139,19 @@ async def eval_python_code(
 
 
 async def eval_python_code_no_capture(
-    ctx: tanjun.abc.Context, component: tanjun.abc.Component, file_name: str, code: str
+    client: tanjun.abc.Client,
+    ctx: tanjun.abc.Context | yuyo.ComponentContext | yuyo.ModalContext,
+    code: str,
+    /,
+    *,
+    component: tanjun.abc.Component | None = None,
+    file_name: str = "<string>",
 ) -> None:
     globals_ = {
         "app": ctx.shards,
         "asyncio": asyncio,
         "bot": ctx.shards,
-        "client": ctx.client,
+        "client": client,
         "component": component,
         "ctx": ctx,
         "hikari": hikari,
@@ -164,38 +175,162 @@ def _bytes_from_io(
     return hikari.Bytes(data, name, mimetype=mimetype)
 
 
+EVAL_MODAL_ID = "UPDATE_EVAL"
+CODEBLOCK_REGEX = re.compile(r"```(?:[\w]*\n?)([\s\S(^\\`{3})]*?)\n*```")
+STATE_FILE_NAME = "EVAL_STATE"
+EDIT_BUTTON_EMOJI = "\N{SQUARED NEW}"
+
+
+async def _check_owner(
+    client: tanjun.abc.Client,
+    authors: tanjun.dependencies.AbstractOwners,
+    ctx: yuyo.ComponentContext | yuyo.ModalContext,
+) -> bool:
+    state = await authors.check_ownership(client, ctx.interaction.user)
+    if not state:
+        # TODO: yuyo needs an equiv of CommandError
+        await ctx.respond("You cannot use this button")
+
+    return state
+
+
+@yuyo.modals.as_modal(parse_signature=True)
+async def eval_modal(
+    ctx: yuyo.ModalContext,
+    client: alluka.Injected[tanjun.abc.Client],
+    component_client: alluka.Injected[yuyo.ComponentClient],
+    authors: alluka.Injected[tanjun.dependencies.AbstractOwners],
+    *,
+    content: str = yuyo.modals.text_input("Content", style=hikari.TextInputStyle.PARAGRAPH),
+    raw_file_output: str = yuyo.modals.text_input(
+        "File output (y/n)", default="\N{THUMBS DOWN SIGN}", min_length=1, max_length=5
+    ),
+) -> None:
+    """Evaluate the input from an eval modal call."""
+    try:
+        file_output = tanjun.conversion.to_bool(raw_file_output)
+
+    except ValueError:
+        # TODO: yuyo needs an equiv of CommandError
+        await ctx.create_initial_response("Invalid value passed for File output", ephemeral=True)
+        return
+
+    if not await _check_owner(client, authors, ctx):
+        return
+
+    await ctx.defer(defer_type=hikari.ResponseType.DEFERRED_MESSAGE_UPDATE)
+    await eval_command(
+        ctx,
+        client,
+        component_client,
+        content=content,
+        file_output=file_output,
+        state_attachment=hikari.Bytes(content, STATE_FILE_NAME),
+    )
+
+
+def _make_rows(default: str) -> collections.Sequence[hikari.api.ModalActionRowBuilder]:
+    """Make a custom instance of the eval modal's rows with the eval content pre-set."""
+    assert isinstance(eval_modal.rows[0], hikari.api.ModalActionRowBuilder)
+    assert isinstance(eval_modal.rows[0].components[0], hikari.api.TextInputBuilder)
+    rows = [
+        hikari.impl.ModalActionRowBuilder().add_component(
+            eval_modal.rows[0].components[0].set_value(default or hikari.UNDEFINED)
+        ),
+        *eval_modal.rows[1:],
+    ]
+    return rows
+
+
+@yuyo.components.as_single_executor(EVAL_MODAL_ID, ephemeral_default=True)
+async def on_edit_button(
+    ctx: yuyo.ComponentContext,
+    client: alluka.Injected[tanjun.abc.Client],
+    authors: alluka.Injected[tanjun.dependencies.AbstractOwners],
+) -> None:
+    if not await _check_owner(client, authors, ctx):
+        return
+
+    rows = eval_modal.rows
+    # Try to get the old eval call's code
+    for attachment in ctx.interaction.message.attachments:
+        # If the edit button has been used already then a state file will be present.
+        if attachment.filename == STATE_FILE_NAME:
+            with contextlib.suppress(hikari.HikariError):
+                rows = _make_rows((await attachment.read()).decode())
+
+            break
+
+    else:
+        # Otherwise try to get the source message.
+        message = await client.rest.fetch_message(ctx.interaction.channel_id, ctx.interaction.message)
+        if message.referenced_message and message.referenced_message.content:
+            with contextlib.suppress(IndexError):
+                rows = _make_rows(CODEBLOCK_REGEX.findall(message.referenced_message.content)[0])
+
+    await ctx.create_modal_response("Edit eval", EVAL_MODAL_ID, components=rows)
+
+
+async def _on_noop(ctx: yuyo.ComponentContext) -> None:
+    raise RuntimeError("Shouldn't be reached")
+
+
 @tanjun.annotations.with_annotated_args
 @tanjun.as_message_command("eval", "exec")
 async def eval_command(
-    ctx: tanjun.abc.MessageContext,
-    component: alluka.Injected[tanjun.abc.Component],
+    ctx: typing.Union[tanjun.abc.MessageContext, yuyo.ModalContext],
+    client: alluka.Injected[tanjun.abc.Client],
     component_client: alluka.Injected[yuyo.ComponentClient],
+    *,
+    content: str | None = None,
+    component: alluka.Injected[tanjun.abc.Component | None] = None,
     file_output: Annotated[Bool, Flag(empty_value=True, aliases=["-f", "--file-out", "--file"])] = False,
+    state_attachment: hikari.Bytes | None = None,
     suppress_response: Annotated[Bool, Flag(empty_value=True, aliases=["-s", "--suppress"])] = False,
 ) -> None:
     """Dynamically evaluate a script in the bot's environment.
 
     This can only be used by the bot's owner.
     """
-    assert ctx.message.content is not None  # This shouldn't ever be the case in a command client.
-    code = re.findall(r"```(?:[\w]*\n?)([\s\S(^\\`{3})]*?)\n*```", ctx.message.content)
-    if not code:
-        raise tanjun.CommandError("Expected a python code block.", component=utility.delete_row(ctx))
+    if isinstance(ctx, tanjun.abc.MessageContext):
+        code = CODEBLOCK_REGEX.findall(ctx.content)
+        kwargs: dict[str, typing.Any] = {"reply": ctx.message.id}
+
+        if not code:
+            raise tanjun.CommandError(
+                "Expected a python code block.", component=utility.delete_row_from_authors(ctx.author.id)
+            )
+
+        code = code[0]
+
+    else:
+        assert content is not None
+        code = content
+        kwargs = {}
 
     if suppress_response:
-        await eval_python_code_no_capture(ctx, component, "<string>", code[0])
+        # Doesn't want a response, just run the eval to completion
+        await eval_python_code_no_capture(client, ctx, code, component=component)
         return
 
-    stdout, stderr, exec_time, failed = await eval_python_code(ctx, component, code[0])
+    stdout, stderr, exec_time, failed = await eval_python_code(client, ctx, code, component=component)
+    attachments = [state_attachment] if state_attachment else []
 
     if file_output:
-        await ctx.respond(
+        # Wants the output to be attached as two files, avoid building a paginator.
+        message = await ctx.respond(
             attachments=[
                 hikari.Bytes(stdout, "stdout.py", mimetype="text/x-python;charset=utf-8"),
                 hikari.Bytes(stderr, "stderr.py", mimetype="text/x-python;charset=utf-8"),
+                *attachments,
             ],
-            component=utility.delete_row(ctx),
+            component=utility.delete_row_from_authors(ctx.author.id).add_interactive_button(
+                hikari.ButtonStyle.SECONDARY, EVAL_MODAL_ID, emoji=EDIT_BUTTON_EMOJI
+            ),
+            **kwargs,
+            ensure_result=True,
         )
+        _try_deregister(component_client, message)
         return
 
     colour = utility.FAILED_COLOUR if failed else utility.PASS_COLOUR
@@ -211,15 +346,29 @@ async def eval_command(
         )
         for page, text in enumerate(string_paginator)
     )
-    paginator = utility.make_paginator(embed_generator, author=ctx.author, full=True)
+    paginator = utility.make_paginator(embed_generator, author=ctx.author.id, full=True)
     first_response = await paginator.get_next_entry()
     utility.add_file_button(
         paginator, make_files=lambda: [_bytes_from_io(stdout, "stdout.py"), _bytes_from_io(stderr, "stderr.py")]
     )
+    paginator.add_interactive_button(
+        hikari.ButtonStyle.SECONDARY, _on_noop, custom_id=EVAL_MODAL_ID, emoji=EDIT_BUTTON_EMOJI
+    )
 
     assert first_response is not None
-    message = await ctx.respond(**first_response.to_kwargs(), components=paginator.rows, ensure_result=True)
+    message = await ctx.respond(
+        **first_response.to_kwargs() | {"attachments": attachments},
+        components=paginator.rows,
+        **kwargs,
+        ensure_result=True,
+    )
+    _try_deregister(component_client, message)
     component_client.register_executor(paginator, message=message)
+
+
+def _try_deregister(client: yuyo.ComponentClient, message: hikari.Message) -> None:
+    with contextlib.suppress(KeyError):
+        client.deregister_message(message)
 
 
 load_sudo = (

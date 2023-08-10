@@ -36,11 +36,11 @@ __all__: list[str] = [
     "add_file_button",
     "basic_name_grid",
     "chunk",
-    "delete_button_callback",
     "delete_row",
     "delete_row_from_authors",
     "embed_iterator",
     "make_paginator",
+    "on_delete_button",
     "prettify_date",
     "prettify_index",
     "raise_error",
@@ -161,7 +161,16 @@ def basic_name_grid(flags: enum.IntFlag, /) -> str:  # TODO: actually deal with 
     return "\n".join(name_grid)
 
 
-async def delete_button_callback(ctx: yuyo.ComponentContext, /) -> None:
+DELETE_CUSTOM_ID = "AUTHOR_DELETE_BUTTON"
+"""Prefix ID used for delete buttons."""
+
+
+def _make_delete_id(*authors: hikari.SnowflakeishOr[hikari.User]) -> str:
+    return DELETE_CUSTOM_ID + ":" + ",".join(str(int(author)) for author in authors)
+
+
+@yuyo.components.as_single_executor(DELETE_CUSTOM_ID)
+async def on_delete_button(ctx: yuyo.ComponentContext, /) -> None:
     """Constant callback used by delete buttons.
 
     Parameters
@@ -209,14 +218,6 @@ def make_paginator(
         paginator.add_last_button()
 
     return paginator
-
-
-DELETE_CUSTOM_ID = "AUTHOR_DELETE_BUTTON"
-"""Prefix ID used for delete buttons."""
-
-
-def _make_delete_id(*authors: hikari.SnowflakeishOr[hikari.User]) -> str:
-    return DELETE_CUSTOM_ID + ":" + ",".join(str(int(author)) for author in authors)
 
 
 def delete_row(

@@ -51,13 +51,13 @@ __all__: list[str] = [
     "chunk",
     "command_hooks",
     "constants",
-    "delete_button_callback",
     "delete_row",
     "delete_row_from_authors",
     "dependencies",
     "embed_colour",
     "embed_iterator",
     "make_paginator",
+    "on_delete_button",
     "on_error",
     "on_parser_error",
     "prettify_date",
@@ -78,11 +78,11 @@ from .basic import FileCallback
 from .basic import add_file_button
 from .basic import basic_name_grid
 from .basic import chunk
-from .basic import delete_button_callback
 from .basic import delete_row
 from .basic import delete_row_from_authors
 from .basic import embed_iterator
 from .basic import make_paginator
+from .basic import on_delete_button
 from .basic import prettify_date
 from .basic import prettify_index
 from .basic import raise_error
