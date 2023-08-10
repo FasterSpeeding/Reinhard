@@ -257,11 +257,8 @@ async def on_edit_button(
     for attachment in ctx.interaction.message.attachments:
         # If the edit button has been used already then a state file will be present.
         if attachment.filename == STATE_FILE_NAME:
-            try:
+            with contextlib.suppress(hikari.HikariError):
                 rows = _make_rows((await attachment.read()).decode())
-
-            except hikari.HikariError:
-                pass
 
             break
 
@@ -269,11 +266,8 @@ async def on_edit_button(
         # Otherwise try to get the source message.
         message = await tanjun_client.rest.fetch_message(ctx.interaction.channel_id, ctx.interaction.message)
         if message.referenced_message and message.referenced_message.content:
-            try:
+            with contextlib.suppress(IndexError):
                 rows = _make_rows(CODEBLOCK_REGEX.findall(message.referenced_message.content)[0])
-
-            except IndexError:
-                pass
 
     await ctx.create_modal_response("Edit eval", EVAL_MODAL_ID, components=rows)
 
@@ -374,11 +368,8 @@ async def eval_command(
 
 
 def _try_deregister(client: yuyo.ComponentClient, message: hikari.Message) -> None:
-    try:
+    with contextlib.suppress(KeyError):
         client.deregister_message(message)
-
-    except KeyError:
-        pass
 
 
 load_sudo = (
