@@ -252,7 +252,6 @@ async def on_edit_button(
         return
 
     rows = eval_modal.rows
-
     # Try to get the old eval call's code
     for attachment in ctx.interaction.message.attachments:
         # If the edit button has been used already then a state file will be present.
