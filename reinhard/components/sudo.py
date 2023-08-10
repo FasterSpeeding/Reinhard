@@ -218,7 +218,7 @@ async def eval_modal(
     if not await _check_owner(client, authors, ctx):
         return
 
-    await ctx.defer(defer_type=hikari.ResponseType.DEFERRED_MESSAGE_UPDATE)
+    await ctx.create_initial_response(response_type=hikari.ResponseType.MESSAGE_UPDATE)
     await eval_command(
         ctx,
         client,
@@ -295,6 +295,7 @@ async def eval_command(
     if isinstance(ctx, tanjun.abc.MessageContext):
         code = CODEBLOCK_REGEX.findall(ctx.content)
         kwargs: dict[str, typing.Any] = {"reply": ctx.message.id}
+        respond = ctx.respond
 
         if not code:
             raise tanjun.CommandError(
@@ -307,6 +308,7 @@ async def eval_command(
         assert content is not None
         code = content
         kwargs = {}
+        respond = ctx.edit_initial_response
 
     if suppress_response:
         # Doesn't want a response, just run the eval to completion
@@ -318,7 +320,7 @@ async def eval_command(
 
     if file_output:
         # Wants the output to be attached as two files, avoid building a paginator.
-        message = await ctx.respond(
+        message = await respond(
             attachments=[
                 hikari.Bytes(stdout, "stdout.py", mimetype="text/x-python;charset=utf-8"),
                 hikari.Bytes(stderr, "stderr.py", mimetype="text/x-python;charset=utf-8"),
@@ -328,7 +330,6 @@ async def eval_command(
                 hikari.ButtonStyle.SECONDARY, EVAL_MODAL_ID, emoji=EDIT_BUTTON_EMOJI
             ),
             **kwargs,
-            ensure_result=True,
         )
         _try_deregister(component_client, message)
         return
@@ -356,11 +357,10 @@ async def eval_command(
     )
 
     assert first_response is not None
-    message = await ctx.respond(
+    message = await respond(
         **first_response.to_kwargs() | {"attachments": attachments},
         components=paginator.rows,
         **kwargs,
-        ensure_result=True,
     )
     _try_deregister(component_client, message)
     component_client.register_executor(paginator, message=message)
