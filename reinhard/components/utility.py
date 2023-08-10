@@ -258,7 +258,6 @@ async def avatar(
         avatar = user.guild_avatar_url
 
     avatar = avatar or user.avatar_url or user.default_avatar_url
-
     embed = hikari.Embed(title=str(user), url=str(avatar), colour=utility.embed_colour()).set_image(avatar)
     await ctx.respond(embed=embed, component=utility.delete_row(ctx))
 
