@@ -107,7 +107,7 @@ def _yields_results(*args: io.StringIO) -> collections.Iterator[str]:
 
 
 async def eval_python_code(
-    tanjun_client: tanjun.abc.Client,
+    client: tanjun.abc.Client,
     ctx: tanjun.abc.Context | yuyo.ComponentContext | yuyo.ModalContext,
     code: str,
     /,
@@ -124,7 +124,7 @@ async def eval_python_code(
     start_time = time.perf_counter()
     try:
         with stack:
-            await eval_python_code_no_capture(tanjun_client, ctx, code, component=component)
+            await eval_python_code_no_capture(client, ctx, code, component=component)
 
         failed = False
     except Exception:
@@ -139,7 +139,7 @@ async def eval_python_code(
 
 
 async def eval_python_code_no_capture(
-    tanjun_client: tanjun.abc.Client,
+    client: tanjun.abc.Client,
     ctx: tanjun.abc.Context | yuyo.ComponentContext | yuyo.ModalContext,
     code: str,
     /,
@@ -151,7 +151,7 @@ async def eval_python_code_no_capture(
         "app": ctx.shards,
         "asyncio": asyncio,
         "bot": ctx.shards,
-        "client": tanjun_client,
+        "client": client,
         "component": component,
         "ctx": ctx,
         "hikari": hikari,
@@ -182,11 +182,11 @@ EDIT_BUTTON_EMOJI = "\N{SQUARED NEW}"
 
 
 async def _check_owner(
-    tanjun_client: tanjun.abc.Client,
+    client: tanjun.abc.Client,
     authors: tanjun.dependencies.AbstractOwners,
     ctx: yuyo.ComponentContext | yuyo.ModalContext,
 ) -> bool:
-    state = await authors.check_ownership(tanjun_client, ctx.interaction.user)
+    state = await authors.check_ownership(client, ctx.interaction.user)
     if not state:
         # TODO: yuyo needs an equiv of CommandError
         await ctx.respond("You cannot use this button")
@@ -197,7 +197,7 @@ async def _check_owner(
 @yuyo.modals.as_modal(parse_signature=True)
 async def eval_modal(
     ctx: yuyo.ModalContext,
-    tanjun_client: alluka.Injected[tanjun.abc.Client],
+    client: alluka.Injected[tanjun.abc.Client],
     component_client: alluka.Injected[yuyo.ComponentClient],
     authors: alluka.Injected[tanjun.dependencies.AbstractOwners],
     *,
@@ -215,13 +215,13 @@ async def eval_modal(
         await ctx.create_initial_response("Invalid value passed for File output", ephemeral=True)
         return
 
-    if not await _check_owner(tanjun_client, authors, ctx):
+    if not await _check_owner(client, authors, ctx):
         return
 
     await ctx.defer(defer_type=hikari.ResponseType.DEFERRED_MESSAGE_UPDATE)
     await eval_command(
         ctx,
-        tanjun_client,
+        client,
         component_client,
         content=content,
         file_output=file_output,
@@ -245,10 +245,10 @@ def _make_rows(default: str) -> collections.Sequence[hikari.api.ModalActionRowBu
 @yuyo.components.as_single_executor(EVAL_MODAL_ID, ephemeral_default=True)
 async def on_edit_button(
     ctx: yuyo.ComponentContext,
-    tanjun_client: alluka.Injected[tanjun.abc.Client],
+    client: alluka.Injected[tanjun.abc.Client],
     authors: alluka.Injected[tanjun.dependencies.AbstractOwners],
 ) -> None:
-    if not await _check_owner(tanjun_client, authors, ctx):
+    if not await _check_owner(client, authors, ctx):
         return
 
     rows = eval_modal.rows
@@ -264,7 +264,7 @@ async def on_edit_button(
 
     else:
         # Otherwise try to get the source message.
-        message = await tanjun_client.rest.fetch_message(ctx.interaction.channel_id, ctx.interaction.message)
+        message = await client.rest.fetch_message(ctx.interaction.channel_id, ctx.interaction.message)
         if message.referenced_message and message.referenced_message.content:
             with contextlib.suppress(IndexError):
                 rows = _make_rows(CODEBLOCK_REGEX.findall(message.referenced_message.content)[0])
@@ -280,7 +280,7 @@ async def _on_noop(ctx: yuyo.ComponentContext) -> None:
 @tanjun.as_message_command("eval", "exec")
 async def eval_command(
     ctx: typing.Union[tanjun.abc.MessageContext, yuyo.ModalContext],
-    tanjun_client: alluka.Injected[tanjun.abc.Client],
+    client: alluka.Injected[tanjun.abc.Client],
     component_client: alluka.Injected[yuyo.ComponentClient],
     *,
     content: str | None = None,
@@ -311,10 +311,10 @@ async def eval_command(
 
     if suppress_response:
         # Doesn't want a response, just run the eval to completion
-        await eval_python_code_no_capture(tanjun_client, ctx, code, component=component)
+        await eval_python_code_no_capture(client, ctx, code, component=component)
         return
 
-    stdout, stderr, exec_time, failed = await eval_python_code(tanjun_client, ctx, code, component=component)
+    stdout, stderr, exec_time, failed = await eval_python_code(client, ctx, code, component=component)
     attachments = [state_attachment] if state_attachment else []
 
     if file_output:
