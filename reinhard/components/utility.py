@@ -44,6 +44,7 @@ from tanjun.annotations import Color
 from tanjun.annotations import Flag
 from tanjun.annotations import Greedy
 from tanjun.annotations import Member
+from tanjun.annotations import Name
 from tanjun.annotations import Role
 from tanjun.annotations import Snowflake
 from tanjun.annotations import Str
@@ -225,21 +226,38 @@ async def user(ctx: tanjun.abc.Context, user: User | None = None) -> None:
 
 
 @doc_parse.with_annotated_args(follow_wrapped=True)
+@tanjun.with_argument("user", converters=(tanjun.to_member, tanjun.to_user), default=None)
 @tanjun.as_message_command("avatar")
+@tanjun.with_user_slash_option(
+    "user", "User to get the avatar for. If not provided then this returns the current user's avatar.", default=None
+)
 @doc_parse.as_slash_command()
-async def avatar(ctx: tanjun.abc.Context, user: User | None = None) -> None:
+async def avatar(
+    ctx: tanjun.abc.Context,
+    user: hikari.Member | hikari.User | None,
+    default: Annotated[Bool, Flag(empty_value=True)] = False,
+    global_avatar: Annotated[Bool, Name("global"), Flag(empty_value=True)] = False,
+) -> None:
     """Get a user's avatar.
 
     Parameters
     ----------
-    user
-        User to get the avatar for.
-        If not provided then this returns the current user's avatar.
+    global_avatar
+        Get their global avatar.
+    default
+        Get their default avatar.
     """
     if user is None:
-        user = ctx.author
+        user = ctx.member or ctx.author
 
-    avatar = user.avatar_url or user.default_avatar_url
+    avatar = None
+    if default:
+        avatar = user.default_avatar_url
+
+    elif not global_avatar and isinstance(user, hikari.Member):
+        avatar = user.guild_avatar_url
+
+    avatar = avatar or user.avatar_url or user.default_avatar_url
     embed = hikari.Embed(title=str(user), url=str(avatar), colour=utility.embed_colour()).set_image(avatar)
     await ctx.respond(embed=embed, component=utility.delete_row(ctx))
 
