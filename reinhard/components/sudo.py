@@ -358,9 +358,7 @@ async def eval_command(
 
     assert first_response is not None
     message = await respond(
-        **first_response.to_kwargs() | {"attachments": attachments},
-        components=paginator.rows,
-        **kwargs,
+        **first_response.to_kwargs() | {"attachments": attachments}, components=paginator.rows, **kwargs
     )
     _try_deregister(component_client, message)
     component_client.register_executor(paginator, message=message)
