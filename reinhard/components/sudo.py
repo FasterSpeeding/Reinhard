@@ -197,7 +197,6 @@ async def _check_owner(
 @yuyo.modals.as_modal(parse_signature=True)
 async def eval_modal(
     ctx: yuyo.ModalContext,
-    bot: alluka.Injected[hikari.RESTAware],
     tanjun_client: alluka.Injected[tanjun.abc.Client],
     component_client: alluka.Injected[yuyo.ComponentClient],
     authors: alluka.Injected[tanjun.dependencies.AbstractOwners],
@@ -222,7 +221,6 @@ async def eval_modal(
     await ctx.defer(defer_type=hikari.ResponseType.DEFERRED_MESSAGE_UPDATE)
     await eval_command(
         ctx,
-        bot,
         tanjun_client,
         component_client,
         content=content,
