@@ -107,7 +107,6 @@ def _yields_results(*args: io.StringIO) -> collections.Iterator[str]:
 
 
 async def eval_python_code(
-    bot: hikari.RESTAware,
     tanjun_client: tanjun.abc.Client,
     ctx: tanjun.abc.Context | yuyo.ComponentContext | yuyo.ModalContext,
     code: str,
@@ -125,7 +124,7 @@ async def eval_python_code(
     start_time = time.perf_counter()
     try:
         with stack:
-            await eval_python_code_no_capture(bot, tanjun_client, ctx, code, component=component)
+            await eval_python_code_no_capture(tanjun_client, ctx, code, component=component)
 
         failed = False
     except Exception:
@@ -140,7 +139,6 @@ async def eval_python_code(
 
 
 async def eval_python_code_no_capture(
-    bot: hikari.RESTAware,
     tanjun_client: tanjun.abc.Client,
     ctx: tanjun.abc.Context | yuyo.ComponentContext | yuyo.ModalContext,
     code: str,
@@ -150,10 +148,9 @@ async def eval_python_code_no_capture(
     file_name: str = "<string>",
 ) -> None:
     globals_ = {
-        # TODO: add shards attribute to yuyo's context types
-        "app": bot,
+        "app": ctx.shards,
         "asyncio": asyncio,
-        "bot": bot,
+        "bot": ctx.shards,
         "client": tanjun_client,
         "component": component,
         "ctx": ctx,
@@ -291,7 +288,6 @@ async def _on_noop(ctx: yuyo.ComponentContext) -> None:
 @tanjun.as_message_command("eval", "exec")
 async def eval_command(
     ctx: typing.Union[tanjun.abc.MessageContext, yuyo.ModalContext],
-    bot: alluka.Injected[hikari.RESTAware],
     tanjun_client: alluka.Injected[tanjun.abc.Client],
     component_client: alluka.Injected[yuyo.ComponentClient],
     *,
@@ -323,10 +319,10 @@ async def eval_command(
 
     if suppress_response:
         # Doesn't want a response, just run the eval to completion
-        await eval_python_code_no_capture(bot, tanjun_client, ctx, code, component=component)
+        await eval_python_code_no_capture(tanjun_client, ctx, code, component=component)
         return
 
-    stdout, stderr, exec_time, failed = await eval_python_code(bot, tanjun_client, ctx, code, component=component)
+    stdout, stderr, exec_time, failed = await eval_python_code(tanjun_client, ctx, code, component=component)
     attachments = [state_attachment] if state_attachment else []
 
     if file_output:
