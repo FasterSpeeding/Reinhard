@@ -57,7 +57,7 @@ default_py_ver = "3.10"
 [tool.piped.github_actions.verify_locks]
 
 [tool.pyright]
-include = ["reinhard"] 
+include = ["reinhard"]
 
 pythonVersion = "3.10"
 typeCheckingMode = "strict"
