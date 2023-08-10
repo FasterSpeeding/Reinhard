@@ -206,7 +206,9 @@ async def eval_modal(
     authors: alluka.Injected[tanjun.dependencies.AbstractOwners],
     *,
     content: str = yuyo.modals.text_input("Content", style=hikari.TextInputStyle.PARAGRAPH),
-    raw_file_output: str = yuyo.modals.text_input("File output (y/n)", default="n", min_length=1, max_length=3),
+    raw_file_output: str = yuyo.modals.text_input(
+        "File output (y/n)", default="\N{THUMBS DOWN SIGN}", min_length=1, max_length=5
+    ),
 ) -> None:
     """Evaluate the input from an eval modal call."""
     try:
