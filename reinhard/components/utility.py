@@ -44,6 +44,7 @@ from tanjun.annotations import Color
 from tanjun.annotations import Flag
 from tanjun.annotations import Greedy
 from tanjun.annotations import Member
+from tanjun.annotations import Name
 from tanjun.annotations import Role
 from tanjun.annotations import Snowflake
 from tanjun.annotations import Str
@@ -51,7 +52,6 @@ from tanjun.annotations import User
 from tanjun.annotations import channel_field
 
 from .. import utility
-from tanjun.annotations import Name
 
 
 @doc_parse.with_annotated_args(follow_wrapped=True)
@@ -228,7 +228,9 @@ async def user(ctx: tanjun.abc.Context, user: User | None = None) -> None:
 @doc_parse.with_annotated_args(follow_wrapped=True)
 @tanjun.with_argument("user", converters=(tanjun.to_member, tanjun.to_user), default=None)
 @tanjun.as_message_command("avatar")
-@tanjun.with_user_slash_option("user", "User to get the avatar for. If not provided then this returns the current user's avatar.", default=None)
+@tanjun.with_user_slash_option(
+    "user", "User to get the avatar for. If not provided then this returns the current user's avatar.", default=None
+)
 @doc_parse.as_slash_command()
 async def avatar(
     ctx: tanjun.abc.Context,
