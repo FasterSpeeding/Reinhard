@@ -31,7 +31,6 @@
 from __future__ import annotations
 
 __all__: list[str] = [
-    "DELETE_CUSTOM_ID",
     "FileCallback",
     "add_file_button",
     "basic_name_grid",
@@ -40,7 +39,6 @@ __all__: list[str] = [
     "delete_row_from_authors",
     "embed_iterator",
     "make_paginator",
-    "on_delete_button",
     "prettify_date",
     "prettify_index",
     "raise_error",
@@ -163,42 +161,6 @@ def basic_name_grid(flags: enum.IntFlag, /) -> str:  # TODO: actually deal with 
     return "\n".join(name_grid)
 
 
-DELETE_CUSTOM_ID = "AUTHOR_DELETE_BUTTON"
-"""Prefix ID used for delete buttons."""
-
-
-def _make_delete_id(*authors: hikari.SnowflakeishOr[hikari.User]) -> str:
-    return DELETE_CUSTOM_ID + ":" + ",".join(str(int(author)) for author in authors)
-
-
-@yuyo.components.as_single_executor(DELETE_CUSTOM_ID)
-async def on_delete_button(ctx: yuyo.ComponentContext, /) -> None:
-    """Constant callback used by delete buttons.
-
-    Parameters
-    ----------
-    ctx
-        The context that triggered this delete.
-    """
-    # Filter is needed as "".split(",") will give [""] which is not a valid snowflake.
-    author_ids = set(map(hikari.Snowflake, filter(None, ctx.id_metadata.split(","))))
-    if (
-        not author_ids  # no IDs == public
-        or ctx.interaction.user.id in author_ids
-        or ctx.interaction.member
-        and author_ids.intersection(ctx.interaction.member.role_ids)
-    ):
-        await ctx.defer(defer_type=hikari.ResponseType.DEFERRED_MESSAGE_UPDATE)
-        await ctx.delete_initial_response()
-
-    else:
-        await ctx.create_initial_response(
-            "You do not own this message",
-            response_type=hikari.ResponseType.MESSAGE_CREATE,
-            flags=hikari.MessageFlag.EPHEMERAL,
-        )
-
-
 def make_paginator(
     iterator: typing.Union[
         collections.Iterator[yuyo.pagination.EntryT], collections.AsyncIterator[yuyo.pagination.EntryT]
@@ -214,7 +176,7 @@ def make_paginator(
     if full:
         paginator.add_first_button()
 
-    paginator.add_previous_button().add_stop_button(custom_id=_make_delete_id(*authors)).add_next_button()
+    paginator.add_previous_button().add_stop_button(custom_id=constants.make_delete_id(*authors)).add_next_button()
 
     if full:
         paginator.add_last_button()
@@ -240,7 +202,7 @@ def delete_row(
         Action row builder with a delete button.
     """
     return hikari.impl.MessageActionRowBuilder().add_interactive_button(
-        hikari.ButtonStyle.DANGER, _make_delete_id(ctx.author), emoji=constants.DELETE_EMOJI
+        hikari.ButtonStyle.DANGER, constants.make_delete_id(ctx.author), emoji=constants.DELETE_EMOJI
     )
 
 
@@ -262,7 +224,7 @@ def delete_row_from_authors(*authors: hikari.Snowflakeish) -> hikari.impl.Messag
     """
 
     return hikari.impl.MessageActionRowBuilder().add_interactive_button(
-        hikari.ButtonStyle.DANGER, _make_delete_id(*authors), emoji=constants.DELETE_EMOJI
+        hikari.ButtonStyle.DANGER, constants.make_delete_id(*authors), emoji=constants.DELETE_EMOJI
     )
 
 

@@ -55,8 +55,8 @@ __all__: list[str] = [
     "dependencies",
     "embed_colour",
     "embed_iterator",
+    "make_delete_id",
     "make_paginator",
-    "on_delete_button",
     "on_error",
     "on_parser_error",
     "prettify_date",
@@ -72,7 +72,6 @@ from . import constants
 from . import dependencies
 from . import rest
 from . import ytdl
-from .basic import DELETE_CUSTOM_ID
 from .basic import add_file_button
 from .basic import basic_name_grid
 from .basic import chunk
@@ -80,13 +79,13 @@ from .basic import delete_row
 from .basic import delete_row_from_authors
 from .basic import embed_iterator
 from .basic import make_paginator
-from .basic import on_delete_button
 from .basic import prettify_date
 from .basic import prettify_index
 from .basic import raise_error
 from .command_hooks import on_error
 from .command_hooks import on_parser_error
 from .constants import AMARANTH_PINK
+from .constants import DELETE_CUSTOM_ID
 from .constants import DELETE_EMOJI
 from .constants import FAILED_COLOUR
 from .constants import FILE_EMOJI
@@ -94,6 +93,7 @@ from .constants import MAYA_BLUE
 from .constants import PASS_COLOUR
 from .constants import WHITE
 from .constants import embed_colour
+from .constants import make_delete_id
 from .dependencies import SessionManager
 from .rest import AIOHTTPStatusHandler
 from .rest import ClientCredentialsOauth2

@@ -30,7 +30,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["load_sudo"]
+__all__: list[str] = ["load_sudo", "unload_sudo"]
 
 import ast
 import asyncio
@@ -423,4 +423,28 @@ def _try_deregister(client: yuyo.ComponentClient, message: hikari.Message) -> No
         client.deregister_message(message)
 
 
-load_sudo = component.add_check(tanjun.checks.OwnerCheck()).load_from_scope().make_loader()
+component.add_check(tanjun.checks.OwnerCheck()).load_from_scope()
+
+
+@tanjun.as_loader
+def load_sudo(client: tanjun.abc.Client) -> None:
+    client.add_component(component)
+
+    component_client = client.injector.get_type_dependency(yuyo.ComponentClient)
+    modal_client = client.injector.get_type_dependency(yuyo.ModalClient)
+    assert component_client
+    assert modal_client
+    component_client.register_executor(on_edit_button, timeout=None)
+    modal_client.register_modal(EVAL_MODAL_ID, eval_modal, timeout=None)
+
+
+@tanjun.as_unloader
+def unload_sudo(client: tanjun.abc.Client) -> None:
+    client.remove_component_by_name(component.name)
+
+    component_client = client.injector.get_type_dependency(yuyo.ComponentClient)
+    modal_client = client.injector.get_type_dependency(yuyo.ModalClient)
+    assert component_client
+    assert modal_client
+    component_client.deregister_executor(on_edit_button)
+    modal_client.deregister_modal(EVAL_MODAL_ID)

@@ -43,7 +43,6 @@ import yuyo.modals
 
 from . import config as config_
 from . import utility
-from .components import sudo
 
 if typing.TYPE_CHECKING:
     from hikari import traits as hikari_traits
@@ -144,21 +143,8 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> tanjun.Client:
         .set_type_dependency(config_.Tokens, config.tokens)
     )
 
-    components_dir = pathlib.Path(".") / "reinhard" / "components"
-    if config.hot_reload:
-        guilds = (
-            config.declare_global_commands if isinstance(config.declare_global_commands, hikari.Snowflake) else None
-        )
-        redeclare = None if config.declare_global_commands is False else datetime.timedelta(seconds=10)
-        (
-            tanjun.HotReloader(commands_guild=guilds, redeclare_cmds_after=redeclare)
-            .add_directory(components_dir, namespace="reinhard.components")
-            .add_to_client(client)
-        )
-
-    else:
-        client.load_directory(components_dir, namespace="reinhard.components")
-
+    yuyo.ComponentClient.from_tanjun(client)
+    yuyo.ModalClient.from_tanjun(client)
     assert isinstance(client.rest.http_settings, hikari.impl.HTTPSettings)
     assert isinstance(client.rest.proxy_settings, hikari.impl.ProxySettings)
     utility.SessionManager(
@@ -175,12 +161,21 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> tanjun.Client:
     if client.shards:
         yuyo.ReactionClient.from_tanjun(client)
 
-    (
-        yuyo.ComponentClient.from_tanjun(client)
-        .register_executor(utility.on_delete_button, timeout=None)
-        .register_executor(sudo.on_edit_button, timeout=None)
-    )
-    yuyo.ModalClient.from_tanjun(client).register_modal(sudo.EVAL_MODAL_ID, sudo.eval_modal, timeout=None)
+    components_dir = pathlib.Path(".") / "reinhard" / "components"
+    if config.hot_reload:
+        guilds = (
+            config.declare_global_commands if isinstance(config.declare_global_commands, hikari.Snowflake) else None
+        )
+        redeclare = None if config.declare_global_commands is False else datetime.timedelta(seconds=10)
+        (
+            tanjun.HotReloader(commands_guild=guilds, redeclare_cmds_after=redeclare)
+            .add_directory(components_dir, namespace="reinhard.components")
+            .add_to_client(client)
+        )
+
+    else:
+        client.load_directory(components_dir, namespace="reinhard.components")
+
     return client
 
 
