@@ -217,9 +217,11 @@ async def eval_modal(
 
     await _check_owner(client, authors, ctx)
     if ctx.interaction.message:
+        # Being executed as a button attached to an eval call's response to edit it.
         await ctx.create_initial_response(response_type=hikari.ResponseType.MESSAGE_UPDATE)
 
     else:
+        # Being executed in response to the slash command.
         await ctx.create_initial_response("Loading...")
 
     state_file = json.dumps({"content": content, "file_output": file_output})
