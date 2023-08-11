@@ -239,9 +239,6 @@ def _make_rows(
     *, default: str | None = None, file_output: bool | None = None
 ) -> collections.Sequence[hikari.api.ModalActionRowBuilder]:
     """Make a custom instance of the eval modal's rows with the eval content pre-set."""
-    if default is None and file_output is None:
-        return eval_modal.rows
-
     rows = list(eval_modal.rows)
     content_row = eval_modal.rows[0]
     if default is not None:
