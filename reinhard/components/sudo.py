@@ -35,6 +35,7 @@ __all__: list[str] = ["load_sudo"]
 import ast
 import asyncio
 import contextlib
+import copy
 import inspect
 import io
 import json
@@ -221,25 +222,40 @@ async def eval_modal(
     else:
         await ctx.create_initial_response("Loading...")
 
+    state_file = json.dumps({"content": content, "file_output": raw_file_output})
     await eval_message_command(
         ctx,
         client,
         component_client,
         content=content,
         file_output=file_output,
-        state_attachment=hikari.Bytes(content, STATE_FILE_NAME),
+        state_attachment=hikari.Bytes(state_file, STATE_FILE_NAME),
     )
 
 
-def _make_rows(default: str) -> collections.Sequence[hikari.api.ModalActionRowBuilder]:
+def _make_rows(
+    *, default: str | None = None, file_output: bool | None = None
+) -> collections.Sequence[hikari.api.ModalActionRowBuilder]:
     """Make a custom instance of the eval modal's rows with the eval content pre-set."""
-    assert isinstance(eval_modal.rows[0].components[0], hikari.api.TextInputBuilder)
-    rows = [
-        hikari.impl.ModalActionRowBuilder().add_component(
-            eval_modal.rows[0].components[0].set_value(default or hikari.UNDEFINED)
-        ),
-        *eval_modal.rows[1:],
-    ]
+    if not default and file_output is None:
+        return eval_modal.rows
+
+    rows = list(eval_modal.rows)
+    content_row = eval_modal.rows[0]
+    if default is not None:
+        assert isinstance(content_row.components[0], hikari.api.TextInputBuilder)
+        rows[0] = hikari.impl.ModalActionRowBuilder().add_component(
+            copy.copy(content_row.components[0]).set_value(default)
+        )
+
+    button_row = eval_modal.rows[1]
+    if file_output is not None:
+        assert isinstance(button_row.components[0], hikari.api.TextInputBuilder)
+        file_output_repr = THUMBS_UP_EMOJI if file_output else THUMBS_DOWN_EMOJI
+        rows[1] = hikari.impl.ModalActionRowBuilder().add_component(
+            copy.copy(button_row.components[0]).set_value(file_output_repr)
+        )
+
     return rows
 
 
@@ -255,8 +271,22 @@ async def on_edit_button(
     for attachment in ctx.interaction.message.attachments:
         # If the edit button has been used already then a state file will be present.
         if attachment.filename == STATE_FILE_NAME:
-            with contextlib.suppress(hikari.HikariError):
-                rows = _make_rows((await attachment.read()).decode())
+            try:
+                data = await attachment.read()
+
+            except hikari.HikariError:
+                break
+
+            try:
+                data = json.loads(data)
+
+            # Backwards compatibility with old eval responses which just stored
+            # the eval code in the file output file raw without any json wrapping.
+            except json.JSONDecodeError:
+                rows = _make_rows(default=data.decode())
+
+            else:
+                rows = _make_rows(default=data["content"], file_output=data["file_output"])
 
             break
 
@@ -265,7 +295,7 @@ async def on_edit_button(
         message = await client.rest.fetch_message(ctx.interaction.channel_id, ctx.interaction.message)
         if message.referenced_message and message.referenced_message.content:
             with contextlib.suppress(IndexError):
-                rows = _make_rows(CODEBLOCK_REGEX.findall(message.referenced_message.content)[0])
+                rows = _make_rows(default=CODEBLOCK_REGEX.findall(message.referenced_message.content)[0])
 
     await ctx.create_modal_response("Edit eval", EVAL_MODAL_ID, components=rows)
 
@@ -364,7 +394,7 @@ async def eval_message_command(
 @doc_parse.with_annotated_args
 @tanjun.with_owner_check
 @doc_parse.as_slash_command(name="eval", is_global=False)
-async def eval_slash_command(ctx: tanjun.abc.SlashContext, file_output: Bool = False) -> None:
+async def eval_slash_command(ctx: tanjun.abc.SlashContext, file_output: Bool | None = None) -> None:
     """Owner only command used to dynamically evaluate a script.
 
     This can only be used by the bot's owner.
@@ -376,16 +406,7 @@ async def eval_slash_command(ctx: tanjun.abc.SlashContext, file_output: Bool = F
 
         Defaults to False.
     """
-    assert isinstance(eval_modal.rows[1].components[0], hikari.api.TextInputBuilder)
-    # TODO: persist this default forever.
-    # Use JSON for the file thingy and store that there as another field
-    file_output_repr = THUMBS_UP_EMOJI if file_output else THUMBS_DOWN_EMOJI
-    rows = [
-        eval_modal.rows[0],
-        hikari.impl.ModalActionRowBuilder().add_component(eval_modal.rows[1].components[0].set_value(file_output_repr)),
-        *eval_modal.rows[2:],
-    ]
-    await ctx.create_modal_response("Eval", EVAL_MODAL_ID, components=rows)
+    await ctx.create_modal_response("Eval", EVAL_MODAL_ID, components=_make_rows(file_output=file_output))
 
 
 @component.with_listener()
