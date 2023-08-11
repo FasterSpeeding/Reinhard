@@ -207,7 +207,6 @@ async def eval_modal(
         file_output = tanjun.conversion.to_bool(raw_file_output)
 
     except ValueError:
-        # TODO: yuyo needs an equiv of CommandError
         await ctx.create_initial_response("Invalid value passed for File output", ephemeral=True)
         return
 
@@ -344,7 +343,6 @@ async def eval_command(
     utility.add_file_button(
         paginator, make_files=lambda: [_bytes_from_io(stdout, "stdout.py"), _bytes_from_io(stderr, "stderr.py")]
     )
-    # TODO: add this button back after add_file is called somehow
     paginator.add_interactive_button(
         hikari.ButtonStyle.SECONDARY, _on_noop, custom_id=EVAL_MODAL_ID, emoji=EDIT_BUTTON_EMOJI
     )

@@ -39,7 +39,6 @@ __all__: list[str] = [
     "FAILED_COLOUR",
     "FILE_EMOJI",
     "FetchedResource",
-    "FileCallback",
     "MAYA_BLUE",
     "PASS_COLOUR",
     "SessionManager",
@@ -74,7 +73,6 @@ from . import dependencies
 from . import rest
 from . import ytdl
 from .basic import DELETE_CUSTOM_ID
-from .basic import FileCallback
 from .basic import add_file_button
 from .basic import basic_name_grid
 from .basic import chunk
