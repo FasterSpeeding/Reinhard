@@ -201,6 +201,16 @@ def _str_to_bool(value: str, /, *, default: ValueT = ...) -> bool | ValueT:
     raise ValueError(f"{value!r} is not a valid boolean")
 
 
+def _parse_ids(values: typing.Union[collections.Sequence[int], str]) -> set[hikari.Snowflake]:
+    if isinstance(values, str):
+        return {hikari.Snowflake(value.strip()) for value in values.split(",")}
+
+    return {hikari.Snowflake(value) for value in values}
+
+
+_DEFAULT_EVAL_GUILDS = frozenset((hikari.Snowflake(561884984214814744), hikari.Snowflake(574921006817476608)))
+
+
 @dataclasses.dataclass(kw_only=True, repr=False, slots=True)
 class FullConfig(Config):
     database: DatabaseConfig
@@ -215,6 +225,7 @@ class FullConfig(Config):
     ptf: PTFConfig | None = None
     declare_global_commands: bool | hikari.Snowflake = True
     hot_reload: bool = False
+    eval_guilds: collections.Set[hikari.Snowflake] = _DEFAULT_EVAL_GUILDS
 
     @classmethod
     def from_env(cls) -> Self:
@@ -234,7 +245,7 @@ class FullConfig(Config):
             log_level=_cast_or_else(os.environ, "LOG_LEVEL", lambda v: int(v) if v.isdigit() else v, logging.INFO),
             mention_prefix=_cast_or_else(os.environ, "MENTION_PREFIX", _str_to_bool, True),
             owner_only=_cast_or_else(os.environ, "OWNER_ONLY", _str_to_bool, False),
-            prefixes=_cast_or_else(os.environ, "PREFIXES", lambda v: frozenset(map(str, v)), frozenset[str]()),
+            prefixes=_cast_or_else(os.environ, "PREFIXES", lambda v: set(map(str, v)), set[str]()),
             ptf=PTFConfig.from_env() if os.getenv("PTF_USERNAME") else None,
             tokens=Tokens.from_env(),
             declare_global_commands=_cast_or_else(
@@ -244,6 +255,7 @@ class FullConfig(Config):
                 True,
             ),
             hot_reload=_cast_or_else(os.environ, "HOT_RELOAD", _str_to_bool, False),
+            eval_guilds=_cast_or_else(os.environ, "EVAL_GUILDS", _parse_ids, _DEFAULT_EVAL_GUILDS),
         )
 
     @classmethod
@@ -273,10 +285,11 @@ class FullConfig(Config):
             log_level=log_level,
             mention_prefix=bool(mapping.get("mention_prefix", True)),
             owner_only=bool(mapping.get("owner_only", False)),
-            prefixes=frozenset(map(str, mapping["prefixes"])) if "prefixes" in mapping else frozenset(),
+            prefixes=set(map(str, mapping["prefixes"])) if "prefixes" in mapping else set(),
             ptf=_cast_or_else(mapping, "ptf", PTFConfig.from_mapping, None),
             tokens=Tokens.from_mapping(mapping["tokens"]),
             declare_global_commands=declare_global_commands,
+            eval_guilds=_cast_or_else(mapping, "eval_guilds", _parse_ids, _DEFAULT_EVAL_GUILDS),
         )
 
 

@@ -50,6 +50,7 @@ import hikari
 import tanjun
 import yuyo
 from hikari import traits
+from tanchan import doc_parse
 from tanjun.annotations import Bool
 from tanjun.annotations import Converted
 from tanjun.annotations import Flag
@@ -57,9 +58,10 @@ from tanjun.annotations import Greedy
 from tanjun.annotations import Positional
 from tanjun.annotations import Str
 
+from .. import config
 from .. import utility
 
-CallbackT = collections.Callable[..., collections.Coroutine[typing.Any, typing.Any, typing.Any]]
+component = tanjun.Component(name="sudo", strict=True)
 
 
 @tanjun.as_message_command("error")
@@ -179,6 +181,8 @@ EVAL_MODAL_ID = "UPDATE_EVAL"
 CODEBLOCK_REGEX = re.compile(r"```(?:[\w]*\n?)([\s\S(^\\`{3})]*?)\n*```")
 STATE_FILE_NAME = "EVAL_STATE"
 EDIT_BUTTON_EMOJI = "\N{SQUARED NEW}"
+THUMBS_UP_EMOJI = "\N{THUMBS UP SIGN}"
+THUMBS_DOWN_EMOJI = "\N{THUMBS DOWN SIGN}"
 
 
 async def _check_owner(
@@ -199,7 +203,7 @@ async def eval_modal(
     *,
     content: str = yuyo.modals.text_input("Content", style=hikari.TextInputStyle.PARAGRAPH),
     raw_file_output: str = yuyo.modals.text_input(
-        "File output (y/n)", default="\N{THUMBS DOWN SIGN}", min_length=1, max_length=5
+        "File output (y/n)", default=THUMBS_DOWN_EMOJI, min_length=1, max_length=5
     ),
 ) -> None:
     """Evaluate the input from an eval modal call."""
@@ -211,8 +215,13 @@ async def eval_modal(
         return
 
     await _check_owner(client, authors, ctx)
-    await ctx.create_initial_response(response_type=hikari.ResponseType.MESSAGE_UPDATE)
-    await eval_command(
+    if ctx.interaction.message:
+        await ctx.create_initial_response(response_type=hikari.ResponseType.MESSAGE_UPDATE)
+
+    else:
+        await ctx.create_initial_response("Loading...")
+
+    await eval_message_command(
         ctx,
         client,
         component_client,
@@ -224,7 +233,6 @@ async def eval_modal(
 
 def _make_rows(default: str) -> collections.Sequence[hikari.api.ModalActionRowBuilder]:
     """Make a custom instance of the eval modal's rows with the eval content pre-set."""
-    assert isinstance(eval_modal.rows[0], hikari.api.ModalActionRowBuilder)
     assert isinstance(eval_modal.rows[0].components[0], hikari.api.TextInputBuilder)
     rows = [
         hikari.impl.ModalActionRowBuilder().add_component(
@@ -268,7 +276,7 @@ async def _on_noop(ctx: yuyo.ComponentContext) -> None:
 
 @tanjun.annotations.with_annotated_args
 @tanjun.as_message_command("eval", "exec")
-async def eval_command(
+async def eval_message_command(
     ctx: typing.Union[tanjun.abc.MessageContext, yuyo.ModalContext],
     client: alluka.Injected[tanjun.abc.Client],
     component_client: alluka.Injected[yuyo.ComponentClient],
@@ -279,10 +287,7 @@ async def eval_command(
     state_attachment: hikari.Bytes | None = None,
     suppress_response: Annotated[Bool, Flag(empty_value=True, aliases=["-s", "--suppress"])] = False,
 ) -> None:
-    """Dynamically evaluate a script in the bot's environment.
-
-    This can only be used by the bot's owner.
-    """
+    """Owner only command used to dynamically evaluate a script."""
     if isinstance(ctx, tanjun.abc.MessageContext):
         code = CODEBLOCK_REGEX.findall(ctx.content)
         kwargs: dict[str, typing.Any] = {"reply": ctx.message.id}
@@ -312,6 +317,7 @@ async def eval_command(
     if file_output:
         # Wants the output to be attached as two files, avoid building a paginator.
         message = await respond(
+            "",
             attachments=[
                 hikari.Bytes(stdout, "stdout.py", mimetype="text/x-python;charset=utf-8"),
                 hikari.Bytes(stderr, "stderr.py", mimetype="text/x-python;charset=utf-8"),
@@ -349,10 +355,46 @@ async def eval_command(
 
     assert first_response is not None
     message = await respond(
-        **first_response.to_kwargs() | {"attachments": attachments}, components=paginator.rows, **kwargs
+        **first_response.to_kwargs() | {"attachments": attachments, "content": ""}, components=paginator.rows, **kwargs
     )
     _try_deregister(component_client, message)
     component_client.register_executor(paginator, message=message)
+
+
+@doc_parse.with_annotated_args
+@tanjun.with_owner_check
+@doc_parse.as_slash_command(name="eval", is_global=False)
+async def eval_slash_command(ctx: tanjun.abc.SlashContext, file_output: Bool = False) -> None:
+    """Owner only command used to dynamically evaluate a script.
+
+    This can only be used by the bot's owner.
+
+    Parameters
+    ----------
+    file_output
+        Whether this should send the output as embeddable txt files.
+
+        Defaults to False.
+    """
+    assert isinstance(eval_modal.rows[1].components[0], hikari.api.TextInputBuilder)
+    # TODO: persist this default forever.
+    # Use JSON for the file thingy and store that there as another field
+    file_output_repr = THUMBS_UP_EMOJI if file_output else THUMBS_DOWN_EMOJI
+    rows = [
+        eval_modal.rows[0],
+        hikari.impl.ModalActionRowBuilder().add_component(eval_modal.rows[1].components[0].set_value(file_output_repr)),
+        *eval_modal.rows[2:],
+    ]
+    await ctx.create_modal_response("Eval", EVAL_MODAL_ID, components=rows)
+
+
+@component.with_listener()
+async def on_guild_create(
+    event: hikari.GuildJoinEvent | hikari.GuildAvailableEvent, config: alluka.Injected[config.FullConfig]
+) -> None:
+    if event.guild_id in config.eval_guilds:
+        app = await event.app.rest.fetch_application()
+        await eval_slash_command.build().create(event.app.rest, app.id, guild=event.guild_id)
 
 
 def _try_deregister(client: yuyo.ComponentClient, message: hikari.Message) -> None:
@@ -360,6 +402,4 @@ def _try_deregister(client: yuyo.ComponentClient, message: hikari.Message) -> No
         client.deregister_message(message)
 
 
-load_sudo = (
-    tanjun.Component(name="sudo", strict=True).add_check(tanjun.checks.OwnerCheck()).load_from_scope().make_loader()
-)
+load_sudo = component.add_check(tanjun.checks.OwnerCheck()).load_from_scope().make_loader()
