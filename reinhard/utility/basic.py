@@ -309,9 +309,7 @@ class FileCallback:
                 ):
                     component.set_is_disabled(True)
 
-            await ctx.create_initial_response(
-                components=rows, response_type=hikari.ResponseType.MESSAGE_UPDATE
-            )
+            await ctx.create_initial_response(components=rows, response_type=hikari.ResponseType.MESSAGE_UPDATE)
 
         files = self._make_files() if self._make_files else self._files
         await ctx.respond(attachments=files, component=delete_row_from_authors(ctx.interaction.user.id))
