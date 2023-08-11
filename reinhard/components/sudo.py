@@ -222,7 +222,7 @@ async def eval_modal(
     else:
         await ctx.create_initial_response("Loading...")
 
-    state_file = json.dumps({"content": content, "file_output": raw_file_output})
+    state_file = json.dumps({"content": content, "file_output": file_output})
     await eval_message_command(
         ctx,
         client,
