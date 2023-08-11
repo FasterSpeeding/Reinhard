@@ -48,6 +48,8 @@ __all__: list[str] = [
 
 import datetime
 import enum
+import itertools
+import random
 import typing
 
 import hikari
@@ -281,23 +283,34 @@ class FileCallback:
         pressed.
     """
 
-    __slots__ = ("_files", "_make_files", "_post_components", "__weakref__")
+    __slots__ = ("_custom_id", "_files", "_make_files", "_post_components", "__weakref__")
 
     def __init__(
         self,
+        custom_id: str,
+        /,
         *,
         files: collections.Sequence[hikari.Resourceish] = (),
         make_files: collections.Callable[[], collections.Sequence[hikari.Resourceish]] | None = None,
-        post_components: hikari.UndefinedOr[collections.Sequence[hikari.api.ComponentBuilder]] = hikari.UNDEFINED,
+        post_components: yuyo.ActionColumnExecutor | None = None,
     ) -> None:
+        self._custom_id = custom_id
         self._files = files
         self._make_files = make_files
         self._post_components = post_components
 
     async def __call__(self, ctx: yuyo.ComponentContext) -> None:
-        if self._post_components is not hikari.UNDEFINED:
+        if self._post_components:
+            rows = self._post_components.rows
+            for component in itertools.chain.from_iterable(row.components for row in rows):
+                if (
+                    isinstance(component, hikari.api.InteractiveButtonBuilder)
+                    and component.custom_id == self._custom_id
+                ):
+                    component.set_is_disabled(True)
+
             await ctx.create_initial_response(
-                components=self._post_components, response_type=hikari.ResponseType.MESSAGE_UPDATE
+                components=rows, response_type=hikari.ResponseType.MESSAGE_UPDATE
             )
 
         files = self._make_files() if self._make_files else self._files
@@ -326,9 +339,10 @@ def add_file_button(
         A callback which returns the files to send when the to file button is
         pressed.
     """
-    # TODO: remove this button from the column after it's used or disable it.
+    custom_id = random.randbytes(32).hex()
     column.add_interactive_button(
         hikari.ButtonStyle.SECONDARY,
-        FileCallback(files=files, make_files=make_files, post_components=column.rows),
+        FileCallback(custom_id, files=files, make_files=make_files, post_components=column),
+        custom_id=custom_id,
         emoji=constants.FILE_EMOJI,
     )
