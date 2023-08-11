@@ -185,13 +185,9 @@ async def _check_owner(
     client: tanjun.abc.Client,
     authors: tanjun.dependencies.AbstractOwners,
     ctx: yuyo.ComponentContext | yuyo.ModalContext,
-) -> bool:
-    state = await authors.check_ownership(client, ctx.interaction.user)
-    if not state:
-        # TODO: yuyo needs an equiv of CommandError
-        await ctx.respond("You cannot use this button")
-
-    return state
+) -> None:
+    if not await authors.check_ownership(client, ctx.interaction.user):
+        raise yuyo.InteractionError("You cannot use this button")
 
 
 @yuyo.modals.as_modal(parse_signature=True)
@@ -215,9 +211,7 @@ async def eval_modal(
         await ctx.create_initial_response("Invalid value passed for File output", ephemeral=True)
         return
 
-    if not await _check_owner(client, authors, ctx):
-        return
-
+    await _check_owner(client, authors, ctx)
     await ctx.create_initial_response(response_type=hikari.ResponseType.MESSAGE_UPDATE)
     await eval_command(
         ctx,
@@ -248,9 +242,7 @@ async def on_edit_button(
     client: alluka.Injected[tanjun.abc.Client],
     authors: alluka.Injected[tanjun.dependencies.AbstractOwners],
 ) -> None:
-    if not await _check_owner(client, authors, ctx):
-        return
-
+    await _check_owner(client, authors, ctx)
     rows = eval_modal.rows
     # Try to get the old eval call's code
     for attachment in ctx.interaction.message.attachments:
