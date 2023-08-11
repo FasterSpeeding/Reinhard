@@ -1,4 +1,4 @@
-[tool.black] 
+[tool.black]
 include         = ".*py$"
 line-length     = 120
 skip-magic-trailing-comma = true
