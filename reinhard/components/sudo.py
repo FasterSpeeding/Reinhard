@@ -355,6 +355,7 @@ async def eval_message_command(
             component=utility.delete_row_from_authors(ctx.author.id).add_interactive_button(
                 hikari.ButtonStyle.SECONDARY, EVAL_MODAL_ID, emoji=EDIT_BUTTON_EMOJI
             ),
+            embeds=[],
             **kwargs,
         )
         _try_deregister(component_client, message)
