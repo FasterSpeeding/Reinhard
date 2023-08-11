@@ -224,14 +224,14 @@ async def eval_modal(
         # Being executed in response to the slash command.
         await ctx.create_initial_response("Loading...")
 
-    state_file = json.dumps({"content": content, "file_output": file_output})
+    state = json.dumps({"content": content, "file_output": file_output})
     await eval_message_command(
         ctx,
         client,
         component_client,
         content=content,
         file_output=file_output,
-        state_attachment=hikari.Bytes(state_file, STATE_FILE_NAME),
+        state_attachment=hikari.Bytes(state, STATE_FILE_NAME),
     )
 
 
