@@ -269,25 +269,27 @@ async def on_edit_button(
     # Try to get the old eval call's code
     for attachment in ctx.interaction.message.attachments:
         # If the edit button has been used already then a state file will be present.
-        if attachment.filename == STATE_FILE_NAME:
-            try:
-                data = await attachment.read()
+        if attachment.filename != STATE_FILE_NAME:
+            continue
 
-            except hikari.HikariError:
-                break
+        try:
+            data = await attachment.read()
 
-            try:
-                data = json.loads(data)
-
-            # Backwards compatibility with old eval responses which just stored
-            # the eval code in the file output file raw without any json wrapping.
-            except json.JSONDecodeError:
-                rows = _make_rows(default=data.decode())
-
-            else:
-                rows = _make_rows(default=data["content"], file_output=data["file_output"])
-
+        except hikari.HikariError:
             break
+
+        try:
+            data = json.loads(data)
+
+        # Backwards compatibility with old eval responses which just stored
+        # the eval code in the file output file raw without any json wrapping.
+        except json.JSONDecodeError:
+            rows = _make_rows(default=data.decode())
+
+        else:
+            rows = _make_rows(default=data["content"], file_output=data["file_output"])
+
+        break
 
     else:
         # Otherwise try to get the source message.
