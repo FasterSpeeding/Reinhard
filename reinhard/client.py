@@ -156,7 +156,7 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> tanjun.Client:
         client.set_type_dependency(config_.PTFConfig, ptf)
 
     if config.owner_only:
-        client.add_check(tanjun.checks.OwnerCheck())
+        client.add_check(tanjun.checks.OwnerCheck(halt_execution=True))
 
     if client.shards:
         yuyo.ReactionClient.from_tanjun(client)
