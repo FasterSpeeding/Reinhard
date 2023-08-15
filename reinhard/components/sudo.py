@@ -173,9 +173,7 @@ def _bytes_from_io(
 ) -> hikari.Bytes:
     index = stream.tell()
     stream.seek(0)
-    data = stream.read()
-    stream.seek(index)
-    return hikari.Bytes(data, name, mimetype=mimetype)
+    return hikari.Bytes(stream, name, mimetype=mimetype)
 
 
 EVAL_MODAL_ID = "UPDATE_EVAL"
@@ -395,7 +393,7 @@ async def eval_message_command(
 
 @doc_parse.with_annotated_args
 @tanjun.with_owner_check
-@doc_parse.as_slash_command(name="eval", is_global=False)
+@doc_parse.as_slash_command(name="eval", default_member_permissions=hikari.Permissions.ADMINISTRATOR, is_global=False)
 async def eval_slash_command(ctx: tanjun.abc.SlashContext, file_output: Bool | None = None) -> None:
     """Owner only command used to dynamically evaluate a script.
 
