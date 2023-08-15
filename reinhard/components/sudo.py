@@ -30,7 +30,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["load_sudo"]
+__all__: list[str] = ["load_sudo", "unload_sudo"]
 
 import ast
 import asyncio
@@ -171,11 +171,8 @@ async def eval_python_code_no_capture(
 def _bytes_from_io(
     stream: io.StringIO, name: str, mimetype: str | None = "text/x-python;charset=utf-8"
 ) -> hikari.Bytes:
-    index = stream.tell()
     stream.seek(0)
-    data = stream.read()
-    stream.seek(index)
-    return hikari.Bytes(data, name, mimetype=mimetype)
+    return hikari.Bytes(stream, name, mimetype=mimetype)
 
 
 EVAL_MODAL_ID = "UPDATE_EVAL"
@@ -269,25 +266,27 @@ async def on_edit_button(
     # Try to get the old eval call's code
     for attachment in ctx.interaction.message.attachments:
         # If the edit button has been used already then a state file will be present.
-        if attachment.filename == STATE_FILE_NAME:
-            try:
-                data = await attachment.read()
+        if attachment.filename != STATE_FILE_NAME:
+            continue
 
-            except hikari.HikariError:
-                break
+        try:
+            data = await attachment.read()
 
-            try:
-                data = json.loads(data)
-
-            # Backwards compatibility with old eval responses which just stored
-            # the eval code in the file output file raw without any json wrapping.
-            except json.JSONDecodeError:
-                rows = _make_rows(default=data.decode())
-
-            else:
-                rows = _make_rows(default=data["content"], file_output=data["file_output"])
-
+        except hikari.HikariError:
             break
+
+        try:
+            data = json.loads(data)
+
+        # Backwards compatibility with old eval responses which just stored
+        # the eval code in the file output file raw without any json wrapping.
+        except json.JSONDecodeError:
+            rows = _make_rows(default=data.decode())
+
+        else:
+            rows = _make_rows(default=data["content"], file_output=data["file_output"])
+
+        break
 
     else:
         # Otherwise try to get the source message.
@@ -393,7 +392,7 @@ async def eval_message_command(
 
 @doc_parse.with_annotated_args
 @tanjun.with_owner_check
-@doc_parse.as_slash_command(name="eval", is_global=False)
+@doc_parse.as_slash_command(name="eval", default_member_permissions=hikari.Permissions.ADMINISTRATOR, is_global=False)
 async def eval_slash_command(ctx: tanjun.abc.SlashContext, file_output: Bool | None = None) -> None:
     """Owner only command used to dynamically evaluate a script.
 
@@ -423,4 +422,28 @@ def _try_deregister(client: yuyo.ComponentClient, message: hikari.Message) -> No
         client.deregister_message(message)
 
 
-load_sudo = component.add_check(tanjun.checks.OwnerCheck()).load_from_scope().make_loader()
+component.add_check(tanjun.checks.OwnerCheck()).load_from_scope()
+
+
+@tanjun.as_loader
+def load_sudo(client: tanjun.abc.Client) -> None:
+    client.add_component(component)
+
+    component_client = client.injector.get_type_dependency(yuyo.ComponentClient)
+    modal_client = client.injector.get_type_dependency(yuyo.ModalClient)
+    assert component_client
+    assert modal_client
+    component_client.register_executor(on_edit_button, timeout=None)
+    modal_client.register_modal(EVAL_MODAL_ID, eval_modal, timeout=None)
+
+
+@tanjun.as_unloader
+def unload_sudo(client: tanjun.abc.Client) -> None:
+    client.remove_component_by_name(component.name)
+
+    component_client = client.injector.get_type_dependency(yuyo.ComponentClient)
+    modal_client = client.injector.get_type_dependency(yuyo.ModalClient)
+    assert component_client
+    assert modal_client
+    component_client.deregister_executor(on_edit_button)
+    modal_client.deregister_modal(EVAL_MODAL_ID)

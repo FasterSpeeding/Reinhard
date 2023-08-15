@@ -43,7 +43,6 @@ import yuyo.modals
 
 from . import config as config_
 from . import utility
-from .components import sudo
 
 if typing.TYPE_CHECKING:
     from hikari import traits as hikari_traits
@@ -144,6 +143,24 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> tanjun.Client:
         .set_type_dependency(config_.Tokens, config.tokens)
     )
 
+    yuyo.ComponentClient.from_tanjun(client)
+    yuyo.ModalClient.from_tanjun(client)
+    assert isinstance(client.rest.http_settings, hikari.impl.HTTPSettings)
+    assert isinstance(client.rest.proxy_settings, hikari.impl.ProxySettings)
+    utility.SessionManager(
+        client.rest.http_settings, client.rest.proxy_settings, "Reinhard discord bot"
+    ).load_into_client(client)
+
+    if config.ptf:
+        ptf = config.ptf
+        client.set_type_dependency(config_.PTFConfig, ptf)
+
+    if config.owner_only:
+        client.add_check(tanjun.checks.OwnerCheck(halt_execution=True))
+
+    if client.shards:
+        yuyo.ReactionClient.from_tanjun(client)
+
     components_dir = pathlib.Path(".") / "reinhard" / "components"
     if config.hot_reload:
         guilds = (
@@ -159,28 +176,6 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> tanjun.Client:
     else:
         client.load_directory(components_dir, namespace="reinhard.components")
 
-    assert isinstance(client.rest.http_settings, hikari.impl.HTTPSettings)
-    assert isinstance(client.rest.proxy_settings, hikari.impl.ProxySettings)
-    utility.SessionManager(
-        client.rest.http_settings, client.rest.proxy_settings, "Reinhard discord bot"
-    ).load_into_client(client)
-
-    if config.ptf:
-        ptf = config.ptf
-        client.set_type_dependency(config_.PTFConfig, ptf)
-
-    if config.owner_only:
-        client.add_check(tanjun.checks.OwnerCheck())
-
-    if client.shards:
-        yuyo.ReactionClient.from_tanjun(client)
-
-    (
-        yuyo.ComponentClient.from_tanjun(client)
-        .register_executor(utility.on_delete_button, timeout=None)
-        .register_executor(sudo.on_edit_button, timeout=None)
-    )
-    yuyo.ModalClient.from_tanjun(client).register_modal(sudo.EVAL_MODAL_ID, sudo.eval_modal, timeout=None)
     return client
 
 
