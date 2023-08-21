@@ -43,6 +43,7 @@ import re
 import time
 import traceback
 import typing
+import urllib.parse
 from collections import abc as collections
 from typing import Annotated
 
@@ -181,6 +182,7 @@ STATE_FILE_NAME = "EVAL_STATE"
 EDIT_BUTTON_EMOJI = "\N{SQUARED NEW}"
 THUMBS_UP_EMOJI = "\N{THUMBS UP SIGN}"
 THUMBS_DOWN_EMOJI = "\N{THUMBS DOWN SIGN}"
+PRIVATE_KEY = "p"
 
 
 async def _check_owner(
@@ -219,7 +221,9 @@ async def eval_modal(
 
     else:
         # Being executed in response to the slash command.
-        await ctx.create_initial_response("Loading...")
+        query = urllib.parse.parse_qs(ctx.id_metadata).get(PRIVATE_KEY)
+        ephemeral = tanjun.conversion.to_bool(query[0]) if query else False
+        await ctx.create_initial_response("Loading...", ephemeral=ephemeral)
 
     state = json.dumps({"content": content, "file_output": file_output})
     await eval_message_command(
@@ -390,7 +394,9 @@ async def eval_message_command(
 @doc_parse.with_annotated_args
 @tanjun.with_owner_check
 @doc_parse.as_slash_command(name="eval", default_member_permissions=hikari.Permissions.ADMINISTRATOR, is_global=False)
-async def eval_slash_command(ctx: tanjun.abc.SlashContext, file_output: Bool | None = None) -> None:
+async def eval_slash_command(
+    ctx: tanjun.abc.SlashContext, file_output: Bool | None = None, private: Bool = False
+) -> None:
     """Owner only command used to dynamically evaluate a script.
 
     This can only be used by the bot's owner.
@@ -401,8 +407,11 @@ async def eval_slash_command(ctx: tanjun.abc.SlashContext, file_output: Bool | N
         Whether this should send the output as embeddable txt files.
 
         Defaults to False.
+    private
+        Whether the output should be send as a private message. Defaults to false.
     """
-    await ctx.create_modal_response("Eval", EVAL_MODAL_ID, components=_make_rows(file_output=file_output))
+    custom_id = f"{EVAL_MODAL_ID}:{PRIVATE_KEY}={int(private)}"
+    await ctx.create_modal_response("Eval", custom_id, components=_make_rows(file_output=file_output))
 
 
 @component.with_listener()
