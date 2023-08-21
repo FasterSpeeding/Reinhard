@@ -408,7 +408,7 @@ async def eval_slash_command(
 
         Defaults to False.
     private
-        Whether the output should be send as a private message. Defaults to false.
+        Whether the output should be sent as a private message. Defaults to false.
     """
     custom_id = f"{EVAL_MODAL_ID}:{PRIVATE_KEY}={int(private)}"
     await ctx.create_modal_response("Eval", custom_id, components=_make_rows(file_output=file_output))
