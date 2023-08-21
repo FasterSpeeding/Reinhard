@@ -88,7 +88,7 @@ class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
     def __aiter__(self) -> Self:
         return self
 
-    async def __anext__(self) -> tuple[str, hikari.UndefinedType]:
+    async def __anext__(self) -> yuyo.pagination.Page:
         if not self._next_page_token and self._next_page_token is not None:
             retry = yuyo.Backoff(max_retries=5)
             error_manager = utility.AIOHTTPStatusHandler(self._author, retry, break_on=[404])
@@ -123,7 +123,7 @@ class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
         while self._buffer:
             page = self._buffer.pop(0)
             if response_type := YOUTUBE_TYPES.get(page["id"]["kind"].lower()):
-                return f"{response_type[1]}{page['id'][response_type[0]]}", hikari.UNDEFINED
+                return yuyo.pagination.Page(f"{response_type[1]}{page['id'][response_type[0]]}")
 
         kind: str = page["id"]["kind"]  # pyright: ignore[reportUnboundVariable]
         raise RuntimeError(f"Got unexpected 'kind' from youtube {kind}")
@@ -151,7 +151,7 @@ class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
     def __aiter__(self) -> Self:
         return self
 
-    async def __anext__(self) -> tuple[str, hikari.UndefinedType]:
+    async def __anext__(self) -> yuyo.pagination.Page:
         if not self._buffer and self._offset is not None:
             retry = yuyo.Backoff(max_retries=5)
             resource_type = self._parameters["type"]
@@ -189,7 +189,7 @@ class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
             self._offset = None
             raise StopAsyncIteration
 
-        return (self._buffer.pop(0)["external_urls"]["spotify"], hikari.UNDEFINED)
+        return yuyo.pagination.Page(self._buffer.pop(0)["external_urls"]["spotify"])
 
 
 class YtOrder(str, enum.Enum):

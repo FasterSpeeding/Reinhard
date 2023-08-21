@@ -190,7 +190,7 @@ async def _docs_command(
         return
 
     if return_list:
-        iterator = utility.embed_iterator(
+        iterator = utility.page_iterator(
             utility.chunk((f"[{m.title}]({m.url})" for m in index.search(ctx, path)), 10),
             lambda entries: "\n".join(entries),
             title=f"{index.name} Documentation",
@@ -203,7 +203,7 @@ async def _docs_command(
         )
 
     else:
-        iterator = ((hikari.UNDEFINED, metadata.to_embed()) for metadata in index.search(ctx, path))
+        iterator = (yuyo.pagination.Page(metadata.to_embed()) for metadata in index.search(ctx, path))
         paginator = utility.make_paginator(iterator, author=None if public else ctx.author, full=True)
 
     if first_response := await paginator.get_next_entry():

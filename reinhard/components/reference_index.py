@@ -655,7 +655,7 @@ class _IndexCommand:
 
             full_path, uses = result
 
-        iterator = utility.embed_iterator(
+        iterator = utility.page_iterator(
             utility.chunk(iter(uses), 10),
             lambda entries: "Note: This only searches return types and attributes.\n\n" + "\n".join(entries),
             title=f"{len(uses)} references found for {full_path}",

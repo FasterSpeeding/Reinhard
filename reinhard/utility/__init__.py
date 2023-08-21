@@ -54,11 +54,11 @@ __all__: list[str] = [
     "delete_row_from_authors",
     "dependencies",
     "embed_colour",
-    "embed_iterator",
     "make_delete_id",
     "make_paginator",
     "on_error",
     "on_parser_error",
+    "page_iterator",
     "prettify_date",
     "prettify_index",
     "raise_error",
@@ -77,8 +77,8 @@ from .basic import basic_name_grid
 from .basic import chunk
 from .basic import delete_row
 from .basic import delete_row_from_authors
-from .basic import embed_iterator
 from .basic import make_paginator
+from .basic import page_iterator
 from .basic import prettify_date
 from .basic import prettify_index
 from .basic import raise_error

@@ -365,15 +365,12 @@ async def eval_message_command(
         _yields_results(stdout, stderr), wrapper="```python\n{}\n```", char_limit=2034
     )
     embed_generator = (
-        (
-            hikari.UNDEFINED,
-            hikari.Embed(colour=colour, description=text, title=f"Eval page {page + 1}").set_footer(
-                text=f"Time taken: {exec_time} ms"
-            ),
+        hikari.Embed(colour=colour, description=text, title=f"Eval page {page + 1}").set_footer(
+            text=f"Time taken: {exec_time} ms"
         )
         for page, text in enumerate(string_paginator)
     )
-    paginator = utility.make_paginator(embed_generator, author=ctx.author.id, full=True)
+    paginator = utility.make_paginator(map(yuyo.pagination.Page, embed_generator), author=ctx.author.id, full=True)
     first_response = await paginator.get_next_entry()
     utility.add_file_button(
         paginator, make_files=lambda: [_bytes_from_io(stdout, "stdout.py"), _bytes_from_io(stderr, "stderr.py")]

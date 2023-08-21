@@ -37,8 +37,8 @@ __all__: list[str] = [
     "chunk",
     "delete_row",
     "delete_row_from_authors",
-    "embed_iterator",
     "make_paginator",
+    "page_iterator",
     "prettify_date",
     "prettify_index",
     "raise_error",
@@ -62,7 +62,7 @@ if typing.TYPE_CHECKING:
     _ValueT = typing.TypeVar("_ValueT")
 
 
-def embed_iterator(
+def page_iterator(
     descriptions: collections.Iterator[_ValueT],
     description_cast: collections.Callable[[_ValueT], str] = lambda v: str(v),
     /,
@@ -72,21 +72,23 @@ def embed_iterator(
     color: hikari.Colorish | None = None,
     timestamp: datetime.datetime | None = None,
     cast_embed: collections.Callable[[hikari.Embed], hikari.Embed] | None = None,
-) -> collections.Iterator[tuple[hikari.UndefinedType, hikari.Embed]]:
+) -> collections.Iterator[yuyo.pagination.Page]:
     iterator = (
         (
-            hikari.UNDEFINED,
             hikari.Embed(
                 description=description_cast(description),
                 color=constants.embed_colour() if color is None else color,
                 title=title,
                 url=url,
                 timestamp=timestamp,
-            ).set_footer(text=f"Page {index + 1}"),
+            ).set_footer(text=f"Page {index + 1}")
         )
         for index, description in enumerate(descriptions)
     )
-    return ((hikari.UNDEFINED, cast_embed(v[1])) for v in iterator) if cast_embed else iterator
+    if cast_embed:
+        iterator = map(cast_embed, iterator)
+
+    return map(yuyo.pagination.Page, iterator)
 
 
 def chunk(iterator: collections.Iterator[_ValueT], max_value: int, /) -> collections.Iterator[list[_ValueT]]:
