@@ -50,6 +50,7 @@ from tanjun.annotations import Snowflake
 from tanjun.annotations import Str
 from tanjun.annotations import User
 from tanjun.annotations import channel_field
+from tanchan.components import buttons
 
 from .. import utility
 
@@ -73,14 +74,14 @@ async def color(
         color = role.color
 
     elif color is None:
-        raise tanjun.CommandError("Either role or color must be provided", component=utility.delete_row(ctx))
+        raise tanjun.CommandError("Either role or color must be provided", component=buttons.delete_row(ctx))
 
     embed = (
         hikari.Embed(colour=color)
         .add_field(name="RGB", value=str(color.rgb))
         .add_field(name="HEX", value=str(color.hex_code))
     )
-    await ctx.respond(embed=embed, component=utility.delete_row(ctx))
+    await ctx.respond(embed=embed, component=buttons.delete_row(ctx))
 
 
 @doc_parse.with_annotated_args(follow_wrapped=True)
@@ -151,7 +152,7 @@ async def member(ctx: tanjun.abc.Context, member: Member | None = None) -> None:
         .set_thumbnail(member.avatar_url or member.default_avatar_url)
         .set_footer(text=str(member.user.id), icon=member.user.default_avatar_url)
     )
-    await ctx.respond(embed=embed, component=utility.delete_row(ctx))
+    await ctx.respond(embed=embed, component=buttons.delete_row(ctx))
 
 
 @doc_parse.with_annotated_args(follow_wrapped=True)
@@ -168,7 +169,7 @@ async def role(ctx: tanjun.abc.Context, role: Role) -> None:
         The role to get information about.
     """
     if role.guild_id != ctx.guild_id:
-        raise tanjun.CommandError("Role not found", component=utility.delete_row(ctx))
+        raise tanjun.CommandError("Role not found", component=buttons.delete_row(ctx))
 
     permissions = utility.basic_name_grid(role.permissions) or "None"
     role_information = [f"Created: {tanjun.conversion.from_datetime(role.created_at)}", f"Position: {role.position}"]
@@ -190,7 +191,7 @@ async def role(ctx: tanjun.abc.Context, role: Role) -> None:
         title=role.name,
         description="\n".join(role_information) + f"\n\nPermissions:\n{permissions}",
     )
-    await ctx.respond(embed=embed, component=utility.delete_row(ctx))
+    await ctx.respond(embed=embed, component=buttons.delete_row(ctx))
 
 
 @doc_parse.with_annotated_args(follow_wrapped=True)
@@ -222,7 +223,7 @@ async def user(ctx: tanjun.abc.Context, user: User | None = None) -> None:
         .set_thumbnail(user.avatar_url or user.default_avatar_url)
         .set_footer(text=str(user.id), icon=user.default_avatar_url)
     )
-    await ctx.respond(embed=embed, component=utility.delete_row(ctx))
+    await ctx.respond(embed=embed, component=buttons.delete_row(ctx))
 
 
 @doc_parse.with_annotated_args(follow_wrapped=True)
@@ -259,7 +260,7 @@ async def avatar(
 
     avatar = avatar or user.avatar_url or user.default_avatar_url
     embed = hikari.Embed(title=str(user), url=str(avatar), colour=utility.embed_colour()).set_image(avatar)
-    await ctx.respond(embed=embed, component=utility.delete_row(ctx))
+    await ctx.respond(embed=embed, component=buttons.delete_row(ctx))
 
 
 @doc_parse.with_annotated_args(follow_wrapped=True)
@@ -286,7 +287,7 @@ async def mentions(
     try:
         message_ = await ctx.rest.fetch_message(channel_id, message)
     except hikari.NotFoundError:
-        raise tanjun.CommandError("Message not found", component=utility.delete_row(ctx)) from None
+        raise tanjun.CommandError("Message not found", component=buttons.delete_row(ctx)) from None
 
     mentions: str | None = None
     if message_.user_mentions:
@@ -294,7 +295,7 @@ async def mentions(
 
     await ctx.respond(
         content=f"Pinging mentions: {mentions}" if mentions else "No pinging mentions.",
-        component=utility.delete_row(ctx),
+        component=buttons.delete_row(ctx),
     )
 
 
@@ -321,7 +322,7 @@ async def members(ctx: tanjun.abc.Context, name: Annotated[Str, Greedy()]) -> No
     else:
         content = "No similar members found"
 
-    await ctx.respond(content=content, component=utility.delete_row(ctx))
+    await ctx.respond(content=content, component=buttons.delete_row(ctx))
 
 
 def _format_char_line(char: str, to_file: bool) -> str:
@@ -363,7 +364,7 @@ async def char(
     if file or len(content) >= 1990:
         response_file = hikari.Bytes(content.encode(), "character-info.md", mimetype="text/markdown; charset=UTF-8")
 
-    await ctx.respond(content=content, attachment=response_file, component=utility.delete_row(ctx))
+    await ctx.respond(content=content, attachment=response_file, component=buttons.delete_row(ctx))
 
 
 load_utility = tanjun.Component(name="utility", strict=True).load_from_scope().make_loader()

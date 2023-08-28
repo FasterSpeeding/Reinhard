@@ -35,8 +35,6 @@ __all__: list[str] = [
     "add_file_button",
     "basic_name_grid",
     "chunk",
-    "delete_row",
-    "delete_row_from_authors",
     "make_paginator",
     "page_iterator",
     "prettify_date",
@@ -53,6 +51,7 @@ import typing
 import hikari
 import tanjun
 import yuyo
+from tanchan.components import buttons
 
 from . import constants
 
@@ -72,7 +71,7 @@ def page_iterator(
     color: hikari.Colorish | None = None,
     timestamp: datetime.datetime | None = None,
     cast_embed: collections.Callable[[hikari.Embed], hikari.Embed] | None = None,
-) -> collections.Iterator[yuyo.pagination.Page]:
+) -> collections.Iterator[yuyo.Page]:
     iterator = (
         (
             hikari.Embed(
@@ -88,7 +87,7 @@ def page_iterator(
     if cast_embed:
         iterator = map(cast_embed, iterator)
 
-    return map(yuyo.pagination.Page, iterator)
+    return map(yuyo.Page, iterator)
 
 
 def chunk(iterator: collections.Iterator[_ValueT], max_value: int, /) -> collections.Iterator[list[_ValueT]]:
@@ -178,56 +177,12 @@ def make_paginator(
     if full:
         paginator.add_first_button()
 
-    paginator.add_previous_button().add_stop_button(custom_id=constants.make_delete_id(*authors)).add_next_button()
+    paginator.add_previous_button().add_stop_button(custom_id=buttons.make_delete_id(*authors)).add_next_button()
 
     if full:
         paginator.add_last_button()
 
     return paginator
-
-
-def delete_row(
-    ctx: typing.Union[tanjun.abc.Context, tanjun.abc.AutocompleteContext], /
-) -> hikari.impl.MessageActionRowBuilder:
-    """Make an action row builder with a delete button from a context.
-
-    Parameters
-    ----------
-    ctx
-        Context to use to make this row builder.
-
-        This will only allow the context's author to delete the response.
-
-    Returns
-    -------
-    hikari.impl.ActionRowBuilder
-        Action row builder with a delete button.
-    """
-    return hikari.impl.MessageActionRowBuilder().add_interactive_button(
-        hikari.ButtonStyle.DANGER, constants.make_delete_id(ctx.author), emoji=constants.DELETE_EMOJI
-    )
-
-
-def delete_row_from_authors(*authors: hikari.Snowflakeish) -> hikari.impl.MessageActionRowBuilder:
-    """Make an action row builder with a delete button from a list of authors.
-
-    Parameters
-    ----------
-    *authors
-        IDs of authors who should be allowed to delete the response.
-
-        Both user IDs and role IDs are supported with no IDs indicating
-        that anybody should be able to delete the response.
-
-    Returns
-    -------
-    hikari.impl.ActionRowBuilder
-        Action row builder with a delete button.
-    """
-
-    return hikari.impl.MessageActionRowBuilder().add_interactive_button(
-        hikari.ButtonStyle.DANGER, constants.make_delete_id(*authors), emoji=constants.DELETE_EMOJI
-    )
 
 
 class FileCallback:
@@ -276,7 +231,7 @@ class FileCallback:
             await ctx.create_initial_response(components=rows, response_type=hikari.ResponseType.MESSAGE_UPDATE)
 
         files = self._make_files() if self._make_files else self._files
-        await ctx.respond(attachments=files, component=delete_row_from_authors(ctx.interaction.user.id))
+        await ctx.respond(attachments=files, component=buttons.delete_row(ctx))
 
 
 def add_file_button(

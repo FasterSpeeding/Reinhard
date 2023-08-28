@@ -54,7 +54,7 @@ from tanjun.annotations import Bool
 from tanjun.annotations import Flag
 from tanjun.annotations import Name
 from tanjun.annotations import Str
-
+from tanchan.components import buttons
 from .. import utility
 
 if typing.TYPE_CHECKING:
@@ -168,7 +168,7 @@ class DocIndex:
             results: list[dict[str, str]] = self._search_index.search(search_path)
         except lunr.exceptions.QueryParseError as exc:
             reason: str = exc.args[0]
-            raise tanjun.CommandError(f"Invalid query: `{reason}`", component=utility.delete_row(ctx)) from None
+            raise tanjun.CommandError(f"Invalid query: `{reason}`", component=buttons.delete_row(ctx)) from None
 
         return (self._data[entry["ref"]] for entry in results)
 
@@ -182,7 +182,7 @@ async def _docs_command(
     return_list: bool = False,
 ) -> None:
     if not path:
-        await ctx.respond(index.docs_url, component=utility.delete_row(ctx))
+        await ctx.respond(index.docs_url, component=buttons.delete_row(ctx))
         return
 
     if autocomplete_result := index.get_autocomplete_result(path):
@@ -203,7 +203,7 @@ async def _docs_command(
         )
 
     else:
-        iterator = (yuyo.pagination.Page(metadata.to_embed()) for metadata in index.search(ctx, path))
+        iterator = (yuyo.Page(metadata.to_embed()) for metadata in index.search(ctx, path))
         paginator = utility.make_paginator(iterator, author=None if public else ctx.author, full=True)
 
     if first_response := await paginator.get_next_entry():
@@ -211,7 +211,7 @@ async def _docs_command(
         component_client.register_executor(paginator, message=message)
         return
 
-    await ctx.respond("Entry not found", component=utility.delete_row(ctx))
+    await ctx.respond("Entry not found", component=buttons.delete_row(ctx))
 
 
 def make_autocomplete(get_index: collections.Callable[..., _CoroT[_DocIndexT]]) -> tanjun.abc.AutocompleteSig[str]:

@@ -50,8 +50,7 @@ from tanjun.annotations import Flag
 from tanjun.annotations import Int
 from tanjun.annotations import Ranged
 from tanjun.annotations import Snowflake
-
-from .. import utility
+from tanchan.components import buttons
 
 if typing.TYPE_CHECKING:
     from typing_extensions import Self
@@ -73,16 +72,16 @@ def iter_messages(
 ) -> hikari.LazyIterator[hikari.Message]:
     if human_only and bot_only:
         raise tanjun.CommandError(
-            "Can only specify one of `human_only` or `user_only`", component=utility.delete_row(ctx)
+            "Can only specify one of `human_only` or `user_only`", component=buttons.delete_row(ctx)
         )
 
     if count is None and after is None:
         raise tanjun.CommandError(
-            "Must specify `count` when `after` is not specified", component=utility.delete_row(ctx)
+            "Must specify `count` when `after` is not specified", component=buttons.delete_row(ctx)
         )
 
     elif count is not None and count <= 0:
-        raise tanjun.CommandError("Count must be greater than 0.", component=utility.delete_row(ctx))
+        raise tanjun.CommandError("Count must be greater than 0.", component=buttons.delete_row(ctx))
 
     if before is None and after is None:
         before = hikari.Snowflake.from_datetime(ctx.created_at)
@@ -114,7 +113,7 @@ def iter_messages(
 
     if users is not None:
         if not users:
-            raise tanjun.CommandError("Must specify at least one user.", component=utility.delete_row(ctx))
+            raise tanjun.CommandError("Must specify at least one user.", component=buttons.delete_row(ctx))
 
         iterator = iterator.filter(lambda message: message.author.id in users)
 
@@ -195,7 +194,7 @@ async def clear(
     before_too_old = (before := kwargs.get("before")) and now - before.created_at >= MAX_MESSAGE_BULK_DELETE
 
     if after_too_old or before_too_old:
-        raise tanjun.CommandError("Cannot delete messages that are over 14 days old", component=utility.delete_row(ctx))
+        raise tanjun.CommandError("Cannot delete messages that are over 14 days old", component=buttons.delete_row(ctx))
 
     iterator = (
         iter_messages(ctx, **kwargs, users=users)
@@ -204,15 +203,15 @@ async def clear(
         .chunk(100)
     )
 
-    await ctx.respond("Starting message deletes", component=utility.delete_row(ctx))
+    await ctx.respond("Starting message deletes", component=buttons.delete_row(ctx))
     async for messages in iterator:
         await ctx.rest.delete_messages(ctx.channel_id, *messages)
         break
 
     try:
-        await ctx.edit_last_response(content="Cleared messages.", component=utility.delete_row(ctx), delete_after=2)
+        await ctx.edit_last_response(content="Cleared messages.", component=buttons.delete_row(ctx), delete_after=2)
     except hikari.NotFoundError:
-        await ctx.respond(content="Cleared messages.", component=utility.delete_row(ctx), delete_after=2)
+        await ctx.respond(content="Cleared messages.", component=buttons.delete_row(ctx), delete_after=2)
 
 
 ban_group = (
@@ -260,7 +259,7 @@ class _MultiBanner:
         if not ctx.member.role_ids and not is_owner:
             # If they have no role and aren't the guild owner then the role
             # hierarchy would never let them ban anyone.
-            raise tanjun.CommandError("You cannot ban any of these members", component=utility.delete_row(ctx))
+            raise tanjun.CommandError("You cannot ban any of these members", component=buttons.delete_row(ctx))
 
         if is_owner:
             # If the author is the owner then we don't actually check the role
@@ -390,10 +389,10 @@ async def multi_ban_command(
         delete_message_days=clear_message_days,
         members_only=members_only,
     )
-    await ctx.respond("Starting bans \N{THUMBS UP SIGN}", component=utility.delete_row(ctx), delete_after=2)
+    await ctx.respond("Starting bans \N{THUMBS UP SIGN}", component=buttons.delete_row(ctx), delete_after=2)
     await asyncio.gather(*(banner.try_ban(target=user) for user in users))
     content, attachment = banner.make_response()
-    await ctx.respond(content, attachment=attachment, component=utility.delete_row(ctx))
+    await ctx.respond(content, attachment=attachment, component=buttons.delete_row(ctx))
 
 
 @doc_parse.with_annotated_args(follow_wrapped=True)
@@ -429,13 +428,13 @@ async def ban_authors_command(
         .filter(lambda author: author not in found_authors)
     )
 
-    await ctx.respond("Starting bans \N{THUMBS UP SIGN}", component=utility.delete_row(ctx), delete_after=2)
+    await ctx.respond("Starting bans \N{THUMBS UP SIGN}", component=buttons.delete_row(ctx), delete_after=2)
     async for author in authors:
         found_authors.add(author)
         await banner.try_ban(author)
 
     content, attachment = banner.make_response()
-    await ctx.respond(content, attachment=attachment, component=utility.delete_row(ctx))
+    await ctx.respond(content, attachment=attachment, component=buttons.delete_row(ctx))
 
 
 load_moderation = (

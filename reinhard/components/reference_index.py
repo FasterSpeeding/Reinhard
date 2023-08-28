@@ -51,6 +51,7 @@ import hikari.interactions
 import lightbulb
 import sake
 import tanjun
+from tanchan.components import buttons
 import yuyo
 
 from .. import utility
@@ -627,6 +628,7 @@ reference_group = tanjun.slash_command_group("references", "Find the references 
 
 @dataclasses.dataclass(eq=False, slots=True)
 class _IndexCommand:
+    """Search the reference for types and callbacks in a Python library."""
     __weakref__: typing.Any = dataclasses.field(init=False)
 
     index: ReferenceIndex
@@ -643,7 +645,7 @@ class _IndexCommand:
         if absolute:
             if not (result := self.index.get_references(path)):
                 raise tanjun.CommandError(
-                    f"No references found for the absolute path `{path}`", component=utility.delete_row(ctx)
+                    f"No references found for the absolute path `{path}`", component=buttons.delete_row(ctx)
                 )
 
             full_path = path
@@ -651,7 +653,7 @@ class _IndexCommand:
 
         else:
             if not (result := self.index.search(path)):
-                raise tanjun.CommandError(f"No references found for `{path}`", component=utility.delete_row(ctx))
+                raise tanjun.CommandError(f"No references found for `{path}`", component=buttons.delete_row(ctx))
 
             full_path, uses = result
 

@@ -54,7 +54,7 @@ from tanjun.annotations import Flag
 from tanjun.annotations import Greedy
 from tanjun.annotations import Str
 from tanjun.annotations import str_field
-
+from tanchan.components import buttons
 from .. import config as config_
 from .. import utility
 
@@ -88,7 +88,7 @@ class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
     def __aiter__(self) -> Self:
         return self
 
-    async def __anext__(self) -> yuyo.pagination.Page:
+    async def __anext__(self) -> yuyo.Page:
         if not self._next_page_token and self._next_page_token is not None:
             retry = yuyo.Backoff(max_retries=5)
             error_manager = utility.AIOHTTPStatusHandler(self._author, retry, break_on=[404])
@@ -123,7 +123,7 @@ class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
         while self._buffer:
             page = self._buffer.pop(0)
             if response_type := YOUTUBE_TYPES.get(page["id"]["kind"].lower()):
-                return yuyo.pagination.Page(f"{response_type[1]}{page['id'][response_type[0]]}")
+                return yuyo.Page(f"{response_type[1]}{page['id'][response_type[0]]}")
 
         kind: str = page["id"]["kind"]  # pyright: ignore[reportUnboundVariable]
         raise RuntimeError(f"Got unexpected 'kind' from youtube {kind}")
@@ -151,7 +151,7 @@ class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
     def __aiter__(self) -> Self:
         return self
 
-    async def __anext__(self) -> yuyo.pagination.Page:
+    async def __anext__(self) -> yuyo.Page:
         if not self._buffer and self._offset is not None:
             retry = yuyo.Backoff(max_retries=5)
             resource_type = self._parameters["type"]
@@ -175,7 +175,7 @@ class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
 
             else:
                 raise tanjun.CommandError(
-                    f"Couldn't fetch {resource_type} in time", component=utility.delete_row_from_authors(self._author)
+                    f"Couldn't fetch {resource_type} in time", component=buttons.delete_row(self._author)
                 ) from None
 
             # TODO: Used to be catching (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError)
@@ -189,7 +189,7 @@ class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
             self._offset = None
             raise StopAsyncIteration
 
-        return yuyo.pagination.Page(self._buffer.pop(0)["external_urls"]["spotify"])
+        return yuyo.Page(self._buffer.pop(0)["external_urls"]["spotify"])
 
 
 class YtOrder(str, enum.Enum):
@@ -280,7 +280,7 @@ async def youtube(
             safe_search = not channel_is_nsfw
 
         elif not safe_search and not channel_is_nsfw:
-            raise tanjun.CommandError("Cannot disable safe search in a sfw channel", component=utility.delete_row(ctx))
+            raise tanjun.CommandError("Cannot disable safe search in a sfw channel", component=buttons.delete_row(ctx))
 
     parameters: dict[str, str | int] = {
         "key": tokens.google,
@@ -303,18 +303,18 @@ async def youtube(
         first_response = await paginator.get_next_entry()
 
     except RuntimeError as exc:
-        raise tanjun.CommandError(str(exc), component=utility.delete_row(ctx)) from None
+        raise tanjun.CommandError(str(exc), component=buttons.delete_row(ctx)) from None
 
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError) as exc:
         _LOGGER.exception("Youtube returned invalid data", exc_info=exc)
-        await ctx.respond(content="Youtube returned invalid data.", component=utility.delete_row(ctx))
+        await ctx.respond(content="Youtube returned invalid data.", component=buttons.delete_row(ctx))
         raise
 
     else:
         if not first_response:
             # data["pageInfo"]["totalResults"] will not reliably be `0` when no data is returned and they don't use 404
             # for that so we'll just check to see if nothing is being returned.
-            raise tanjun.CommandError(f"Couldn't find `{query}`.", component=utility.delete_row(ctx))
+            raise tanjun.CommandError(f"Couldn't find `{query}`.", component=buttons.delete_row(ctx))
 
         message = await ctx.respond(**first_response.to_kwargs(), components=paginator.rows, ensure_result=True)
         component_client.register_executor(paginator, message=message)
@@ -345,16 +345,16 @@ async def moe_command(
             break
 
     else:
-        raise tanjun.CommandError("Couldn't get an image in time", component=utility.delete_row(ctx)) from None
+        raise tanjun.CommandError("Couldn't get an image in time", component=buttons.delete_row(ctx)) from None
 
     try:
         data = (await response.json())["data"]
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, LookupError, ValueError):
-        await ctx.respond(content="Image API returned invalid data.", component=utility.delete_row(ctx))
+        await ctx.respond(content="Image API returned invalid data.", component=buttons.delete_row(ctx))
         raise
 
     await ctx.respond(
-        content=f"{data['image']} (source {data.get('source') or 'unknown'})", component=utility.delete_row(ctx)
+        content=f"{data['image']} (source {data.get('source') or 'unknown'})", component=buttons.delete_row(ctx)
     )
 
 
@@ -381,17 +381,17 @@ async def query_nekos_life(
         status_code = response.status
 
     if status_code == 404:
-        raise tanjun.CommandError("Query not found.", component=utility.delete_row(ctx)) from None
+        raise tanjun.CommandError("Query not found.", component=buttons.delete_row(ctx)) from None
 
     if status_code >= 500 or data is None or response_key not in data:
         raise tanjun.CommandError(
             "Unable to fetch image at the moment due to server error or malformed response.",
-            component=utility.delete_row(ctx),
+            component=buttons.delete_row(ctx),
         ) from None
 
     if status_code >= 300:
         raise tanjun.CommandError(
-            f"Unable to fetch image due to unexpected error {status_code}", component=utility.delete_row(ctx)
+            f"Unable to fetch image due to unexpected error {status_code}", component=buttons.delete_row(ctx)
         ) from None
 
     result = data[response_key]
@@ -455,17 +455,17 @@ async def spotify(
         first_response = await paginator.get_next_entry()
 
     except RuntimeError as exc:
-        raise tanjun.CommandError(str(exc), component=utility.delete_row(ctx)) from None
+        raise tanjun.CommandError(str(exc), component=buttons.delete_row(ctx)) from None
 
     except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError) as exc:
         _LOGGER.exception("Spotify returned invalid data", exc_info=exc)
-        await ctx.respond(content="Spotify returned invalid data.", component=utility.delete_row(ctx))
+        await ctx.respond(content="Spotify returned invalid data.", component=buttons.delete_row(ctx))
         raise
 
     else:
         if not first_response:
             raise tanjun.CommandError(
-                f"Couldn't find {resource_type.value}", component=utility.delete_row(ctx)
+                f"Couldn't find {resource_type.value}", component=buttons.delete_row(ctx)
             ) from None
 
         message = await ctx.respond(**first_response.to_kwargs(), components=paginator.rows, ensure_result=True)
@@ -562,11 +562,11 @@ async def check_domain(
 
     if domain_hash in bad_domains or base_domain_hash in bad_domains:
         await ctx.respond(
-            content="\N{LARGE RED SQUARE} Domain is on the bad domains list.", component=utility.delete_row(ctx)
+            content="\N{LARGE RED SQUARE} Domain is on the bad domains list.", component=buttons.delete_row(ctx)
         )
     else:
         await ctx.respond(
-            content="\N{LARGE YELLOW SQUARE} Domain is not on the bad domains list.", component=utility.delete_row(ctx)
+            content="\N{LARGE YELLOW SQUARE} Domain is not on the bad domains list.", component=buttons.delete_row(ctx)
         )
 
 
