@@ -40,9 +40,8 @@ from collections import abc as collections
 import aiohttp
 import alluka
 import tanjun
+from tanchan.components import buttons
 from yuyo import backoff
-
-from . import basic
 
 if typing.TYPE_CHECKING:
     import hikari
@@ -90,7 +89,7 @@ class AIOHTTPStatusHandler(backoff.ErrorManager):
 
         if self._on_404 is not None and exception.status == 404:
             if isinstance(self._on_404, str):
-                raise tanjun.CommandError(self._on_404, component=basic.delete_row_from_authors(self._author)) from None
+                raise tanjun.CommandError(self._on_404, component=buttons.delete_row(self._author)) from None
 
             else:
                 self._on_404()
@@ -175,4 +174,4 @@ class ClientCredentialsOauth2:
             _LOGGER.warning(
                 "Received %r from %s while trying to authenticate as client credentials", response.status, self._path
             )
-        raise tanjun.CommandError("Couldn't authenticate", component=basic.delete_row_from_authors(self._author))
+        raise tanjun.CommandError("Couldn't authenticate", component=buttons.delete_row(self._author))

@@ -67,12 +67,3 @@ FILE_EMOJI: typing.Final[hikari.UnicodeEmoji] = hikari.UnicodeEmoji("\N{CARD FIL
 
 def embed_colour() -> hikari.Colour:
     return random.choices((MAYA_BLUE, WHITE, AMARANTH_PINK), (2, 1, 2))[0]  # noqa: S311 - thinks this is cryptographic
-
-
-DELETE_CUSTOM_ID = "AUTHOR_DELETE_BUTTON"
-"""Prefix ID used for delete buttons."""
-
-
-def make_delete_id(*authors: hikari.SnowflakeishOr[hikari.User]) -> str:
-    """Make a delete button custom ID."""
-    return DELETE_CUSTOM_ID + ":" + ",".join(str(int(author)) for author in authors)

@@ -36,6 +36,7 @@ import pathlib
 import typing
 
 import hikari
+import tanchan.components.config
 import tanjun
 import yuyo
 import yuyo.asgi
@@ -135,6 +136,13 @@ def build_rest_bot(*, config: config_.FullConfig | None = None) -> tuple[hikari.
     return bot, _build_from_rest_bot(config, bot)
 
 
+# Backwards compat with delete buttons from before the logic was moved out to
+# Tanchan since this changed the custom ID.
+_OLD_DELETE_BUTTON = yuyo.components.SingleExecutor(
+    "AUTHOR_DELETE_BUTTON", tanchan.components.buttons.on_delete_button.execute
+)
+
+
 def _build(client: tanjun.Client, config: config_.FullConfig) -> tanjun.Client:
     (
         client.set_hooks(tanjun.AnyHooks().set_on_parser_error(utility.on_parser_error).set_on_error(utility.on_error))
@@ -143,8 +151,11 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> tanjun.Client:
         .set_type_dependency(config_.Tokens, config.tokens)
     )
 
-    yuyo.ComponentClient.from_tanjun(client)
+    tanchan.components.config.Config(enable_slash_command=True, eval_guild_ids=config.eval_guilds).add_to_client(client)
+    yuyo.ComponentClient.from_tanjun(client).register_executor(_OLD_DELETE_BUTTON)
     yuyo.ModalClient.from_tanjun(client)
+    # TODO: support passing raw modules here?
+    client.load_modules("tanchan.components")
     assert isinstance(client.rest.http_settings, hikari.impl.HTTPSettings)
     assert isinstance(client.rest.proxy_settings, hikari.impl.ProxySettings)
     utility.SessionManager(

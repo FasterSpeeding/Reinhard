@@ -46,6 +46,7 @@ import psutil
 import tanjun
 from hikari import snowflakes
 from tanchan import doc_parse
+from tanchan.components import buttons
 
 from .. import utility
 
@@ -125,12 +126,7 @@ async def about(
         )
     )
 
-    await ctx.respond(embed=embed, component=utility.delete_row(ctx))
-
-
-@tanjun.as_message_command("help")
-async def help_command(ctx: tanjun.abc.Context) -> None:
-    await ctx.respond("See the slash command menu")
+    await ctx.respond(embed=embed, component=buttons.delete_row(ctx))
 
 
 @tanjun.as_message_command("ping")
@@ -142,7 +138,7 @@ async def ping(ctx: tanjun.abc.Context, /) -> None:
     time_taken = (time.perf_counter() - start_time) * 1_000
     heartbeat_latency = ctx.shards.heartbeat_latency * 1_000 if ctx.shards else float("NAN")
     await ctx.respond(
-        f"PONG\n - REST: {time_taken:.0f}ms\n - Gateway: {heartbeat_latency:.0f}ms", component=utility.delete_row(ctx)
+        f"PONG\n - REST: {time_taken:.0f}ms\n - Gateway: {heartbeat_latency:.0f}ms", component=buttons.delete_row(ctx)
     )
 
 
@@ -165,7 +161,7 @@ def cache_check(ctx: tanjun.abc.Context) -> bool:
     if ctx.cache:
         return True
 
-    raise tanjun.CommandError("Client is cache-less", component=utility.delete_row(ctx))
+    raise tanjun.CommandError("Client is cache-less", component=buttons.delete_row(ctx))
 
 
 @tanjun.with_check(cache_check, follow_wrapped=True)
@@ -215,7 +211,7 @@ async def cache(
         )
     )
 
-    await ctx.respond(content=f"{storage_time_taken * 1_000:.4g} ms", embed=embed, component=utility.delete_row(ctx))
+    await ctx.respond(content=f"{storage_time_taken * 1_000:.4g} ms", embed=embed, component=buttons.delete_row(ctx))
 
 
 @tanjun.as_message_command("invite")
@@ -224,7 +220,7 @@ async def invite(ctx: tanjun.abc.Context, me: Annotated[hikari.OwnUser, tanjun.i
     """Invite the bot to your server(s)."""
     await ctx.respond(
         f"https://discord.com/oauth2/authorize?client_id={me.id}&scope=bot%20applications.commands&permissions=8",
-        component=utility.delete_row(ctx),
+        component=buttons.delete_row(ctx),
     )
 
 
