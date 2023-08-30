@@ -592,9 +592,9 @@ hikari-sake==1.0.7 ; python_version >= "3.10" and python_version < "3.12" \
 hikari-tanjun==2.17.0 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:1be23be07a240d68215c861dcd8f8f7ce71ff33a29a73835a828e7750845d8ba \
     --hash=sha256:fb2be06f6ab73d506d5eb66b2cf8ac0f3c19b63b8914d3d3b8ef9c0b62b261ef
-hikari-yuyo==1.18.0 ; python_version >= "3.10" and python_version < "3.12" \
-    --hash=sha256:369bce58b5fe110b1630a525e998caf7e791224a88d34afa2e3e1a99a1e395e9 \
-    --hash=sha256:f4fca025e03c1824e2140c01c5efc1973e3f2b179aeb70c64c08449dca77fc23
+hikari-yuyo==1.19.0 ; python_version >= "3.10" and python_version < "3.12" \
+    --hash=sha256:c1a7dce246d8ca018a4d11d7942177c67a188d0b4e68cd5d9b15a7458e1129d8 \
+    --hash=sha256:fdd490b8cfb860855b89c36717ff9e17c4006cb0f56d8ebe14daaa870fe20b4c
 hikari==2.0.0.dev120 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:08201e37d1c1733868d1928a086a4bec79504d0729105bf2fb0a0c3bcd731aa1 \
     --hash=sha256:13122a12f5c83f10049ec66e13554e1d91350cb4faee7b7ad0efcac4a731202b
