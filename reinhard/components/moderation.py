@@ -44,13 +44,13 @@ import hikari
 import tanjun
 import typing_extensions
 from tanchan import doc_parse
+from tanchan.components import buttons
 from tanjun.annotations import Bool
 from tanjun.annotations import Converted
 from tanjun.annotations import Flag
 from tanjun.annotations import Int
 from tanjun.annotations import Ranged
 from tanjun.annotations import Snowflake
-from tanchan.components import buttons
 
 if typing.TYPE_CHECKING:
     from typing_extensions import Self

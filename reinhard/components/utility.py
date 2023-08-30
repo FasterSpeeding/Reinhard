@@ -38,6 +38,7 @@ from typing import Annotated
 import hikari
 import tanjun
 from tanchan import doc_parse
+from tanchan.components import buttons
 from tanjun.annotations import Bool
 from tanjun.annotations import Channel
 from tanjun.annotations import Color
@@ -50,7 +51,6 @@ from tanjun.annotations import Snowflake
 from tanjun.annotations import Str
 from tanjun.annotations import User
 from tanjun.annotations import channel_field
-from tanchan.components import buttons
 
 from .. import utility
 

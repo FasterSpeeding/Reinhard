@@ -51,8 +51,8 @@ import hikari.interactions
 import lightbulb
 import sake
 import tanjun
-from tanchan.components import buttons
 import yuyo
+from tanchan.components import buttons
 
 from .. import utility
 
@@ -629,6 +629,7 @@ reference_group = tanjun.slash_command_group("references", "Find the references 
 @dataclasses.dataclass(eq=False, slots=True)
 class _IndexCommand:
     """Search the reference for types and callbacks in a Python library."""
+
     __weakref__: typing.Any = dataclasses.field(init=False)
 
     index: ReferenceIndex
