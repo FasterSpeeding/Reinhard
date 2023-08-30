@@ -36,11 +36,11 @@ import pathlib
 import typing
 
 import hikari
+import tanchan.components.config
 import tanjun
 import yuyo
 import yuyo.asgi
 import yuyo.modals
-import tanchan.components.config
 
 from . import config as config_
 from . import utility

@@ -50,11 +50,12 @@ import tanjun
 import typing_extensions
 import yuyo
 from tanchan import doc_parse
+from tanchan.components import buttons
 from tanjun.annotations import Bool
 from tanjun.annotations import Flag
 from tanjun.annotations import Name
 from tanjun.annotations import Str
-from tanchan.components import buttons
+
 from .. import utility
 
 if typing.TYPE_CHECKING:

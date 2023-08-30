@@ -39,12 +39,12 @@ import alluka
 import hikari
 import tanjun
 from hikari import traits
+from tanchan.components import buttons
 from tanjun.annotations import Converted
 from tanjun.annotations import Flag
 from tanjun.annotations import Greedy
 from tanjun.annotations import Positional
 from tanjun.annotations import Str
-from tanchan.components import buttons
 
 from .. import utility
 

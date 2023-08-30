@@ -49,12 +49,13 @@ import hikari
 import tanjun
 import yuyo
 from tanchan import doc_parse
+from tanchan.components import buttons
 from tanjun.annotations import Bool
 from tanjun.annotations import Flag
 from tanjun.annotations import Greedy
 from tanjun.annotations import Str
 from tanjun.annotations import str_field
-from tanchan.components import buttons
+
 from .. import config as config_
 from .. import utility
 
