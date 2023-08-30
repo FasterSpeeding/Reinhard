@@ -34,8 +34,8 @@ __all__ = ["on_error", "on_parser_error"]
 
 import hikari
 import tanjun
+from tanchan.components import buttons
 
-from . import basic
 from . import constants
 
 
@@ -57,7 +57,7 @@ async def on_error(ctx: tanjun.abc.Context, exception: BaseException) -> None:
         colour=constants.FAILED_COLOUR,
         description=f"```python\n{str(exception)[:1950]}```",
     )
-    await ctx.respond(embed=embed, component=basic.delete_row(ctx))
+    await ctx.respond(embed=embed, component=buttons.delete_row(ctx))
 
 
 async def on_parser_error(ctx: tanjun.abc.Context, exception: tanjun.ParserError) -> None:
@@ -80,4 +80,4 @@ async def on_parser_error(ctx: tanjun.abc.Context, exception: tanjun.ParserError
         else:
             message = f"{message}: `{exception.errors[0]}`"
 
-    await ctx.respond(content=message, component=basic.delete_row(ctx))
+    await ctx.respond(content=message, component=buttons.delete_row(ctx))
