@@ -826,9 +826,9 @@ redis==4.6.0 ; python_version >= "3.10" and python_version < "3.12" \
 six==1.16.0 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926 \
     --hash=sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254
-soupsieve==2.4.1 ; python_version >= "3.10" and python_version < "3.12" \
-    --hash=sha256:1c1bfee6819544a3447586c889157365a27e10d88cde3ad3da0cf0ddf646feb8 \
-    --hash=sha256:89d12b2d5dfcd2c9e8c22326da9d9aa9cb3dfab0a83a024f05704076ee8d35ea
+soupsieve==2.5 ; python_version >= "3.10" and python_version < "3.12" \
+    --hash=sha256:5663d5a7b3bfaeee0bc4372e7fc48f9cff4940b3eec54a6451cc5299f1097690 \
+    --hash=sha256:eaa337ff55a1579b6549dc679565eac1e3d000563bcb1c8ab0d0fefbc0c2cdc7
 tanchan==0.4.0 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:1aee26e9583a08b81889973854f0a84962ce8f598af14723f7bca2a855f3770b \
     --hash=sha256:cb2e6b7ee515c973135212e9ef84f96ff4b6017892b3c1971e6d0949dde7bb7c
