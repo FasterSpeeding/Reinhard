@@ -224,7 +224,7 @@ async def youtube(
     query: Annotated[Str, Greedy()],
     resource_type: YtResource = str_field(
         choices=YtResource.__members__,
-        converters=YtResource,  # pyright: ignore[reportGeneralTypeIssues]
+        converters=YtResource, 
         slash_name="type",
         message_names=["--type", "-t"],
         default=YtResource.Video,
@@ -233,7 +233,8 @@ async def youtube(
     language: Annotated[Str | None, Flag(aliases=["-l"])] = None,
     order: YtOrder = str_field(
         choices=YtOrder.__members__,
-        converters=YtOrder,  # pyright: ignore[reportGeneralTypeIssues]
+        converters=YtOrder,
+        
         default=YtOrder.Relevance,
     ),
     safe_search: Bool | None = None,
@@ -429,7 +430,7 @@ async def spotify(
     component_client: alluka.Injected[yuyo.ComponentClient],
     spotify_auth: Annotated[utility.ClientCredentialsOauth2, tanjun.cached_inject(_build_spotify_auth)],
     resource_type: SpotifyType = str_field(
-        converters=SpotifyType,  # pyright: ignore[reportGeneralTypeIssues]
+        converters=SpotifyType,  
         choices=SpotifyType.__members__,
         default=SpotifyType.Track,
         message_names=["--type", "-t"],
