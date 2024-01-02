@@ -7,9 +7,9 @@
 astor==0.8.1 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:070a54e890cefb5b3739d19f30f5a5ec840ffc9c50ffa7d23cc9fc1a38ebbfc5 \
     --hash=sha256:6a6effda93f4e1ce9f618779b2dd1d9d84f1e32812c23a29b3fff6fd7f63fa5e
-attrs==23.1.0 ; python_version >= "3.10" and python_version < "3.12" \
-    --hash=sha256:1f28b4522cdc2fb4256ac1a020c78acf9cba2c6b461ccd2c126f3aa8e8335d04 \
-    --hash=sha256:6279836d581513a26f1bf235f9acd333bc9115683f14f7e8fae46c98fc50e015
+attrs==23.2.0 ; python_version >= "3.10" and python_version < "3.12" \
+    --hash=sha256:935dc3b529c262f6cf76e50877d35a4bd3c1de194fd41f47a2b7ae8f19971f30 \
+    --hash=sha256:99b87a485a5820b23b879f04c2305b44b951b502fd64be915879d77a7e8fc6f1
 bandit==1.7.6 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:36da17c67fc87579a5d20c323c8d0b1643a890a2b93f00b3d1229966624694ff \
     --hash=sha256:72ce7bc9741374d96fb2f1c9a8960829885f1243ffde743de70a19cee353e8f3
