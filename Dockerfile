@@ -1,4 +1,4 @@
-FROM python:3.12.1
+FROM python:3.13.0a3
 # FROM colesbury/python-nogil
 WORKDIR /reinhard
 
