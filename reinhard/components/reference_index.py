@@ -355,11 +355,13 @@ class ReferenceIndex:
 
     def _recurse_module(
         self,
-        obj: types.MethodType
-        | types.FunctionType
-        | type[typing.Any]
-        | classmethod[typing.Any, typing.Any, typing.Any]
-        | property,
+        obj: (
+            types.MethodType
+            | types.FunctionType
+            | type[typing.Any]
+            | classmethod[typing.Any, typing.Any, typing.Any]
+            | property
+        ),
         /,
         *,
         path: str | None = None,
