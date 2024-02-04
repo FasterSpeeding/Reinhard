@@ -81,3 +81,4 @@ reportUnknownArgumentType = "warning"  # Pretty much the same as reportUnknownMe
 reportUnknownParameterType = "warning"  # Pretty much the same as reportUnknownMemberType
 reportUnusedFunction = "warning"  # This assumes decorator calls don't load a function into something for usage
 reportImportCycles = "warning"                  # This isn't necessarily an issue if it's type checking only.
+
