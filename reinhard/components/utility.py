@@ -270,9 +270,9 @@ async def avatar(
 async def mentions(
     ctx: tanjun.abc.Context,
     message: Snowflake,
-    channel: Channel
-    | None
-    | hikari.Snowflake = channel_field(or_snowflake=True, message_names=["--channel", "-c"], default=None),
+    channel: Channel | None | hikari.Snowflake = channel_field(
+        or_snowflake=True, message_names=["--channel", "-c"], default=None
+    ),
 ) -> None:
     """Get a list of the users who were pinged by a message.
 

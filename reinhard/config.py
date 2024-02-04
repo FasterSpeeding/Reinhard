@@ -54,8 +54,7 @@ ValueT = typing.TypeVar("ValueT")
 @typing.overload
 def _cast_or_else(
     data: collections.Mapping[str, typing.Any], key: str, cast: collections.Callable[[typing.Any], ValueT]
-) -> ValueT:
-    ...
+) -> ValueT: ...
 
 
 @typing.overload
@@ -64,8 +63,7 @@ def _cast_or_else(
     key: str,
     cast: collections.Callable[[typing.Any], ValueT],
     default: DefaultT = ...,
-) -> ValueT | DefaultT:
-    ...
+) -> ValueT | DefaultT: ...
 
 
 def _cast_or_else(
@@ -179,13 +177,11 @@ DEFAULT_INTENTS: typing.Final[hikari.Intents] = hikari.Intents.GUILDS | hikari.I
 
 
 @typing.overload
-def _str_to_bool(value: str, /) -> bool:
-    ...
+def _str_to_bool(value: str, /) -> bool: ...
 
 
 @typing.overload
-def _str_to_bool(value: str, /, *, default: ValueT) -> bool | ValueT:
-    ...
+def _str_to_bool(value: str, /, *, default: ValueT) -> bool | ValueT: ...
 
 
 def _str_to_bool(value: str, /, *, default: ValueT = ...) -> bool | ValueT:

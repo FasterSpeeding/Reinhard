@@ -80,12 +80,10 @@ class SQLError(Exception):
 # TODO: make abstract
 # TODO: Remove this as we shouldn't be expecting sql to raise anything other than field already exists errors
 # as validation should catch other stuff
-class DataError(SQLError):
-    ...
+class DataError(SQLError): ...
 
 
-class AlreadyExistsError(SQLError):
-    ...
+class AlreadyExistsError(SQLError): ...
 
 
 class DatabaseCollection(typing.Protocol[_FieldT_co, _ValueT_co]):
