@@ -126,7 +126,7 @@ class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
             if response_type := YOUTUBE_TYPES.get(page["id"]["kind"].lower()):
                 return yuyo.Page(f"{response_type[1]}{page['id'][response_type[0]]}")
 
-        kind: str = page["id"]["kind"]  # pyright: ignore[reportUnboundVariable, reportUnknownVariableType]
+        kind: str = page["id"]["kind"]  # pyright: ignore[reportUnboundVariable, reportPossiblyUnboundVariable]
         raise RuntimeError(f"Got unexpected 'kind' from youtube {kind}")
 
 
