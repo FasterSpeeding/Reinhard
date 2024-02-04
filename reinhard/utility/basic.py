@@ -256,7 +256,7 @@ def add_file_button(
         A callback which returns the files to send when the to file button is
         pressed.
     """
-    custom_id = random.randbytes(32).hex()
+    custom_id = random.randbytes(32).hex()  # noqa: S311
     column.add_interactive_button(
         hikari.ButtonStyle.SECONDARY,
         FileCallback(custom_id, files=files, make_files=make_files, post_components=column),
