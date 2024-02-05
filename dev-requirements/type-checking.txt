@@ -1050,9 +1050,9 @@ tanchan==0.4.1 ; python_version >= "3.10" and python_version < "3.12" \
 tomli==2.0.1 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:939de3e7a6161af0c887ef91b7d41a53e7c5a1ca976325f429cb46ea9bc30ecc \
     --hash=sha256:de526c12914f0c550d15924c62d72abc48d6fe7364aa87328337a31007fe8a4f
-types-psutil==5.9.5.20240106 ; python_version >= "3.10" and python_version < "3.12" \
-    --hash=sha256:60b233fb613b41fe859526103dbda0b4812d7a16c5f791119ec7016fbe1c8128 \
-    --hash=sha256:fea169a85b1bb9d9edd0b063a93ad950e37d574290b1bf11ef5e46c9c5d82326
+types-psutil==5.9.5.20240205 ; python_version >= "3.10" and python_version < "3.12" \
+    --hash=sha256:3ec9bd8b95a64fe1269241d3ffb74b94a45df2d0391da1402423cd33f29745ca \
+    --hash=sha256:51df36a361aa597bf483dcc5b58f2ab7aa87452a36d2da97c90994d6a81ef743
 types-pyyaml==6.0.12.12 ; python_version >= "3.10" and python_version < "3.12" \
     --hash=sha256:334373d392fde0fdf95af5c3f1661885fa10c52167b14593eb856289e1855062 \
     --hash=sha256:c05bc6c158facb0676674b7f11fe3960db4f389718e19e62bd2b84d6205cfd24
