@@ -44,7 +44,7 @@ force_single_line = true
 default_sessions = ["reformat", "verify-markup", "flake8", "spell-check", "type-check"]
 hide = ["build", "generate_docs", "publish", "slot-check", "test", "test_coverage", "test_publish", "verify_types"]
 top_level_targets = ["./noxfile.py", "./reinhard"]
-version_constraint = "3.10,<3.13"
+version_constraint = "3.10,<3.11"
 
 [tool.piped.github_actions."*"]
 default_py_ver = "3.10"
