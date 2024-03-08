@@ -5,8 +5,7 @@ COPY ./reinhard ./reinhard
 COPY ./dev-requirements/constraints.txt ./requirements.txt
 COPY ./main.py ./main.py
 
-ARG debug=false
-ENV DOCKER_DEBUG=${debug}
+ENV DOCKER_DEBUG=false
 RUN python -m pip install --no-cache-dir wheel && \
     python -m pip install --no-cache-dir -r requirements.txt
 
