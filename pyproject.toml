@@ -49,6 +49,7 @@ version_constraint = "3.10,<3.13"
 [tool.piped.github_actions."*"]
 default_py_ver = "3.10"
 
+[tool.piped.github_actions.docker_publish]
 [tool.piped.github_actions.freeze_for_pr]
 [tool.piped.github_actions.lint]
 [tool.piped.github_actions.reformat]
