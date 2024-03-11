@@ -7,11 +7,11 @@ name: Docker
 
 on:
   schedule:
-    - cron: '24 14 * * *'
+    - cron: "25 14 * * *"
   push:
     branches: [ "master" ]
     # Publish semver tags as releases.
-    tags: [ 'v*.*.*' ]
+    tags: [ "v*.*.*" ]
   pull_request:
     branches: [ "master" ]
 
@@ -35,7 +35,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@8eb1f6a495037164bea451156472f35fdd6bafc0
 
       # Install the cosign tool except on PR
       # https://github.com/sigstore/cosign-installer
@@ -43,7 +43,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@e1523de7571e31dbe865fd2e80c5c7c23ae71eb4 #v3.4.0
         with:
-          cosign-release: 'v2.1.1'
+          cosign-release: "v2.1.1"
 
       # Set up BuildKit Docker container builder to be able to build
       # multi-platform images and export cache
