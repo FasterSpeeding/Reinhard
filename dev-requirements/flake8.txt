@@ -54,9 +54,9 @@ flake8-black==0.3.6 ; python_version >= "3.10" and python_version < "3.13" \
 flake8-broken-line==1.0.0 ; python_version >= "3.10" and python_version < "3.13" \
     --hash=sha256:96c964336024a5030dc536a9f6fb02aa679e2d2a6b35b80a558b5136c35832a9 \
     --hash=sha256:e2c6a17f8d9a129e99c1320fce89b33843e2963871025c4c2bb7b8b8d8732a85
-flake8-builtins==2.2.0 ; python_version >= "3.10" and python_version < "3.13" \
-    --hash=sha256:392d5af3a0720c5a863aa93dc47f48c879081345a143fe9f20d995fe9ff5686a \
-    --hash=sha256:7ee5766d9c60e5d579dfda84e65c6d0e6c26005f6f59cb9bf722462d7987a807
+flake8-builtins==2.3.0 ; python_version >= "3.10" and python_version < "3.13" \
+    --hash=sha256:2db907d96d2817beb3c861d46fad8dde647e76894c6af88a6cc91dd7c3c58bc6 \
+    --hash=sha256:c3669520104233356c1909389d1b5016107c93f4c494922e829fd3c65c10c81c
 flake8-coding==1.3.2 ; python_version >= "3.10" and python_version < "3.13" \
     --hash=sha256:79704112c44d09d4ab6c8965e76a20c3f7073d52146db60303bce777d9612260 \
     --hash=sha256:b8f4d5157a8f74670e6cfea732c3d9f4291a4e994c8701d2c55f787c6e6cb741
