@@ -66,7 +66,7 @@ docs_group = doc_parse.slash_command_group("docs", "Search relevant document sit
 _T = typing.TypeVar("_T")
 _CoroT = collections.Coroutine[typing.Any, typing.Any, _T]
 _DocIndexT = typing.TypeVar("_DocIndexT", bound="DocIndex")
-HIKARI_PAGES = "https://www.hikari-py.dev"
+HIKARI_PAGES = "https://docs.hikari-py.dev/en/2.0.0.dev123"
 SAKE_PAGES = "https://sake.cursed.solutions"
 TANJUN_PAGES = "https://tanjun.cursed.solutions"
 YUYO_PAGES = "https://yuyo.cursed.solutions"
@@ -255,6 +255,25 @@ class _DocsOptions(typing.TypedDict, total=False):
     path: Str
     public: Annotated[Bool, Flag(aliases=["-p"], empty_value=True)]
     return_list: Annotated[Bool, Name("list"), Flag(aliases=["-l"], empty_value=True)]
+
+
+hikari_index = tanjun.dependencies.data.cache_callback(
+    utility.FetchedResource(HIKARI_PAGES + "/search/search_index.json", DocIndex.from_json("Hikari", HIKARI_PAGES)),
+    expire_after=datetime.timedelta(hours=12),
+)
+
+
+@doc_parse.with_annotated_args(follow_wrapped=True)
+@docs_group.as_sub_command("hikari")
+@tanjun.as_message_command("docs hikari")
+def hikari_docs_command(
+    ctx: tanjun.abc.Context,
+    component_client: alluka.Injected[yuyo.ComponentClient],
+    index: Annotated[DocIndex, alluka.inject(callback=hikari_index)],
+    **kwargs: typing_extensions.Unpack[_DocsOptions],
+) -> _CoroT[None]:
+    """Search Sake's documentation."""
+    return _docs_command(ctx, component_client, index, **kwargs)
 
 
 sake_index = tanjun.dependencies.data.cache_callback(

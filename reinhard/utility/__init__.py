@@ -34,7 +34,6 @@ __all__: list[str] = [
     "AIOHTTPStatusHandler",
     "AMARANTH_PINK",
     "ClientCredentialsOauth2",
-    "DELETE_EMOJI",
     "FAILED_COLOUR",
     "FILE_EMOJI",
     "FetchedResource",
@@ -79,7 +78,6 @@ from .basic import raise_error
 from .command_hooks import on_error
 from .command_hooks import on_parser_error
 from .constants import AMARANTH_PINK
-from .constants import DELETE_EMOJI
 from .constants import FAILED_COLOUR
 from .constants import FILE_EMOJI
 from .constants import MAYA_BLUE

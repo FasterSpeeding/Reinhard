@@ -30,16 +30,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__ = [
-    "AMARANTH_PINK",
-    "DELETE_EMOJI",
-    "FAILED_COLOUR",
-    "FILE_EMOJI",
-    "MAYA_BLUE",
-    "PASS_COLOUR",
-    "WHITE",
-    "embed_colour",
-]
+__all__ = ["AMARANTH_PINK", "FAILED_COLOUR", "FILE_EMOJI", "MAYA_BLUE", "PASS_COLOUR", "WHITE", "embed_colour"]
 
 import random
 import typing
@@ -55,11 +46,6 @@ PASS_COLOUR: typing.Final[hikari.Colour] = hikari.Colour(0x43B581)
 MAYA_BLUE: typing.Final[hikari.Colour] = hikari.Colour(0x55CDFC)
 WHITE: typing.Final[hikari.Colour] = hikari.Colour(0xFFFFFE)  # 0xFFFFFF is treated as no colour in embeds by Discord.
 AMARANTH_PINK: typing.Final[hikari.Colour] = hikari.Colour(0xF7A8B8)
-
-DELETE_EMOJI: typing.Final[hikari.UnicodeEmoji] = hikari.UnicodeEmoji(
-    "\N{HEAVY MULTIPLICATION X}\N{VARIATION SELECTOR-16}"
-)
-"""Emoji used for "delete" buttons."""
 
 FILE_EMOJI: typing.Final[hikari.UnicodeEmoji] = hikari.UnicodeEmoji("\N{CARD FILE BOX}\N{VARIATION SELECTOR-16}")
 """Emoji used for "to file" buttons."""

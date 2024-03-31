@@ -403,7 +403,7 @@ def _build_spotify_auth(
         raise tanjun.MissingDependencyError("Missing spotify secret and/or client id", None)
 
     return utility.ClientCredentialsOauth2(
-        ctx.author.id, "https://accounts.spotify.com/api/token", config.spotify_id, config.spotify_secret
+        "https://accounts.spotify.com/api/token", config.spotify_id, config.spotify_secret
     )
 
 

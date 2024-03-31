@@ -74,7 +74,6 @@ class SessionManager:
             tanjun.ClientCallbackNames.CLOSED, self.close
         )
 
-    # TODO: switch over to tanjun.InjectorClient
     def open(self, client: alluka.Injected[tanjun.Client]) -> None:
         """Start the session.
 
@@ -105,5 +104,5 @@ class SessionManager:
 
         session = self._session
         self._session = None
-        await session.close()
         client.remove_type_dependency(aiohttp.ClientSession)
+        await session.close()
