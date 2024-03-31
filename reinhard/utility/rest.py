@@ -35,6 +35,7 @@ __all__: list[str] = ["AIOHTTPStatusHandler", "ClientCredentialsOauth2", "Fetche
 import logging
 import time
 import typing
+import datetime
 from collections import abc as collections
 
 import aiohttp
@@ -45,6 +46,7 @@ from yuyo import backoff
 
 if typing.TYPE_CHECKING:
     import hikari
+
 
 _ValueT = typing.TypeVar("_ValueT")
 _LOGGER = logging.getLogger("hikari.reinhard.rest_utility")
@@ -129,12 +131,11 @@ class FetchedResource(typing.Generic[_ValueT]):
 
 
 class ClientCredentialsOauth2:
-    __slots__ = ("_author", "_authorization", "_expire_at", "_path", "_prefix", "_token")
+    __slots__ = ("_authorization", "_expire_at", "_path", "_prefix", "_token")
 
     def __init__(
-        self, author: hikari.Snowflakeish, path: str, client_id: str, client_secret: str, *, prefix: str = "Bearer "
+        self, path: str, client_id: str, client_secret: str, *, prefix: str = "Bearer "
     ) -> None:
-        self._author = author
         self._authorization = aiohttp.BasicAuth(client_id, client_secret)
         self._expire_at = 0
         self._path = path
@@ -174,4 +175,6 @@ class ClientCredentialsOauth2:
             _LOGGER.warning(
                 "Received %r from %s while trying to authenticate as client credentials", response.status, self._path
             )
-        raise tanjun.CommandError("Couldn't authenticate", component=buttons.delete_row(self._author))
+
+        # TODO: replace delete_after with public delete button.
+        raise tanjun.CommandError("Couldn't authenticate", delete_after=datetime.timedelta(minutes=1))
