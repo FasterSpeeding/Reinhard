@@ -257,7 +257,6 @@ class _DocsOptions(typing.TypedDict, total=False):
     return_list: Annotated[Bool, Name("list"), Flag(aliases=["-l"], empty_value=True)]
 
 
-
 hikari_index = tanjun.dependencies.data.cache_callback(
     utility.FetchedResource(HIKARI_PAGES + "/search/search_index.json", DocIndex.from_json("Hikari", HIKARI_PAGES)),
     expire_after=datetime.timedelta(hours=12),

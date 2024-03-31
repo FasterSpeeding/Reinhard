@@ -32,10 +32,10 @@ from __future__ import annotations
 
 __all__: list[str] = ["AIOHTTPStatusHandler", "ClientCredentialsOauth2", "FetchedResource"]
 
+import datetime
 import logging
 import time
 import typing
-import datetime
 from collections import abc as collections
 
 import aiohttp
@@ -133,9 +133,7 @@ class FetchedResource(typing.Generic[_ValueT]):
 class ClientCredentialsOauth2:
     __slots__ = ("_authorization", "_expire_at", "_path", "_prefix", "_token")
 
-    def __init__(
-        self, path: str, client_id: str, client_secret: str, *, prefix: str = "Bearer "
-    ) -> None:
+    def __init__(self, path: str, client_id: str, client_secret: str, *, prefix: str = "Bearer ") -> None:
         self._authorization = aiohttp.BasicAuth(client_id, client_secret)
         self._expire_at = 0
         self._path = path

@@ -30,15 +30,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__ = [
-    "AMARANTH_PINK",
-    "FAILED_COLOUR",
-    "FILE_EMOJI",
-    "MAYA_BLUE",
-    "PASS_COLOUR",
-    "WHITE",
-    "embed_colour",
-]
+__all__ = ["AMARANTH_PINK", "FAILED_COLOUR", "FILE_EMOJI", "MAYA_BLUE", "PASS_COLOUR", "WHITE", "embed_colour"]
 
 import random
 import typing
