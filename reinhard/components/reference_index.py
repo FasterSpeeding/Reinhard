@@ -46,6 +46,9 @@ from collections import abc as collections
 
 import alluka
 import hikari
+import arc
+import crescent
+import miru
 import hikari.events
 import hikari.interactions
 import lightbulb
@@ -801,6 +804,64 @@ yuyo_command = reference_group.with_command(
     )
 )
 yuyo_command = _with_index_message_options(tanjun.MessageCommand(yuyo_command.callback, "references yuyo"))
+
+
+arc_index = (
+    ReferenceIndex(track_builtins=True, track_3rd_party=True)
+    .index_module(arc, recursive=True)
+    .index_module(hikari, recursive=True)
+    .scan_module(arc, recursive=True)
+)
+arc_command = reference_group.with_command(
+    _with_index_slash_options(
+        tanjun.SlashCommand(
+            _IndexCommand(arc_index, "Arc v" + importlib.metadata.version("hikari-arc")),
+            "arc",
+            "Find the references for a Arc type in Arc",
+        ),
+        arc_index,
+    )
+)
+arc_command = _with_index_message_options(tanjun.MessageCommand(arc_command.callback, "references arc"))
+
+
+crescent_index = (
+    ReferenceIndex(track_builtins=True, track_3rd_party=True)
+    .index_module(crescent, recursive=True)
+    .index_module(hikari, recursive=True)
+    .scan_module(crescent, recursive=True)
+)
+crescent_command = reference_group.with_command(
+    _with_index_slash_options(
+        tanjun.SlashCommand(
+            _IndexCommand(crescent_index, "Crescent v" + importlib.metadata.version("hikari-crescent")),
+            "crescent",
+            "Find the references for a Crescent type in Crescent",
+        ),
+        crescent_index,
+    )
+)
+crescent_command = _with_index_message_options(tanjun.MessageCommand(crescent_command.callback, "references crescent"))
+
+
+
+miru_index = (
+    ReferenceIndex(track_builtins=True, track_3rd_party=True)
+    .index_module(miru, recursive=True)
+    .index_module(hikari, recursive=True)
+    .scan_module(miru, recursive=True)
+)
+miru_command = reference_group.with_command(
+    _with_index_slash_options(
+        tanjun.SlashCommand(
+            _IndexCommand(miru_index, "Miru v" + importlib.metadata.version("hikari-miru")),
+            "miru",
+            "Find the references for a Miru type in Miru",
+        ),
+        miru_index,
+    )
+)
+miru_command = _with_index_message_options(tanjun.MessageCommand(miru_command.callback, "references miru"))
 
 
 load_reference = tanjun.Component(name="reference").load_from_scope().make_loader()
