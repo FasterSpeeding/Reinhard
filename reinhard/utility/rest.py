@@ -30,7 +30,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-__all__: list[str] = ["AIOHTTPStatusHandler", "ClientCredentialsOauth2", "FetchedResource"]
+__all__: list[str] = ["AIOHTTPStatusHandler", "ClientCredentialsOauth2", "fetch_resource"]
 
 import datetime
 import logging
@@ -107,27 +107,11 @@ class AIOHTTPStatusHandler(backoff.ErrorManager):
         self._on_404 = on_404
 
 
-class FetchedResource(typing.Generic[_ValueT]):
-    __slots__ = ("_authorization", "_headers", "_parse_data", "_path", "__weakref__")
-
-    def __init__(
-        self,
-        path: str,
-        parse_data: collections.Callable[[bytes], _ValueT],
-        *,
-        authorization: aiohttp.BasicAuth | None = None,
-        headers: dict[str, typing.Any] | None = None,
-    ) -> None:
-        self._authorization = authorization
-        self._headers = headers
-        self._parse_data = parse_data
-        self._path = path
-
-    async def __call__(self, session: alluka.Injected[aiohttp.ClientSession]) -> _ValueT:
-        response = await session.get(self._path)
-        # TODO: better handling
-        response.raise_for_status()
-        return self._parse_data(await response.read())
+async def fetch_resource(session: alluka.Injected[aiohttp.ClientSession], path: str, /) -> bytes:
+    response = await session.get(path)
+    # TODO: better handling
+    response.raise_for_status()
+    return await response.read()
 
 
 class ClientCredentialsOauth2:

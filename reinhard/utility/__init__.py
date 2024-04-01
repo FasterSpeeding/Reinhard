@@ -36,9 +36,9 @@ __all__: list[str] = [
     "ClientCredentialsOauth2",
     "FAILED_COLOUR",
     "FILE_EMOJI",
-    "FetchedResource",
     "MAYA_BLUE",
     "PASS_COLOUR",
+    "Refreshed",
     "SessionManager",
     "WHITE",
     "YoutubeDownloader",
@@ -50,6 +50,7 @@ __all__: list[str] = [
     "constants",
     "dependencies",
     "embed_colour",
+    "fetch_resource",
     "make_paginator",
     "on_error",
     "on_parser_error",
@@ -84,8 +85,9 @@ from .constants import MAYA_BLUE
 from .constants import PASS_COLOUR
 from .constants import WHITE
 from .constants import embed_colour
+from .dependencies import Refreshed
 from .dependencies import SessionManager
 from .rest import AIOHTTPStatusHandler
 from .rest import ClientCredentialsOauth2
-from .rest import FetchedResource
+from .rest import fetch_resource
 from .ytdl import YoutubeDownloader

@@ -33,6 +33,7 @@ from __future__ import annotations
 
 __all__: list[str] = ["load_docs"]
 
+import abc
 import datetime
 import hashlib
 import json
@@ -40,6 +41,7 @@ import typing
 from collections import abc as collections
 from typing import Annotated
 
+import aiohttp
 import alluka
 import hikari
 import lunr  # type: ignore
@@ -66,13 +68,6 @@ docs_group = doc_parse.slash_command_group("docs", "Search relevant document sit
 _T = typing.TypeVar("_T")
 _CoroT = collections.Coroutine[typing.Any, typing.Any, _T]
 _DocIndexT = typing.TypeVar("_DocIndexT", bound="DocIndex")
-HIKARI_PAGES = "https://docs.hikari-py.dev/en/latest"
-SAKE_PAGES = "https://sake.cursed.solutions"
-TANJUN_PAGES = "https://tanjun.cursed.solutions"
-YUYO_PAGES = "https://yuyo.cursed.solutions"
-ARC_PAGES = "https://arc.hypergonial.com"
-CRESCENT_PAGES = "https://hikari-crescent.github.io/hikari-crescent"
-MIRU_PAGES = "https://miru.hypergonial.com"
 
 
 def hash_path(value: str, /) -> str:
@@ -110,28 +105,38 @@ class DocEntry:
         return hikari.Embed(description=self.text, color=utility.embed_colour(), title=self.title, url=self.url)
 
 
-class DocIndex:
+class DocIndex(abc.ABC):
     """Abstract class of a documentation store index."""
 
-    __slots__ = ("_autocomplete_refs", "_data", "docs_url", "name", "_search_index")
+    __slots__ = ("_autocomplete_refs", "_data", "_search_index")
 
-    def __init__(self, name: str, docs_url: str, data: list[dict[str, str]], /) -> None:
+    def __init__(self, data: list[dict[str, str]], /) -> None:
         # Since the top level dir dupes other places in my projects this can be skipped to improve performance.
         data = [entry for entry in data if not entry["location"].startswith("reference/#")]
         self._data: dict[str, DocEntry] = {
-            entry["location"]: DocEntry(docs_url, entry["location"], entry) for entry in data
+            entry["location"]: DocEntry(self.docs_url(), entry["location"], entry) for entry in data
         }
-        self.docs_url = docs_url
         self._autocomplete_refs: dict[str, DocEntry] = {entry.hashed_location: entry for entry in self._data.values()}
-        self.name = name
         self._search_index: lunr.index.Index = lunr.lunr(  # pyright: ignore[reportUnknownMemberType]
             "location", ("title", "location"), data
         )
 
     @classmethod
-    def from_json(cls, name: str, url: str, /) -> collections.Callable[[str | bytes], Self]:
+    @abc.abstractmethod
+    def docs_url(cls) -> str: ...
+
+    @classmethod
+    def fetch_url(cls) -> str:
+        return f"{cls.docs_url()}/search/search_index.json"
+
+    @classmethod
+    @abc.abstractmethod
+    def name(cls) -> str: ...
+
+    @classmethod
+    def from_json(cls, data: str | bytes, /) -> Self:
         """Build this index from a JSON payload."""
-        return lambda data: cls(name, url, json.loads(data)["docs"])
+        return cls(json.loads(data)["docs"])
 
     def get_autocomplete_result(self, path: str, /) -> DocEntry | None:
         """Try to get the autocomplete result for a "path" option.
@@ -152,7 +157,7 @@ class DocIndex:
         return self._autocomplete_refs.get(path)
 
     def search(
-        self, ctx: typing.Union[tanjun.abc.Context, tanjun.abc.AutocompleteContext], search_path: str, /
+        self, ctx: tanjun.abc.Context | tanjun.abc.AutocompleteContext, search_path: str, /
     ) -> collections.Iterator[DocEntry]:
         """Search the index for an entry.
 
@@ -186,7 +191,7 @@ async def _docs_command(
     return_list: bool = False,
 ) -> None:
     if not path:
-        await ctx.respond(index.docs_url, component=buttons.delete_row(ctx))
+        await ctx.respond(index.docs_url(), component=buttons.delete_row(ctx))
         return
 
     if autocomplete_result := index.get_autocomplete_result(path):
@@ -197,8 +202,8 @@ async def _docs_command(
         iterator = utility.page_iterator(
             utility.chunk((f"[{m.title}]({m.url})" for m in index.search(ctx, path)), 10),
             lambda entries: "\n".join(entries),
-            title=f"{index.name} Documentation",
-            url=index.docs_url,
+            title=f"{index.name()} Documentation",
+            url=index.docs_url(),
         )
         paginator = utility.make_paginator(iterator, author=None if public else ctx.author, full=True)
         utility.add_file_button(
@@ -218,12 +223,12 @@ async def _docs_command(
     await ctx.respond("Entry not found", component=buttons.delete_row(ctx))
 
 
-def make_autocomplete(get_index: collections.Callable[..., _CoroT[_DocIndexT]]) -> tanjun.abc.AutocompleteSig[str]:
+def make_autocomplete(index_type: type[DocIndex]) -> tanjun.abc.AutocompleteSig[str]:
     async def _autocomplete(
         ctx: tanjun.abc.AutocompleteContext,
         value: str,
         # Annotated can't be used here cause forward annotations
-        index: _DocIndexT = alluka.inject(callback=get_index),
+        index: utility.Refreshed[DocIndex] = alluka.inject(type=utility.Refreshed[index_type]),
     ) -> None:
         """Autocomplete strategy."""
         if not value:
@@ -234,12 +239,38 @@ def make_autocomplete(get_index: collections.Callable[..., _CoroT[_DocIndexT]]) 
             # A hash of the location is used as the raw partial paths can easily get over 100 characters
             # (the value length limit).
             await ctx.set_choices(
-                {entry.title: entry.hashed_location for entry, _ in zip(index.search(ctx, value), range(25))}
+                {
+                    entry.title: entry.hashed_location
+                    for entry, _ in zip(index.get_value().search(ctx, value), range(25))
+                }
             )
         except tanjun.CommandError:
             await ctx.set_choices()
 
     return _autocomplete
+
+
+def make_lifetimes(index_type: type[_DocIndexT], /) -> tanjun.schedules.AbstractSchedule:
+    async def fetch(session: alluka.Injected[aiohttp.ClientSession]) -> _DocIndexT:
+        data = await utility.fetch_resource(session, index_type.fetch_url())
+        return index_type.from_json(data)
+
+    # Annotated can't be used here for interval cause forward annotations
+    @tanjun.as_interval(datetime.timedelta(hours=6))
+    async def interval(
+        *,
+        index: utility.Refreshed[_DocIndexT] | None = alluka.inject(type=utility.Refreshed[index_type] | None),
+        client: alluka.Injected[alluka.abc.Client],
+        session: alluka.Injected[aiohttp.ClientSession],
+    ) -> None:
+        if index is None:
+            data = await fetch(session)
+            client.set_type_dependency(utility.Refreshed[index_type], utility.Refreshed(fetch, data))
+
+        else:
+            await index.refresh(client)
+
+    return interval.set_start_callback(interval.callback)
 
 
 class _DocsOptions(typing.TypedDict, total=False):
@@ -260,10 +291,16 @@ class _DocsOptions(typing.TypedDict, total=False):
     return_list: Annotated[Bool, Name("list"), Flag(aliases=["-l"], empty_value=True)]
 
 
-hikari_index = tanjun.dependencies.data.cache_callback(
-    utility.FetchedResource(HIKARI_PAGES + "/search/search_index.json", DocIndex.from_json("Hikari", HIKARI_PAGES)),
-    expire_after=datetime.timedelta(hours=12),
-)
+class HikariIndex(DocIndex):
+    __slots__ = ()
+
+    @classmethod
+    def name(cls) -> str:
+        return "Hikari"
+
+    @classmethod
+    def docs_url(cls) -> str:
+        return "https://docs.hikari-py.dev/en/latest"
 
 
 @doc_parse.with_annotated_args(follow_wrapped=True)
@@ -272,17 +309,27 @@ hikari_index = tanjun.dependencies.data.cache_callback(
 def hikari_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
-    index: Annotated[DocIndex, alluka.inject(callback=hikari_index)],
+    index: alluka.Injected[utility.Refreshed[HikariIndex]],
     **kwargs: typing_extensions.Unpack[_DocsOptions],
 ) -> _CoroT[None]:
     """Search Sake's documentation."""
-    return _docs_command(ctx, component_client, index, **kwargs)
+    return _docs_command(ctx, component_client, index.get_value(), **kwargs)
 
 
-sake_index = tanjun.dependencies.data.cache_callback(
-    utility.FetchedResource(SAKE_PAGES + "/search/search_index.json", DocIndex.from_json("Sake", SAKE_PAGES)),
-    expire_after=datetime.timedelta(hours=12),
-)
+hikari_docs_command.set_str_autocomplete("path", make_autocomplete(HikariIndex))
+hikari_interval = make_lifetimes(HikariIndex)
+
+
+class SakeIndex(DocIndex):
+    __slots__ = ()
+
+    @classmethod
+    def name(cls) -> str:
+        return "Sake"
+
+    @classmethod
+    def docs_url(cls) -> str:
+        return "https://sake.cursed.solutions"
 
 
 @doc_parse.with_annotated_args(follow_wrapped=True)
@@ -291,19 +338,27 @@ sake_index = tanjun.dependencies.data.cache_callback(
 def sake_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
-    index: Annotated[DocIndex, alluka.inject(callback=sake_index)],
+    index: alluka.Injected[utility.Refreshed[SakeIndex]],
     **kwargs: typing_extensions.Unpack[_DocsOptions],
 ) -> _CoroT[None]:
     """Search Sake's documentation."""
-    return _docs_command(ctx, component_client, index, **kwargs)
+    return _docs_command(ctx, component_client, index.get_value(), **kwargs)
 
 
-sake_docs_command.set_str_autocomplete("path", make_autocomplete(sake_index))
+sake_docs_command.set_str_autocomplete("path", make_autocomplete(SakeIndex))
+sake_interval = make_lifetimes(SakeIndex)
 
-tanjun_index = tanjun.dependencies.data.cache_callback(
-    utility.FetchedResource(TANJUN_PAGES + "/search/search_index.json", DocIndex.from_json("Tanjun", TANJUN_PAGES)),
-    expire_after=datetime.timedelta(hours=12),
-)
+
+class TanjunIndex(DocIndex):
+    __slots__ = ()
+
+    @classmethod
+    def name(cls) -> str:
+        return "Tanjun"
+
+    @classmethod
+    def docs_url(cls) -> str:
+        return "https://tanjun.cursed.solutions"
 
 
 @doc_parse.with_annotated_args(follow_wrapped=True)
@@ -312,19 +367,27 @@ tanjun_index = tanjun.dependencies.data.cache_callback(
 def tanjun_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
-    index: Annotated[DocIndex, alluka.inject(callback=tanjun_index)],
+    index: alluka.Injected[utility.Refreshed[TanjunIndex]],
     **kwargs: typing_extensions.Unpack[_DocsOptions],
 ) -> _CoroT[None]:
     """Search Tanjun's documentation."""
-    return _docs_command(ctx, component_client, index, **kwargs)
+    return _docs_command(ctx, component_client, index.get_value(), **kwargs)
 
 
-tanjun_docs_command.set_str_autocomplete("path", make_autocomplete(tanjun_index))
+tanjun_docs_command.set_str_autocomplete("path", make_autocomplete(TanjunIndex))
+tanjun_interval = make_lifetimes(TanjunIndex)
 
-yuyo_index = tanjun.dependencies.data.cache_callback(
-    utility.FetchedResource(YUYO_PAGES + "/search/search_index.json", DocIndex.from_json("Yuyo", YUYO_PAGES)),
-    expire_after=datetime.timedelta(hours=12),
-)
+
+class YuyoIndex(DocIndex):
+    __slots__ = ()
+
+    @classmethod
+    def name(cls) -> str:
+        return "Yuyo"
+
+    @classmethod
+    def docs_url(cls) -> str:
+        return "https://yuyo.cursed.solutions"
 
 
 @doc_parse.with_annotated_args(follow_wrapped=True)
@@ -333,20 +396,27 @@ yuyo_index = tanjun.dependencies.data.cache_callback(
 def yuyo_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
-    index: Annotated[DocIndex, alluka.inject(callback=yuyo_index)],
+    index: alluka.Injected[utility.Refreshed[YuyoIndex]],
     **kwargs: typing_extensions.Unpack[_DocsOptions],
 ) -> _CoroT[None]:
     """Search Yuyo's documentation."""
-    return _docs_command(ctx, component_client, index, **kwargs)
+    return _docs_command(ctx, component_client, index.get_value(), **kwargs)
 
 
-yuyo_docs_command.set_str_autocomplete("path", make_autocomplete(yuyo_index))
+yuyo_docs_command.set_str_autocomplete("path", make_autocomplete(YuyoIndex))
+yuyo_interval = make_lifetimes(YuyoIndex)
 
 
-arc_index = tanjun.dependencies.data.cache_callback(
-    utility.FetchedResource(ARC_PAGES + "/search/search_index.json", DocIndex.from_json("Arc", ARC_PAGES)),
-    expire_after=datetime.timedelta(hours=12),
-)
+class ArcIndex(DocIndex):
+    __slots__ = ()
+
+    @classmethod
+    def name(cls) -> str:
+        return "Arc"
+
+    @classmethod
+    def docs_url(cls) -> str:
+        return "https://arc.hypergonial.com"
 
 
 @doc_parse.with_annotated_args(follow_wrapped=True)
@@ -355,22 +425,27 @@ arc_index = tanjun.dependencies.data.cache_callback(
 def arc_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
-    index: Annotated[DocIndex, alluka.inject(callback=arc_index)],
+    index: alluka.Injected[utility.Refreshed[ArcIndex]],
     **kwargs: typing_extensions.Unpack[_DocsOptions],
 ) -> _CoroT[None]:
     """Search Arc's documentation."""
-    return _docs_command(ctx, component_client, index, **kwargs)
+    return _docs_command(ctx, component_client, index.get_value(), **kwargs)
 
 
-arc_docs_command.set_str_autocomplete("path", make_autocomplete(arc_index))
+arc_docs_command.set_str_autocomplete("path", make_autocomplete(ArcIndex))
+arc_interval = make_lifetimes(ArcIndex)
 
 
-crescent_index = tanjun.dependencies.data.cache_callback(
-    utility.FetchedResource(
-        CRESCENT_PAGES + "/search/search_index.json", DocIndex.from_json("Crescent", CRESCENT_PAGES)
-    ),
-    expire_after=datetime.timedelta(hours=12),
-)
+class CrescentIndex(DocIndex):
+    __slots__ = ()
+
+    @classmethod
+    def name(cls) -> str:
+        return "Crescent"
+
+    @classmethod
+    def docs_url(cls) -> str:
+        return "https://hikari-crescent.github.io/hikari-crescent"
 
 
 @doc_parse.with_annotated_args(follow_wrapped=True)
@@ -379,20 +454,27 @@ crescent_index = tanjun.dependencies.data.cache_callback(
 def crescent_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
-    index: Annotated[DocIndex, alluka.inject(callback=crescent_index)],
+    index: alluka.Injected[utility.Refreshed[CrescentIndex]],
     **kwargs: typing_extensions.Unpack[_DocsOptions],
 ) -> _CoroT[None]:
     """Search Crescent's documentation."""
-    return _docs_command(ctx, component_client, index, **kwargs)
+    return _docs_command(ctx, component_client, index.get_value(), **kwargs)
 
 
-crescent_docs_command.set_str_autocomplete("path", make_autocomplete(crescent_index))
+crescent_docs_command.set_str_autocomplete("path", make_autocomplete(CrescentIndex))
+crescent_interval = make_lifetimes(CrescentIndex)
 
 
-miru_index = tanjun.dependencies.data.cache_callback(
-    utility.FetchedResource(MIRU_PAGES + "/search/search_index.json", DocIndex.from_json("Miru", MIRU_PAGES)),
-    expire_after=datetime.timedelta(hours=12),
-)
+class MiruIndex(DocIndex):
+    __slots__ = ()
+
+    @classmethod
+    def name(cls) -> str:
+        return "Miru"
+
+    @classmethod
+    def docs_url(cls) -> str:
+        return "https://miru.hypergonial.com"
 
 
 @doc_parse.with_annotated_args(follow_wrapped=True)
@@ -401,14 +483,15 @@ miru_index = tanjun.dependencies.data.cache_callback(
 def miru_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
-    index: Annotated[DocIndex, alluka.inject(callback=miru_index)],
+    index: alluka.Injected[utility.Refreshed[MiruIndex]],
     **kwargs: typing_extensions.Unpack[_DocsOptions],
 ) -> _CoroT[None]:
     """Search Miru's documentation."""
-    return _docs_command(ctx, component_client, index, **kwargs)
+    return _docs_command(ctx, component_client, index.get_value(), **kwargs)
 
 
-miru_docs_command.set_str_autocomplete("path", make_autocomplete(miru_index))
+miru_docs_command.set_str_autocomplete("path", make_autocomplete(MiruIndex))
+miru_interval = make_lifetimes(MiruIndex)
 
 
 load_docs = tanjun.Component(name="docs").load_from_scope().make_loader()

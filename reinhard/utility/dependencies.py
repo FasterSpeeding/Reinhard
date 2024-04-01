@@ -40,8 +40,15 @@ import aiohttp
 import alluka
 import tanjun
 
+_T = typing.TypeVar("_T")
+
+
 if typing.TYPE_CHECKING:
+    from collections import abc as collections
+
     import hikari
+
+    _CoroT = collections.Coroutine[typing.Any, typing.Any, _T]
 
 
 _LOGGER = logging.getLogger("hikari.reinhard")
@@ -106,3 +113,17 @@ class SessionManager:
         self._session = None
         client.remove_type_dependency(aiohttp.ClientSession)
         await session.close()
+
+
+class Refreshed(typing.Generic[_T]):
+    __slots__ = ("_make_value", "_value")
+
+    def __init__(self, make_value: collections.Callable[..., _CoroT[_T]], value: _T, /) -> None:
+        self._make_value = make_value
+        self._value = value
+
+    def get_value(self) -> _T:
+        return self._value
+
+    async def refresh(self, client: alluka.Injected[alluka.abc.Client], /) -> None:
+        self._value = await client.call_with_async_di(self._make_value)
