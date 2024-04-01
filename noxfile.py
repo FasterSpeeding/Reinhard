@@ -38,6 +38,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent / "piped" / "python"))
 
 from noxfile import *
 
+
 @nox.session(name="gen-ref-indexes")
 def gen_ref_index(session: nox.Session) -> None:
     session.install("-r", "./dev-requirements/references.in")

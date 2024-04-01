@@ -34,21 +34,17 @@ from __future__ import annotations
 __slots__: list[str] = ["load_reference"]
 
 import dataclasses
+import importlib.metadata
 import json
 import os
-import importlib.metadata
-
 import pathlib
-
 import typing
 from collections import abc as collections
 
 import alluka
-
 import hikari
 import hikari.events
 import hikari.interactions
-
 import tanjun
 import yuyo
 from tanchan.components import buttons
@@ -81,8 +77,6 @@ def _search_tree(index: dict[str, typing.Any], path: str, partial_search: bool =
                 yield key
 
 
-
-
 class ReferenceIndex:
     """Index used for tracking references to types in specified modules.
 
@@ -94,12 +88,7 @@ class ReferenceIndex:
         Whether to track references to types in the builtin module.
     """
 
-    __slots__ = (
-        "_aliases",
-        "_alias_search_tree",
-        "_object_paths_to_uses",
-        "_object_search_tree",
-    )
+    __slots__ = ("_aliases", "_alias_search_tree", "_object_paths_to_uses", "_object_search_tree")
 
     def __init__(self) -> None:
         self._aliases: dict[str, str] = {}
@@ -118,7 +107,6 @@ class ReferenceIndex:
         index._object_paths_to_uses = data["object_paths_to_uses"]
         index._object_search_tree = data["object_search_tree"]
         return index
-
 
     def search(self, path: str, /) -> tuple[str, collections.Sequence[str]] | None:
         """Search for a type to get its references.
