@@ -66,7 +66,7 @@ docs_group = doc_parse.slash_command_group("docs", "Search relevant document sit
 _T = typing.TypeVar("_T")
 _CoroT = collections.Coroutine[typing.Any, typing.Any, _T]
 _DocIndexT = typing.TypeVar("_DocIndexT", bound="DocIndex")
-HIKARI_PAGES = "https://docs.hikari-py.dev/en/2.0.0.dev123"
+HIKARI_PAGES = "https://docs.hikari-py.dev/en/latest"
 SAKE_PAGES = "https://sake.cursed.solutions"
 TANJUN_PAGES = "https://tanjun.cursed.solutions"
 YUYO_PAGES = "https://yuyo.cursed.solutions"
