@@ -70,6 +70,9 @@ HIKARI_PAGES = "https://docs.hikari-py.dev/en/latest"
 SAKE_PAGES = "https://sake.cursed.solutions"
 TANJUN_PAGES = "https://tanjun.cursed.solutions"
 YUYO_PAGES = "https://yuyo.cursed.solutions"
+ARC_PAGES = "https://arc.hypergonial.com"
+CRESCENT_PAGES = "https://hikari-crescent.github.io/hikari-crescent"
+MIRU_PAGES = "https://miru.hypergonial.com"
 
 
 def hash_path(value: str, /) -> str:
@@ -338,5 +341,74 @@ def yuyo_docs_command(
 
 
 yuyo_docs_command.set_str_autocomplete("path", make_autocomplete(yuyo_index))
+
+
+arc_index = tanjun.dependencies.data.cache_callback(
+    utility.FetchedResource(ARC_PAGES + "/search/search_index.json", DocIndex.from_json("Arc", ARC_PAGES)),
+    expire_after=datetime.timedelta(hours=12),
+)
+
+
+@doc_parse.with_annotated_args(follow_wrapped=True)
+@docs_group.as_sub_command("arc")
+@tanjun.as_message_command("docs arc")
+def arc_docs_command(
+    ctx: tanjun.abc.Context,
+    component_client: alluka.Injected[yuyo.ComponentClient],
+    index: Annotated[DocIndex, alluka.inject(callback=arc_index)],
+    **kwargs: typing_extensions.Unpack[_DocsOptions],
+) -> _CoroT[None]:
+    """Search Arc's documentation."""
+    return _docs_command(ctx, component_client, index, **kwargs)
+
+
+arc_docs_command.set_str_autocomplete("path", make_autocomplete(arc_index))
+
+
+crescent_index = tanjun.dependencies.data.cache_callback(
+    utility.FetchedResource(
+        CRESCENT_PAGES + "/search/search_index.json", DocIndex.from_json("Crescent", CRESCENT_PAGES)
+    ),
+    expire_after=datetime.timedelta(hours=12),
+)
+
+
+@doc_parse.with_annotated_args(follow_wrapped=True)
+@docs_group.as_sub_command("crescent")
+@tanjun.as_message_command("docs crescent")
+def crescent_docs_command(
+    ctx: tanjun.abc.Context,
+    component_client: alluka.Injected[yuyo.ComponentClient],
+    index: Annotated[DocIndex, alluka.inject(callback=crescent_index)],
+    **kwargs: typing_extensions.Unpack[_DocsOptions],
+) -> _CoroT[None]:
+    """Search Crescent's documentation."""
+    return _docs_command(ctx, component_client, index, **kwargs)
+
+
+crescent_docs_command.set_str_autocomplete("path", make_autocomplete(crescent_index))
+
+
+miru_index = tanjun.dependencies.data.cache_callback(
+    utility.FetchedResource(MIRU_PAGES + "/search/search_index.json", DocIndex.from_json("Miru", MIRU_PAGES)),
+    expire_after=datetime.timedelta(hours=12),
+)
+
+
+@doc_parse.with_annotated_args(follow_wrapped=True)
+@docs_group.as_sub_command("miru")
+@tanjun.as_message_command("docs miru")
+def miru_docs_command(
+    ctx: tanjun.abc.Context,
+    component_client: alluka.Injected[yuyo.ComponentClient],
+    index: Annotated[DocIndex, alluka.inject(callback=miru_index)],
+    **kwargs: typing_extensions.Unpack[_DocsOptions],
+) -> _CoroT[None]:
+    """Search Miru's documentation."""
+    return _docs_command(ctx, component_client, index, **kwargs)
+
+
+miru_docs_command.set_str_autocomplete("path", make_autocomplete(miru_index))
+
 
 load_docs = tanjun.Component(name="docs").load_from_scope().make_loader()
