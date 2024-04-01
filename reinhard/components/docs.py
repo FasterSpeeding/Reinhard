@@ -251,20 +251,6 @@ def make_autocomplete(index_type: type[DocIndex]) -> tanjun.abc.AutocompleteSig[
     return _autocomplete
 
 
-
-# TODO: something like this should just be standard for tanjun
-class _LifetimeLoader(tanjun.components.AbstractComponentLoader):
-    __slots__ = ("_callback",)
-    def __init__(self, callback: collections.Callable[..., _CoroT[None]], /) -> None:
-        self._callback = callback
-
-    def load_into_component(self, component: Component) -> None:
-        assert isinstance(component, tanjun.components.Component)
-        # TODO: client callbacks should be on tanjun.abc.Component
-        component.add_client_callback(tanjun.abc.ClientCallbackNames.STARTING, self._callback)
-
-
-# TODO: it would make more sense for this to directly add this stuff to a component.
 def make_lifetimes(index_type: type[_DocIndexT], /) -> tanjun.schedules.AbstractSchedule:
     async def fetch(session: alluka.Injected[aiohttp.ClientSession]) -> _DocIndexT:
         data = await utility.fetch_resource(session, index_type.fetch_url())
