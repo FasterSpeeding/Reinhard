@@ -45,13 +45,13 @@ import typing
 from collections import abc as collections
 
 import alluka
-import hikari
 import arc
 import crescent
-import miru
+import hikari
 import hikari.events
 import hikari.interactions
 import lightbulb
+import miru
 import sake
 import tanjun
 import yuyo
@@ -842,7 +842,6 @@ crescent_command = reference_group.with_command(
     )
 )
 crescent_command = _with_index_message_options(tanjun.MessageCommand(crescent_command.callback, "references crescent"))
-
 
 
 miru_index = (
