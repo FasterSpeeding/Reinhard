@@ -31,8 +31,6 @@
 """Commands used to search Tanjun's docs."""
 from __future__ import annotations
 
-from tanjun.abc import Component
-
 __all__: list[str] = ["load_docs"]
 
 import abc
