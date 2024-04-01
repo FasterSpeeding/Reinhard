@@ -197,7 +197,7 @@ def _str_to_bool(value: str, /, *, default: ValueT = ...) -> bool | ValueT:
     raise ValueError(f"{value!r} is not a valid boolean")
 
 
-def _parse_ids(values: typing.Union[collections.Sequence[int], str]) -> set[hikari.Snowflake]:
+def _parse_ids(values: collections.Sequence[int] | str) -> set[hikari.Snowflake]:
     if isinstance(values, str):
         return {hikari.Snowflake(value.strip()) for value in values.split(",")}
 

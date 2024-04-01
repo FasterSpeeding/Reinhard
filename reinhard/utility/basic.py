@@ -163,12 +163,10 @@ def basic_name_grid(flags: enum.IntFlag, /) -> str:  # TODO: actually deal with 
 
 
 def make_paginator(
-    iterator: typing.Union[
-        collections.Iterator[yuyo.pagination.EntryT], collections.AsyncIterator[yuyo.pagination.EntryT]
-    ],
+    iterator: collections.Iterator[yuyo.pagination.EntryT] | collections.AsyncIterator[yuyo.pagination.EntryT],
     /,
     *,
-    author: typing.Optional[hikari.SnowflakeishOr[hikari.User]] = None,
+    author: hikari.SnowflakeishOr[hikari.User] | None = None,
     ephemeral_default: bool = False,
     full: bool = False,
 ) -> yuyo.ComponentPaginator:

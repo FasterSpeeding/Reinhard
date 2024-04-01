@@ -36,16 +36,17 @@ __all__: list[str] = [
     "ClientCredentialsOauth2",
     "FAILED_COLOUR",
     "FILE_EMOJI",
-    "FetchedResource",
     "MAYA_BLUE",
     "PASS_COLOUR",
     "SessionManager",
     "WHITE",
     "YoutubeDownloader",
+    "fetch_resource",
     "add_file_button",
     "basic",
     "basic_name_grid",
     "chunk",
+    "Refreshed",
     "command_hooks",
     "constants",
     "dependencies",
@@ -63,6 +64,7 @@ __all__: list[str] = [
 
 from . import basic
 from . import command_hooks
+from .dependencies import Refreshed
 from . import constants
 from . import dependencies
 from . import rest
@@ -87,5 +89,5 @@ from .constants import embed_colour
 from .dependencies import SessionManager
 from .rest import AIOHTTPStatusHandler
 from .rest import ClientCredentialsOauth2
-from .rest import FetchedResource
+from .rest import fetch_resource
 from .ytdl import YoutubeDownloader
