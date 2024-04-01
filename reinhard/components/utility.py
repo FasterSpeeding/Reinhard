@@ -126,8 +126,10 @@ async def member(ctx: tanjun.abc.Context, member: Member | None = None) -> None:
     member_information = [
         f"Color: {colour}",
         f"Joined Discord: {tanjun.conversion.from_datetime(member.user.created_at)}",
-        f"Joined Server: {tanjun.conversion.from_datetime(member.joined_at)}",
     ]
+
+    if member.joined_at is not None:
+        member_information.append(f"Joined Server: {tanjun.conversion.from_datetime(member.joined_at)}")
 
     if member.nickname:
         member_information.append(f"Nickname: {member.nickname}")
