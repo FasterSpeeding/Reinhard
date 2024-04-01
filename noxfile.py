@@ -41,5 +41,5 @@ from noxfile import *
 
 @nox.session(name="gen-ref-indexes")
 def gen_ref_index(session: nox.Session) -> None:
-    session.install("-r", "./dev-requirements/references.in")
+    session.install("-r", "./dev-requirements/references.txt")
     session.run("python", "./scripts/gen_ref_index.py", "default")
