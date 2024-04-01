@@ -13,4 +13,8 @@ uvicorn>=0.20
 youtube_dl>=2021.12.17
 # Since this is for the find references feature,
 # don't care about versioning like at all.
+hikari-arc
+hikari-crescent
 hikari-lightbulb
+hikari-miru
+
