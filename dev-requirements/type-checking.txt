@@ -564,21 +564,12 @@ hikari-tanjun==2.17.3 ; python_version >= "3.10" and python_version < "3.13" \
 hikari-yuyo==1.20.0 ; python_version >= "3.10" and python_version < "3.13" \
     --hash=sha256:c6935a8f37e0a6b21f90a570962e0dd682332eff3508874394835873bc6720f2 \
     --hash=sha256:d2a1c30174b352d9358cb5941024575e67cb1b4014db3069a7bf26b28e443331
-<<<<<<< HEAD
-hikari==2.0.0.dev123 ; python_version >= "3.10" and python_version < "3.13" \
-    --hash=sha256:1bb02f3804594e61d2ca916d2ccc81b379f0faba913c7daa2de935db5bf7f07a \
-    --hash=sha256:50f3b1aa42aa6dca7beb38c9781d9528cbdf213cc1ebb516ca22bcc0d48cb741
-hikari[speedups]==2.0.0.dev123 ; python_version >= "3.10" and python_version < "3.13" \
-    --hash=sha256:1bb02f3804594e61d2ca916d2ccc81b379f0faba913c7daa2de935db5bf7f07a \
-    --hash=sha256:50f3b1aa42aa6dca7beb38c9781d9528cbdf213cc1ebb516ca22bcc0d48cb741
-=======
 hikari==2.0.0.dev122 ; python_version >= "3.10" and python_version < "3.13" \
     --hash=sha256:5bc873776320f465b727a9e56e58eb063ab7e5a7147dc9e2d775946bd6943f1c \
     --hash=sha256:84c94c7991249397a311b6aa47e03f810e6ee3dee08cecebf22df7789171cb1b
 hikari[speedups]==2.0.0.dev122 ; python_version >= "3.10" and python_version < "3.13" \
     --hash=sha256:5bc873776320f465b727a9e56e58eb063ab7e5a7147dc9e2d775946bd6943f1c \
     --hash=sha256:84c94c7991249397a311b6aa47e03f810e6ee3dee08cecebf22df7789171cb1b
->>>>>>> b97d2fe (Freeze PR dependency changes)
 idna==3.6 ; python_version >= "3.10" and python_version < "3.13" \
     --hash=sha256:9ecdbbd083b06798ae1e86adcbfe8ab1479cf864e4ee30fe4e46a003d12491ca \
     --hash=sha256:c05567e9c24a6b9faaa835c4821bad0590fbb9d5779e7caa6e1cc4978e7eb24f
