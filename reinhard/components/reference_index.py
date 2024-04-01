@@ -33,6 +33,7 @@ from __future__ import annotations
 
 __slots__: list[str] = ["load_reference"]
 
+import ast
 import dataclasses
 import importlib.metadata
 import inspect
@@ -77,10 +78,6 @@ def _is_public_key(entry: tuple[str, typing.Any]) -> bool:
 
 _GENERIC_CAPTURE_PATTERN = re.compile(r"([\w\.]+)\[(.+)\]$", flags=re.ASCII)
 _NAME_PATTERN = re.compile(r"[a-zA-Z_]\w*(?:\.[a-zA-Z_]\w*)*", flags=re.ASCII)
-_IMPORT_CAPTURE_PATTERN = re.compile(
-    r"\s*import ([\w\.]+)(?: as (\w+))?|\s*from ([\w\.]+) import ([\w\.]+)(?: as (\w+))?", flags=re.ASCII
-)
-_RELATIVE_IMPORT_DOT_PATTERN = re.compile(r"^(\.*)")
 _BUILTIN_TYPES = set(filter(_is_public, __builtins__.keys()))
 _END_KEY = "_link"
 
@@ -116,20 +113,13 @@ def _search_tree(index: dict[str, typing.Any], path: str, partial_search: bool =
                 yield key
 
 
-def _combine_imports(part_1: str, part_2: str) -> str:
-    # If this is a relative import then adding a dot in would break it.
-    if part_1.endswith("."):
-        return f"{part_1}{part_2}"
+def _process_relative_import(import_link: str | None, current_module: str, depth: int) -> str:
+    assert current_module.count(".") > (depth - 2), "This import is invalid, how'd you get this far?"
+    parent = current_module.rsplit(".", depth)[0]
+    if import_link is None:
+        return parent
 
-    return f"{part_1}.{part_2}"
-
-
-def _process_relative_import(import_link: str, current_module: str) -> str:
-    dots = _RELATIVE_IMPORT_DOT_PATTERN.match(import_link)
-    assert dots, "We already know this starts with dots so this'll always pass"
-    dot_count = len(dots.group())
-    assert current_module.count(".") > (dot_count - 2), "This import is invalid, how'd you get this far?"
-    return current_module.rsplit(".", dot_count)[0] + import_link[dot_count - 1 :]
+    return f"{parent}.{import_link}"
 
 
 def _split_by_tl_commas(string: str) -> collections.Iterator[str]:
@@ -150,6 +140,23 @@ def _split_by_tl_commas(string: str) -> collections.Iterator[str]:
         yield string[last_comma:].strip()
 
 
+_TYPING_IMPORTS = {"t", "typing"}
+
+
+# TODO: this could just be passed a list of how typing.TYPE_CHECKING is
+# imported if i was real smart about it
+def _process_if(ast_to_check: list[ast.stmt], statement: ast.If, /) -> None:
+    if isinstance(statement.test, ast.Name) and statement.test.id == "TYPE_CHECKING":
+        ast_to_check.extend(statement.body)
+        return
+
+    if not isinstance(statement.test, ast.Attribute) or not isinstance(statement.test.value, ast.Name):
+        return
+
+    if statement.test.value.id in _TYPING_IMPORTS and statement.test.attr == "TYPE_CHECKING":
+        ast_to_check.extend(statement.body)
+
+
 class ReferenceIndex:
     """Index used for tracking references to types in specified modules.
 
@@ -164,6 +171,7 @@ class ReferenceIndex:
     __slots__ = (
         "_aliases",
         "_alias_search_tree",
+        "_index_name",
         "_is_tracking_3rd_party",
         "_is_tracking_builtins",
         "_indexed_modules",
@@ -173,9 +181,10 @@ class ReferenceIndex:
         "_top_level_modules",
     )
 
-    def __init__(self, *, track_builtins: bool = False, track_3rd_party: bool = False) -> None:
+    def __init__(self, name: str, *, track_builtins: bool = False, track_3rd_party: bool = False) -> None:
         self._aliases: dict[str, str] = {}
         self._alias_search_tree: dict[str, typing.Any] = {}
+        self._index_name = name
         self._is_tracking_3rd_party = track_3rd_party
         self._is_tracking_builtins = track_builtins
         self._indexed_modules: dict[str, types.ModuleType] = {}
@@ -222,31 +231,34 @@ class ReferenceIndex:
         assert (
             module_path is not None
         ), "These modules were all imported using the normal import system so this should never be None"
-        # TODO: parse as ast instead to support fancy stuff like multi-line imports.
         # TODO: do we want to explicitly work out star imports?
         with pathlib.Path(module_path).open("r") as file:
-            for match in filter(None, map(_IMPORT_CAPTURE_PATTERN.match, file.readlines())):
-                groups = match.groups()
-                if groups[1]:  # `import {0} as {1}`
-                    imported_name = groups[1]
-                    imported_from = groups[0]
+            # TODO: chunk this?
+            parsed_ast = ast.parse(file.read())
 
-                elif groups[0]:  # `import {0}`
-                    imported_name = imported_from = groups[0]
+        ast_to_check: list[ast.stmt] = parsed_ast.body
+        while ast_to_check:
+            statement = ast_to_check.pop()
+            if isinstance(statement, ast.Import):
+                current = [(i.name, i.name, 0) for i in statement.names]
 
-                elif groups[4]:  # `from {2} import {3} as {4}`
-                    imported_name = groups[4]
-                    imported_from = _combine_imports(groups[2], groups[3])
+            elif isinstance(statement, ast.ImportFrom):
+                current = [(statement.module, name.name, statement.level) for name in statement.names]
 
-                elif groups[3]:  # `from {2} import {3}`
-                    imported_name = groups[3]
-                    imported_from = _combine_imports(groups[2], imported_name)
+            elif isinstance(statement, ast.If):
+                _process_if(ast_to_check, statement)
+                current = []
+                continue
 
-                else:  # Case not defined by the regex
-                    raise RuntimeError("This shouldn't ever happen")
+            else:
+                continue
 
-                if imported_from.startswith("."):
-                    imported_from = _process_relative_import(imported_from, module_name)
+            for imported_from, imported_name, depth in current:
+                if depth:
+                    imported_from = _process_relative_import(imported_from, module_name, depth)
+
+                else:
+                    assert imported_from is not None
 
                 if self._is_tracking_3rd_party or imported_from.split(".", 1)[0] in self._top_level_modules:
                     imports[imported_name] = imported_from
@@ -425,6 +437,7 @@ class ReferenceIndex:
         module
             The module to index.
         """
+        _LOGGER.info("Indexing %s for %s index", module.__name__, self._index_name)
         self._indexed_modules[module.__name__] = module
         self._top_level_modules.add(module.__name__.split(".", 1)[0])
 
@@ -524,6 +537,7 @@ class ReferenceIndex:
         module
             The module to scan for type references.
         """
+        _LOGGER.info("Scanning %s for %s index", module.__name__, self._index_name)
         module_members = dict[str, typing.Any](filter(_is_public_key, inspect.getmembers(module)))
         for name, obj in module_members.items():
             if isinstance(obj, (types.FunctionType, types.MethodType, type, classmethod)):
@@ -712,7 +726,7 @@ def _with_index_slash_options(command: _SlashCommandT, index: ReferenceIndex, /)
 
 
 hikari_index = (
-    ReferenceIndex(track_builtins=True, track_3rd_party=True)
+    ReferenceIndex("Hikari", track_builtins=True, track_3rd_party=True)
     .index_module(hikari, recursive=True)
     .scan_indexed_modules()
 )
@@ -730,7 +744,7 @@ hikari_command = _with_index_message_options(tanjun.MessageCommand(hikari_comman
 
 
 lightbulb_index = (
-    ReferenceIndex(track_builtins=True, track_3rd_party=True)
+    ReferenceIndex("Lightbulb", track_builtins=True, track_3rd_party=True)
     .index_module(lightbulb, recursive=True)
     .index_module(hikari, recursive=True)
     .scan_module(lightbulb, recursive=True)
@@ -749,8 +763,9 @@ lightbulb_command = _with_index_message_options(
     tanjun.MessageCommand(lightbulb_command.callback, "references lightbulb")
 )
 
+
 sake_index = (
-    ReferenceIndex(track_builtins=True, track_3rd_party=True)
+    ReferenceIndex("Sake", track_builtins=True, track_3rd_party=True)
     .index_module(sake, recursive=True)
     .index_module(hikari, recursive=True)
     .scan_module(sake, recursive=True)
@@ -769,7 +784,7 @@ sake_command = _with_index_message_options(tanjun.MessageCommand(sake_command.ca
 
 
 tanjun_index = (
-    ReferenceIndex(track_builtins=True, track_3rd_party=True)
+    ReferenceIndex("Tanjun", track_builtins=True, track_3rd_party=True)
     .index_module(tanjun, recursive=True)
     .index_module(hikari, recursive=True)
     .scan_module(tanjun, recursive=True)
@@ -788,7 +803,7 @@ tanjun_command = _with_index_message_options(tanjun.MessageCommand(tanjun_comman
 
 
 yuyo_index = (
-    ReferenceIndex(track_builtins=True, track_3rd_party=True)
+    ReferenceIndex("Yuyo", track_builtins=True, track_3rd_party=True)
     .index_module(yuyo, recursive=True)
     .index_module(hikari, recursive=True)
     .scan_module(yuyo, recursive=True)
@@ -807,7 +822,7 @@ yuyo_command = _with_index_message_options(tanjun.MessageCommand(yuyo_command.ca
 
 
 arc_index = (
-    ReferenceIndex(track_builtins=True, track_3rd_party=True)
+    ReferenceIndex("Arc", track_builtins=True, track_3rd_party=True)
     .index_module(arc, recursive=True)
     .index_module(hikari, recursive=True)
     .scan_module(arc, recursive=True)
@@ -826,7 +841,7 @@ arc_command = _with_index_message_options(tanjun.MessageCommand(arc_command.call
 
 
 crescent_index = (
-    ReferenceIndex(track_builtins=True, track_3rd_party=True)
+    ReferenceIndex("Crescent", track_builtins=True, track_3rd_party=True)
     .index_module(crescent, recursive=True)
     .index_module(hikari, recursive=True)
     .scan_module(crescent, recursive=True)
@@ -845,7 +860,7 @@ crescent_command = _with_index_message_options(tanjun.MessageCommand(crescent_co
 
 
 miru_index = (
-    ReferenceIndex(track_builtins=True, track_3rd_party=True)
+    ReferenceIndex("Miru", track_builtins=True, track_3rd_party=True)
     .index_module(miru, recursive=True)
     .index_module(hikari, recursive=True)
     .scan_module(miru, recursive=True)
