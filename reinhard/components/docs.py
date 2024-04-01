@@ -35,15 +35,15 @@ from tanjun.abc import Component
 
 __all__: list[str] = ["load_docs"]
 
-import datetime
-import aiohttp
-import hashlib
 import abc
+import datetime
+import hashlib
 import json
 import typing
 from collections import abc as collections
 from typing import Annotated
 
+import aiohttp
 import alluka
 import hikari
 import lunr  # type: ignore
@@ -125,8 +125,7 @@ class DocIndex(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def docs_url(cls) -> str:
-        ...
+    def docs_url(cls) -> str: ...
 
     @classmethod
     def fetch_url(cls) -> str:
@@ -134,8 +133,7 @@ class DocIndex(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def name(cls) -> str:
-        ...
+    def name(cls) -> str: ...
 
     @classmethod
     def from_json(cls, data: str | bytes, /) -> Self:
@@ -243,7 +241,10 @@ def make_autocomplete(index_type: type[DocIndex]) -> tanjun.abc.AutocompleteSig[
             # A hash of the location is used as the raw partial paths can easily get over 100 characters
             # (the value length limit).
             await ctx.set_choices(
-                {entry.title: entry.hashed_location for entry, _ in zip(index.get_value().search(ctx, value), range(25))}
+                {
+                    entry.title: entry.hashed_location
+                    for entry, _ in zip(index.get_value().search(ctx, value), range(25))
+                }
             )
         except tanjun.CommandError:
             await ctx.set_choices()
@@ -258,7 +259,12 @@ def make_lifetimes(index_type: type[_DocIndexT], /) -> tanjun.schedules.Abstract
 
     # Annotated can't be used here for interval cause forward annotations
     @tanjun.as_interval(datetime.timedelta(hours=6))
-    async def interval(*, index: utility.Refreshed[_DocIndexT] | None = alluka.inject(type=utility.Refreshed[index_type] | None), client: alluka.Injected[alluka.abc.Client], session: alluka.Injected[aiohttp.ClientSession]) -> None:
+    async def interval(
+        *,
+        index: utility.Refreshed[_DocIndexT] | None = alluka.inject(type=utility.Refreshed[index_type] | None),
+        client: alluka.Injected[alluka.abc.Client],
+        session: alluka.Injected[aiohttp.ClientSession],
+    ) -> None:
         if index is None:
             data = await fetch(session)
             client.set_type_dependency(utility.Refreshed[index_type], utility.Refreshed(fetch, data))
@@ -328,7 +334,6 @@ class SakeIndex(DocIndex):
         return "https://sake.cursed.solutions"
 
 
-
 @doc_parse.with_annotated_args(follow_wrapped=True)
 @docs_group.as_sub_command("sake")
 @tanjun.as_message_command("docs sake")
@@ -344,7 +349,6 @@ def sake_docs_command(
 
 sake_docs_command.set_str_autocomplete("path", make_autocomplete(SakeIndex))
 sake_interval = make_lifetimes(SakeIndex)
-
 
 
 class TanjunIndex(DocIndex):
@@ -417,7 +421,6 @@ class ArcIndex(DocIndex):
         return "https://arc.hypergonial.com"
 
 
-
 @doc_parse.with_annotated_args(follow_wrapped=True)
 @docs_group.as_sub_command("arc")
 @tanjun.as_message_command("docs arc")
@@ -445,7 +448,6 @@ class CrescentIndex(DocIndex):
     @classmethod
     def docs_url(cls) -> str:
         return "https://hikari-crescent.github.io/hikari-crescent"
-
 
 
 @doc_parse.with_annotated_args(follow_wrapped=True)
@@ -477,7 +479,6 @@ class MiruIndex(DocIndex):
         return "https://miru.hypergonial.com"
 
 
-
 @doc_parse.with_annotated_args(follow_wrapped=True)
 @docs_group.as_sub_command("miru")
 @tanjun.as_message_command("docs miru")
@@ -496,4 +497,3 @@ miru_interval = make_lifetimes(MiruIndex)
 
 
 load_docs = tanjun.Component(name="docs").load_from_scope().make_loader()
-

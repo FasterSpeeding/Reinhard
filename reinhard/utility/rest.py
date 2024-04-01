@@ -107,11 +107,7 @@ class AIOHTTPStatusHandler(backoff.ErrorManager):
         self._on_404 = on_404
 
 
-async def fetch_resource(
-    session: alluka.Injected[aiohttp.ClientSession],
-    path: str,
-    /,
-) -> bytes:
+async def fetch_resource(session: alluka.Injected[aiohttp.ClientSession], path: str, /) -> bytes:
     response = await session.get(path)
     # TODO: better handling
     response.raise_for_status()

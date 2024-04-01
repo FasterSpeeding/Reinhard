@@ -38,19 +38,19 @@ __all__: list[str] = [
     "FILE_EMOJI",
     "MAYA_BLUE",
     "PASS_COLOUR",
+    "Refreshed",
     "SessionManager",
     "WHITE",
     "YoutubeDownloader",
-    "fetch_resource",
     "add_file_button",
     "basic",
     "basic_name_grid",
     "chunk",
-    "Refreshed",
     "command_hooks",
     "constants",
     "dependencies",
     "embed_colour",
+    "fetch_resource",
     "make_paginator",
     "on_error",
     "on_parser_error",
@@ -64,7 +64,6 @@ __all__: list[str] = [
 
 from . import basic
 from . import command_hooks
-from .dependencies import Refreshed
 from . import constants
 from . import dependencies
 from . import rest
@@ -86,6 +85,7 @@ from .constants import MAYA_BLUE
 from .constants import PASS_COLOUR
 from .constants import WHITE
 from .constants import embed_colour
+from .dependencies import Refreshed
 from .dependencies import SessionManager
 from .rest import AIOHTTPStatusHandler
 from .rest import ClientCredentialsOauth2

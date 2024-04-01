@@ -33,20 +33,20 @@ from __future__ import annotations
 __all__: list[str] = ["SessionManager"]
 
 import asyncio
-import alluka
 import logging
 import typing
 
 import aiohttp
+import alluka
 import tanjun
-
 
 _T = typing.TypeVar("_T")
 
 
 if typing.TYPE_CHECKING:
-    import hikari
     from collections import abc as collections
+
+    import hikari
 
     _CoroT = collections.Coroutine[typing.Any, typing.Any, _T]
 
@@ -113,7 +113,6 @@ class SessionManager:
         self._session = None
         client.remove_type_dependency(aiohttp.ClientSession)
         await session.close()
-
 
 
 class Refreshed(typing.Generic[_T]):
