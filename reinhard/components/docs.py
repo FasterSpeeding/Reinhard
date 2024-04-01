@@ -366,9 +366,7 @@ arc_docs_command.set_str_autocomplete("path", make_autocomplete(arc_index))
 
 
 crescent_index = tanjun.dependencies.data.cache_callback(
-    utility.FetchedResource(
-        CRESCENT_PAGES + "/search/search_index.json", DocIndex.from_json("Crescent", CRESCENT_PAGES)
-    ),
+    utility.FetchedResource(CRESCENT_PAGES + "/search/search_index.json", DocIndex.from_json("Crescent", CRESCENT_PAGES)),
     expire_after=datetime.timedelta(hours=12),
 )
 
