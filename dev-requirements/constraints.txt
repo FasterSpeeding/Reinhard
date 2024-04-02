@@ -528,9 +528,6 @@ frozenlist==1.4.1 ; python_version >= "3.10" and python_version < "3.13" \
 h11==0.14.0 ; python_version >= "3.10" and python_version < "3.13" \
     --hash=sha256:8f19fbbe99e72420ff35c00b27a34cb9937e902a8b810e2c88300c6f0a3b699d \
     --hash=sha256:e3fe4ac4b851c468cc8363d500db52c2ead036020723024a109d37346efaa761
-hikari-lightbulb==2.3.5 ; python_version >= "3.10" and python_version < "3.13" \
-    --hash=sha256:7ae9e75f35f3f91f84455d068e42855e27c8588ace087a4ab3fbae9eb28ad8aa \
-    --hash=sha256:8c2bcb9246b66eae670c914ea1ec7a821da15d4981ec6902e7c7148d05907a78
 hikari-sake==1.0.8 ; python_version >= "3.10" and python_version < "3.13" \
     --hash=sha256:37ac09ee61cb862d9004f8012c1b829e9e7088c4ed61cda8268039c81b19f4fd \
     --hash=sha256:a9a38f8ebe5609ab10efa4fdb321935d4fb8b3822e0cbc2ed8af8251157c74db
