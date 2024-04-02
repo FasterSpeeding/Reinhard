@@ -241,7 +241,6 @@ def _with_index_slash_options(command: _SlashCommandT, index: ReferenceIndex, /)
     )
 
 
-# TODO: env vars to override paths?
 hikari_index = ReferenceIndex.from_file(_INDEXES_DIR / "hikari_index.json")
 hikari_command = reference_group.with_command(
     _with_index_slash_options(
