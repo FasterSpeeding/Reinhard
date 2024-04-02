@@ -82,8 +82,8 @@ class ReferenceIndex:
 
     _aliases: dict[str, str]
     _alias_search_tree: dict[str, typing.Any]
-    _object_paths_to_uses: dict[str, list[str]] 
-    _object_search_tree: dict[str, typing.Any] 
+    _object_paths_to_uses: dict[str, list[str]]
+    _object_search_tree: dict[str, typing.Any]
     _version: str
 
     @classmethod
@@ -92,11 +92,11 @@ class ReferenceIndex:
             data = json.load(file)
 
         return cls(
-            _aliases = data["aliases"],
-            _alias_search_tree = data["alias_search_tree"],
-            _object_paths_to_uses = data["object_paths_to_uses"],
-            _object_search_tree = data["object_search_tree"],
-            _version = data["version"],
+            _aliases=data["aliases"],
+            _alias_search_tree=data["alias_search_tree"],
+            _object_paths_to_uses=data["object_paths_to_uses"],
+            _object_search_tree=data["object_search_tree"],
+            _version=data["version"],
         )
 
     @property
@@ -270,9 +270,7 @@ sake_index = ReferenceIndex.from_file(_INDEXES_DIR / "sake_index.json")
 sake_command = reference_group.with_command(
     _with_index_slash_options(
         tanjun.SlashCommand(
-            _IndexCommand(sake_index, f"Sake v{sake_index.version}"),
-            "sake",
-            "Find the references for types in Sake",
+            _IndexCommand(sake_index, f"Sake v{sake_index.version}"), "sake", "Find the references for types in Sake"
         ),
         sake_index,
     )
@@ -312,9 +310,7 @@ arc_index = ReferenceIndex.from_file(_INDEXES_DIR / "arc_index.json")
 arc_command = reference_group.with_command(
     _with_index_slash_options(
         tanjun.SlashCommand(
-            _IndexCommand(arc_index, f"Arc v{arc_index.version}"),
-            "arc",
-            "Find the references for a Arc type in Arc",
+            _IndexCommand(arc_index, f"Arc v{arc_index.version}"), "arc", "Find the references for a Arc type in Arc"
         ),
         arc_index,
     )
