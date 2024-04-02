@@ -38,6 +38,7 @@ import importlib
 import inspect
 import logging
 import json
+import importlib.metadata
 import pathlib
 import re
 import sys
@@ -147,9 +148,10 @@ class ReferenceIndex:
         "_object_paths_to_uses",
         "_object_search_tree",
         "_top_level_modules",
+        "_version"
     )
 
-    def __init__(self, *, track_builtins: bool = False, track_3rd_party: bool = False) -> None:
+    def __init__(self, *, track_builtins: bool = False, track_3rd_party: bool = False, version: str = "unknown") -> None:
         self._aliases: dict[str, str] = {}
         self._alias_search_tree: dict[str, typing.Any] = {}
         self._is_tracking_3rd_party = track_3rd_party
@@ -159,6 +161,7 @@ class ReferenceIndex:
         self._object_paths_to_uses: dict[str, list[str]] = {}
         self._object_search_tree: dict[str, typing.Any] = {}
         self._top_level_modules: set[str] = set()
+        self._version = version
 
     def save(self, out: pathlib.Path, /) -> None:
         data = {
@@ -166,6 +169,7 @@ class ReferenceIndex:
             "alias_search_tree": self._alias_search_tree,
             "object_paths_to_uses": self._object_paths_to_uses,
             "object_search_tree": self._object_search_tree,
+            "version": self._version,
         }
         with out.open("w+") as file:
             json.dump(data, file)
@@ -586,12 +590,13 @@ def gen() -> None:
 def default(out_dir: pathlib.Path) -> None:
     out_dir.mkdir(exist_ok=True, parents=True)
     assert override.callback
-    override.callback(out=out_dir / "hikari_index.json", index=["hikari"], scan=["hikari"])
+    override.callback(out=out_dir / "hikari_index.json", index=["hikari"], scan=["hikari"], package="hikari")
 
-    for lib in ("sake", "tanjun", "yuyo", "lightbulb", "arc", "crescent", "miru"):
-        override.callback(out_dir / f"{lib}_index.json", index=[lib, "hikari"], scan=[lib])
+    for lib, package in (("sake", "hikari-sake"), ("tanjun", "hikari-tanjun"), ("yuyo", "hikari-yuyo"), ("lightbulb", "hikari-lightbulb"), ("arc", "hikari-arc"), ("crescent", "hikari-crescent"), ("miru", "hikari-miru")):
+        override.callback(out_dir / f"{lib}_index.json", index=[lib, "hikari"], scan=[lib], package=package)
 
 
+@click.option("--package", default=None)
 @click.option("--skip-3rd-party", default=False)
 @click.option("--skip-builtins", default=False)
 @click.option("--index", "-i", multiple=True, required=True)
@@ -604,8 +609,15 @@ def override(
     scan: list[str],
     skip_builtins: bool = False,
     skip_3rd_party: bool = False,
+    package: str | None = None,
 ) -> None:
-    result = ReferenceIndex(track_builtins=not skip_builtins, track_3rd_party=not skip_3rd_party)
+    if package is not None:
+        version = importlib.metadata.version(package)
+
+    else:
+        version = "unknown"
+
+    result = ReferenceIndex(track_builtins=not skip_builtins, track_3rd_party=not skip_3rd_party, version=version)
     for to_index in index:
         module = importlib.import_module(to_index)
         result.index_module(module, recursive=True)

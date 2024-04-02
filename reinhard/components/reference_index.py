@@ -34,7 +34,6 @@ from __future__ import annotations
 __slots__: list[str] = ["load_reference"]
 
 import dataclasses
-import importlib.metadata
 import json
 import os
 import pathlib
@@ -77,36 +76,32 @@ def _search_tree(index: dict[str, typing.Any], path: str, partial_search: bool =
                 yield key
 
 
+@dataclasses.dataclass(slots=True)
 class ReferenceIndex:
-    """Index used for tracking references to types in specified modules.
+    """Index used for tracking references to types in specified modules."""
 
-    Parameters
-    ----------
-    track_3rd_party
-        Whether to track references to types in 3rd party (non-indexed) modules.
-    track_builtins
-        Whether to track references to types in the builtin module.
-    """
-
-    __slots__ = ("_aliases", "_alias_search_tree", "_object_paths_to_uses", "_object_search_tree")
-
-    def __init__(self) -> None:
-        self._aliases: dict[str, str] = {}
-        self._alias_search_tree: dict[str, typing.Any] = {}
-        self._object_paths_to_uses: dict[str, list[str]] = {}
-        self._object_search_tree: dict[str, typing.Any] = {}
+    _aliases: dict[str, str]
+    _alias_search_tree: dict[str, typing.Any]
+    _object_paths_to_uses: dict[str, list[str]] 
+    _object_search_tree: dict[str, typing.Any] 
+    _version: str
 
     @classmethod
     def from_file(cls, path: pathlib.Path, /) -> Self:
-        index = cls()
         with path.open("r") as file:
             data = json.load(file)
 
-        index._aliases = data["aliases"]
-        index._alias_search_tree = data["alias_search_tree"]
-        index._object_paths_to_uses = data["object_paths_to_uses"]
-        index._object_search_tree = data["object_search_tree"]
-        return index
+        return cls(
+            _aliases = data["aliases"],
+            _alias_search_tree = data["alias_search_tree"],
+            _object_paths_to_uses = data["object_paths_to_uses"],
+            _object_search_tree = data["object_search_tree"],
+            _version = data["version"],
+        )
+
+    @property
+    def version(self) -> str:
+        return self._version
 
     def search(self, path: str, /) -> tuple[str, collections.Sequence[str]] | None:
         """Search for a type to get its references.
@@ -245,7 +240,7 @@ hikari_index = ReferenceIndex.from_file(_INDEXES_DIR / "hikari_index.json")
 hikari_command = reference_group.with_command(
     _with_index_slash_options(
         tanjun.SlashCommand(
-            _IndexCommand(hikari_index, "Hikari v" + importlib.metadata.version("hikari")),
+            _IndexCommand(hikari_index, f"Hikari v{hikari_index.version}"),
             "hikari",
             "Find the references for types in hikari",
         ),
@@ -259,7 +254,7 @@ lightbulb_index = ReferenceIndex.from_file(_INDEXES_DIR / "lightbulb_index.json"
 lightbulb_command = reference_group.with_command(
     _with_index_slash_options(
         tanjun.SlashCommand(
-            _IndexCommand(lightbulb_index, "Lightbulb v" + importlib.metadata.version("hikari-lightbulb")),
+            _IndexCommand(lightbulb_index, f"Lightbulb v{lightbulb_index.version}"),
             "lightbulb",
             "Find the references for types in lightbulb",
         ),
@@ -275,7 +270,7 @@ sake_index = ReferenceIndex.from_file(_INDEXES_DIR / "sake_index.json")
 sake_command = reference_group.with_command(
     _with_index_slash_options(
         tanjun.SlashCommand(
-            _IndexCommand(sake_index, "Sake v" + importlib.metadata.version("hikari-sake")),
+            _IndexCommand(sake_index, f"Sake v{sake_index.version}"),
             "sake",
             "Find the references for types in Sake",
         ),
@@ -289,7 +284,7 @@ tanjun_index = ReferenceIndex.from_file(_INDEXES_DIR / "tanjun_index.json")
 tanjun_command = reference_group.with_command(
     _with_index_slash_options(
         tanjun.SlashCommand(
-            _IndexCommand(tanjun_index, "Tanjun v" + importlib.metadata.version("hikari-tanjun")),
+            _IndexCommand(tanjun_index, f"Tanjun v{tanjun_index.version}"),
             "tanjun",
             "Find the references for types in Tanjun",
         ),
@@ -303,7 +298,7 @@ yuyo_index = ReferenceIndex.from_file(_INDEXES_DIR / "yuyo_index.json")
 yuyo_command = reference_group.with_command(
     _with_index_slash_options(
         tanjun.SlashCommand(
-            _IndexCommand(yuyo_index, "Yuyo v" + importlib.metadata.version("hikari-yuyo")),
+            _IndexCommand(yuyo_index, f"Yuyo v{yuyo_index.version}"),
             "yuyo",
             "Find the references for a Yuyo type in Yuyo",
         ),
@@ -317,7 +312,7 @@ arc_index = ReferenceIndex.from_file(_INDEXES_DIR / "arc_index.json")
 arc_command = reference_group.with_command(
     _with_index_slash_options(
         tanjun.SlashCommand(
-            _IndexCommand(arc_index, "Arc v" + importlib.metadata.version("hikari-arc")),
+            _IndexCommand(arc_index, f"Arc v{arc_index.version}"),
             "arc",
             "Find the references for a Arc type in Arc",
         ),
@@ -331,7 +326,7 @@ crescent_index = ReferenceIndex.from_file(_INDEXES_DIR / "crescent_index.json")
 crescent_command = reference_group.with_command(
     _with_index_slash_options(
         tanjun.SlashCommand(
-            _IndexCommand(crescent_index, "Crescent v" + importlib.metadata.version("hikari-crescent")),
+            _IndexCommand(crescent_index, f"Crescent v{crescent_index.version}"),
             "crescent",
             "Find the references for a Crescent type in Crescent",
         ),
@@ -345,7 +340,7 @@ miru_index = ReferenceIndex.from_file(_INDEXES_DIR / "miru_index.json")
 miru_command = reference_group.with_command(
     _with_index_slash_options(
         tanjun.SlashCommand(
-            _IndexCommand(miru_index, "Miru v" + importlib.metadata.version("hikari-miru")),
+            _IndexCommand(miru_index, f"Miru v{miru_index.version}"),
             "miru",
             "Find the references for a Miru type in Miru",
         ),
