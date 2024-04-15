@@ -170,9 +170,9 @@ alluka==0.1.4 ; python_version >= "3.10" and python_version < "3.13" \
 annotated-types==0.6.0 ; python_version >= "3.10" and python_version < "3.13" \
     --hash=sha256:0641064de18ba7a25dee8f96403ebc39113d0cb953a01429249d5c7564666a43 \
     --hash=sha256:563339e807e53ffd9c267e99fc6d9ea23eb8443c08f112651963e24e22f84a5d
-argcomplete==3.2.3 ; python_version >= "3.10" and python_version < "3.13" \
-    --hash=sha256:bf7900329262e481be5a15f56f19736b376df6f82ed27576fa893652c5de6c23 \
-    --hash=sha256:c12355e0494c76a2a7b73e3a59b09024ca0ba1e279fb9ed6c1b82d5b74b6a70c
+argcomplete==3.3.0 ; python_version >= "3.10" and python_version < "3.13" \
+    --hash=sha256:c168c3723482c031df3c207d4ba8fa702717ccb9fc0bfe4117166c1f537b4a54 \
+    --hash=sha256:fd03ff4a5b9e6580569d34b273f741e85cd9e072f3feeeee3eba4891c70eda62
 async-timeout==4.0.3 ; python_version >= "3.10" and python_version < "3.12.0" \
     --hash=sha256:4640d96be84d82d02ed59ea2b7105a0f7b33abe8703703cd0ab0bf87c427522f \
     --hash=sha256:7405140ff1230c310e51dc27b3145b9092d659ce68ff733fb0cefe3ee42be028
@@ -1033,9 +1033,9 @@ pyyaml==6.0.1 ; python_version >= "3.10" and python_version < "3.13" \
 redis==4.6.0 ; python_version >= "3.10" and python_version < "3.13" \
     --hash=sha256:585dc516b9eb042a619ef0a39c3d7d55fe81bdb4df09a52c9cdde0d07bf1aa7d \
     --hash=sha256:e2b03db868160ee4591de3cb90d40ebb50a90dd302138775937f6a42b7ed183c
-setuptools==69.5.0 ; python_version >= "3.10" and python_version < "3.13" \
-    --hash=sha256:3b2dbd8f63dcc6b7c327d0243c2d7dc8c96cc507c016f09221f3787e6e528719 \
-    --hash=sha256:8d881f842bfc0e29e93bc98a2e650e8845609adff4d2989ba6c748e67b09d5be
+setuptools==69.5.1 ; python_version >= "3.10" and python_version < "3.13" \
+    --hash=sha256:6c1fccdac05a97e598fb0ae3bbed5904ccb317337a51139dcd51453611bbb987 \
+    --hash=sha256:c636ac361bc47580504644275c9ad802c50415c7522212252c033bd15f301f32
 six==1.16.0 ; python_version >= "3.10" and python_version < "3.13" \
     --hash=sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926 \
     --hash=sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254
