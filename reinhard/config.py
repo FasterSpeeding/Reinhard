@@ -37,6 +37,7 @@ import dataclasses
 import logging
 import os
 import pathlib
+import types
 import typing
 from collections import abc as collections
 
@@ -47,7 +48,6 @@ if typing.TYPE_CHECKING:
     from typing_extensions import Self
 
 ConfigT = typing.TypeVar("ConfigT", bound="Config")
-DefaultT = typing.TypeVar("DefaultT")
 ValueT = typing.TypeVar("ValueT")
 
 
@@ -55,8 +55,8 @@ def _cast_or_else(
     data: collections.Mapping[str, typing.Any],
     key: str,
     cast: collections.Callable[[typing.Any], ValueT],
-    default: DefaultT = ...,
-) -> ValueT | DefaultT:
+    default: ValueT | types.EllipsisType = ...,
+) -> ValueT:
     try:
         return cast(data[key])
     except KeyError:
