@@ -66,7 +66,6 @@ def _cast_or_else(
 ) -> ValueT: ...
 
 
-
 def _cast_or_else(
     data: collections.Mapping[str, typing.Any],
     key: str,
