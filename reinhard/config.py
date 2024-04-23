@@ -51,6 +51,22 @@ ConfigT = typing.TypeVar("ConfigT", bound="Config")
 ValueT = typing.TypeVar("ValueT")
 
 
+@typing.overload
+def _cast_or_else(
+    data: collections.Mapping[str, typing.Any], key: str, cast: collections.Callable[[typing.Any], ValueT]
+) -> ValueT: ...
+
+
+@typing.overload
+def _cast_or_else(
+    data: collections.Mapping[str, typing.Any],
+    key: str,
+    cast: collections.Callable[[typing.Any], ValueT],
+    default: ValueT = ...,
+) -> ValueT: ...
+
+
+
 def _cast_or_else(
     data: collections.Mapping[str, typing.Any],
     key: str,
