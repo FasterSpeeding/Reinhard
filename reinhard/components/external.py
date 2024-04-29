@@ -234,7 +234,8 @@ async def youtube(
     language: Annotated[Str | None, Flag(aliases=["-l"])] = None,
     # pyright bug
     order: YtOrder = str_field(  # type: ignore
-        choices=YtOrder.__members__, converters=YtOrder, default=YtOrder.Relevance),
+        choices=YtOrder.__members__, converters=YtOrder, default=YtOrder.Relevance
+    ),
     safe_search: Bool | None = None,
 ) -> None:
     """Search for a resource on youtube.

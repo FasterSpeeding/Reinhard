@@ -229,11 +229,11 @@ class FullConfig(Config):
 
         return cls(
             # pyright bug
-            cache=_cast_or_else(os.environ, "CACHE", hikari.api.CacheComponents, DEFAULT_CACHE),   # type: ignore
+            cache=_cast_or_else(os.environ, "CACHE", hikari.api.CacheComponents, DEFAULT_CACHE),  # type: ignore
             database=DatabaseConfig.from_env(),
             emoji_guild=_cast_or_else(os.environ, "EMOJI_GUILD", hikari.Snowflake, None),
             # pyright bug
-            intents=_cast_or_else(os.environ, "INTENTS", hikari.Intents, DEFAULT_INTENTS),   # type: ignore
+            intents=_cast_or_else(os.environ, "INTENTS", hikari.Intents, DEFAULT_INTENTS),  # type: ignore
             log_level=_cast_or_else(os.environ, "LOG_LEVEL", lambda v: int(v) if v.isdigit() else v, logging.INFO),
             mention_prefix=_cast_or_else(os.environ, "MENTION_PREFIX", _str_to_bool, True),
             owner_only=_cast_or_else(os.environ, "OWNER_ONLY", _str_to_bool, False),
