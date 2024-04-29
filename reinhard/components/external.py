@@ -222,7 +222,8 @@ async def youtube(
     tokens: alluka.Injected[config_.Tokens],
     component_client: alluka.Injected[yuyo.ComponentClient],
     query: Annotated[Str, Greedy()],
-    resource_type: YtResource = str_field(
+    # pyright bug
+    resource_type: YtResource = str_field(  # type: ignore
         choices=YtResource.__members__,
         converters=YtResource,
         slash_name="type",
@@ -231,7 +232,10 @@ async def youtube(
     ),
     region: Annotated[Str | None, Flag(aliases=["-r"])] = None,
     language: Annotated[Str | None, Flag(aliases=["-l"])] = None,
-    order: YtOrder = str_field(choices=YtOrder.__members__, converters=YtOrder, default=YtOrder.Relevance),
+    # pyright bug
+    order: YtOrder = str_field(  # type: ignore
+        choices=YtOrder.__members__, converters=YtOrder, default=YtOrder.Relevance
+    ),
     safe_search: Bool | None = None,
 ) -> None:
     """Search for a resource on youtube.
@@ -424,7 +428,8 @@ async def spotify(
     session: alluka.Injected[aiohttp.ClientSession],
     component_client: alluka.Injected[yuyo.ComponentClient],
     spotify_auth: Annotated[utility.ClientCredentialsOauth2, tanjun.cached_inject(_build_spotify_auth)],
-    resource_type: SpotifyType = str_field(
+    # pyright bug
+    resource_type: SpotifyType = str_field(  # type: ignore
         converters=SpotifyType,
         choices=SpotifyType.__members__,
         default=SpotifyType.Track,
