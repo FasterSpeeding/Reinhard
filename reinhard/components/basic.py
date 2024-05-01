@@ -138,7 +138,7 @@ async def ping(ctx: tanjun.abc.Context, /) -> None:
     time_taken = (time.perf_counter() - start_time) * 1_000
     heartbeat_latency = ctx.shards.heartbeat_latency * 1_000 if ctx.shards else float("NAN")
     await ctx.respond(
-        f"PONG\n - REST: {time_taken:.0f}ms\n - Gateway: {heartbeat_latency:.0f}ms", component=buttons.delete_row(ctx)
+        f"PONG\n- REST: {time_taken:.0f}ms\n- Gateway: {heartbeat_latency:.0f}ms", component=buttons.delete_row(ctx)
     )
 
 
