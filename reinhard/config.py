@@ -62,7 +62,7 @@ def _cast_or_else(
     data: collections.Mapping[str, typing.Any],
     key: str,
     cast: collections.Callable[[typing.Any], ValueT],
-    default: DefaultT = ...,
+    default: DefaultT,
 ) -> ValueT | DefaultT: ...
 
 
