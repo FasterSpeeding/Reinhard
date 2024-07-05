@@ -37,6 +37,7 @@ import dataclasses
 import logging
 import os
 import pathlib
+import types
 import typing
 from collections import abc as collections
 
@@ -70,7 +71,7 @@ def _cast_or_else(
     data: collections.Mapping[str, typing.Any],
     key: str,
     cast: collections.Callable[[typing.Any], ValueT],
-    default: DefaultT = ...,
+    default: DefaultT | types.EllipsisType = ...,
 ) -> ValueT | DefaultT:
     try:
         return cast(data[key])
