@@ -185,7 +185,7 @@ def _str_to_bool(value: str, /) -> bool: ...
 def _str_to_bool(value: str, /, *, default: ValueT) -> bool | ValueT: ...
 
 
-def _str_to_bool(value: str, /, *, default: ValueT = ...) -> bool | ValueT:
+def _str_to_bool(value: str, /, *, default: ValueT | types.EllipsisType = ...) -> bool | ValueT:
     if value in ("true", "True", "1"):
         return True
 
