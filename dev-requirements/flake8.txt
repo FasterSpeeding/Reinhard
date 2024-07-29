@@ -221,9 +221,9 @@ pyyaml==6.0.1 ; python_version >= "3.10" and python_version < "3.13" \
 rich==13.7.1 ; python_version >= "3.10" and python_version < "3.13" \
     --hash=sha256:4edbae314f59eb482f54e9e30bf00d33350aaa94f4bfcd4e9e3110e64d0d7222 \
     --hash=sha256:9be308cb1fe2f1f57d67ce99e95af38a1e2bc71ad9813b0e247cf7ffbcc3a432
-setuptools==71.1.0 ; python_version >= "3.10" and python_version < "3.13" \
-    --hash=sha256:032d42ee9fb536e33087fb66cac5f840eb9391ed05637b3f2a76a7c8fb477936 \
-    --hash=sha256:33874fdc59b3188304b2e7c80d9029097ea31627180896fb549c578ceb8a0855
+setuptools==72.0.0 ; python_version >= "3.10" and python_version < "3.13" \
+    --hash=sha256:5a0d9c6a2f332881a0153f629d8000118efd33255cfa802757924c53312c76da \
+    --hash=sha256:98b4d786a12fadd34eabf69e8d014b84e5fc655981e4ff419994700434ace132
 stdlib-list==0.10.0 ; python_version >= "3.10" and python_version < "3.13" \
     --hash=sha256:6519c50d645513ed287657bfe856d527f277331540691ddeaf77b25459964a14 \
     --hash=sha256:b3a911bc441d03e0332dd1a9e7d0870ba3bb0a542a74d7524f54fb431256e214
