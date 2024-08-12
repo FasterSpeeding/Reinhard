@@ -107,7 +107,7 @@ async def member(ctx: tanjun.abc.Context, member: Member | None = None) -> None:
     roles = {role.id: role for role in map(guild.roles.get, member.role_ids) if role}
     ordered_roles = sorted(((role.position, role) for role in roles.values()), reverse=True)
 
-    roles_repr = "\n".join(map("{0[1].name}: {0[1].id}".format, ordered_roles))  # noqa: FS002  # pyright: ignore
+    roles_repr = "\n".join(map("{0[1].name}: {0[1].id}".format, ordered_roles))  # noqa: FS002
 
     for _, role in ordered_roles:
         if role.colour:
