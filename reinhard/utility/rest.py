@@ -80,12 +80,24 @@ class AIOHTTPStatusHandler(backoff.ErrorManager):
             return False
 
         if exception.status == 429:
-            raw_retry_after: str | None = exception.headers.get("Retry-After") if exception.headers else None
-            if raw_retry_after is not None:
-                retry_after = float(raw_retry_after)
+            if isinstance(exception.headers, collections.Iterable):
+                headers_iter = exception.headers
 
+            elif exception.headers:
+                headers_iter = exception.headers.items()
+
+            else:
+                headers_iter = iter(())
+
+            for name, value in headers_iter:
+                if name != "Retry-After":
+                    continue
+
+                retry_after = float(value)
                 if retry_after <= 10:
                     self._backoff_handler.set_next_backoff(retry_after)
+
+                break
 
             return False
 
