@@ -1,4 +1,4 @@
-FROM python:3.12.4 as gen_ref_indexes
+FROM python:3.12.5 as gen_ref_indexes
 
 WORKDIR /code
 
@@ -8,7 +8,7 @@ COPY ./scripts/gen_ref_index.py ./gen_ref_index.py
 RUN python -m pip install -r ./references.txt
 RUN python ./gen_ref_index.py default --out-dir ./indexes
 
-FROM python:3.12.4
+FROM python:3.12.5
 WORKDIR /reinhard
 
 COPY ./reinhard ./reinhard
