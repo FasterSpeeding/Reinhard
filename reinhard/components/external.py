@@ -231,9 +231,7 @@ async def youtube(
     ),
     region: Annotated[Str | None, Flag(aliases=["-r"])] = None,
     language: Annotated[Str | None, Flag(aliases=["-l"])] = None,
-    order: YtOrder = str_field(
-        choices=YtOrder.__members__, converters=YtOrder, default=YtOrder.Relevance
-    ),
+    order: YtOrder = str_field(choices=YtOrder.__members__, converters=YtOrder, default=YtOrder.Relevance),
     safe_search: Bool | None = None,
 ) -> None:
     """Search for a resource on youtube.
