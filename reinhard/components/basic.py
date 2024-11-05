@@ -84,8 +84,13 @@ async def about(
     start_date = datetime.datetime.fromtimestamp(process.create_time())
     uptime = datetime.datetime.now() - start_date
     memory_usage: float = process.memory_full_info().uss / 1024**2
-    cpu_usage: float = process.cpu_percent() / psutil.cpu_count()
     memory_percent: float = process.memory_percent()
+
+    if (cpu_count := psutil.cpu_count()) is not None:
+        cpu_usage: float = process.cpu_percent() / cpu_count
+
+    else:
+        cpu_usage = -1.0
 
     if ctx.shards:
         shard_id = snowflakes.calculate_shard_id(ctx.shards.shard_count, ctx.guild_id) if ctx.guild_id else 0
@@ -177,8 +182,13 @@ async def cache(
     start_date = datetime.datetime.fromtimestamp(process.create_time())
     uptime = datetime.datetime.now() - start_date
     memory_usage: float = process.memory_full_info().uss / 1024**2
-    cpu_usage: float = process.cpu_percent() / psutil.cpu_count()
     memory_percent: float = process.memory_percent()
+
+    if (cpu_count := psutil.cpu_count()) is not None:
+        cpu_usage: float = process.cpu_percent() / cpu_count
+
+    else:
+        cpu_usage = -1.0
 
     cache_stats_lines: list[tuple[str, float]] = []
 
