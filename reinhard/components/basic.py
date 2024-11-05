@@ -90,7 +90,7 @@ async def about(
         cpu_usage: float = process.cpu_percent() / cpu_count
 
     else:
-        cpu_usage = -1.0 
+        cpu_usage = -1.0
 
     if ctx.shards:
         shard_id = snowflakes.calculate_shard_id(ctx.shards.shard_count, ctx.guild_id) if ctx.guild_id else 0
