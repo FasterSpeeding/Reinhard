@@ -92,7 +92,9 @@ class ReferenceIndex:
     def from_file(cls, path: pathlib.Path, /) -> Self:
         if not path.exists():
             _LOGGER.warning("%s does not exist, the relevant docs command will be inoperable", path)
-            return cls(_aliases={}, _alias_search_tree={}, _object_paths_to_uses={}, _object_search_tree={}, _version="v?.?.?")
+            return cls(
+                _aliases={}, _alias_search_tree={}, _object_paths_to_uses={}, _object_search_tree={}, _version="v?.?.?"
+            )
 
         with path.open("r") as file:
             data = json.load(file)
