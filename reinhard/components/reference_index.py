@@ -35,6 +35,7 @@ __slots__: list[str] = ["load_reference"]
 
 import dataclasses
 import json
+import logging
 import os
 import pathlib
 import typing
@@ -59,6 +60,7 @@ _SlashCommandT = typing.TypeVar("_SlashCommandT", bound=tanjun.SlashCommand[typi
 
 _END_KEY = "_link"
 _INDEXES_DIR = pathlib.Path(os.environ.get("REINHARD_INDEX_DIR", "./"))
+_LOGGER = logging.getLogger("hikari.reinhard.reference_index")
 
 
 def _search_tree(index: dict[str, typing.Any], path: str, partial_search: bool = False) -> collections.Iterator[str]:
@@ -88,6 +90,10 @@ class ReferenceIndex:
 
     @classmethod
     def from_file(cls, path: pathlib.Path, /) -> Self:
+        if not path.exists():
+            _LOGGER.warning("%s does not exist, the relevant docs command will be inoperable", path)
+            return cls(_aliases={}, _alias_search_tree={}, _object_paths_to_uses={}, _object_search_tree={}, _version="v?.?.?")
+
         with path.open("r") as file:
             data = json.load(file)
 
