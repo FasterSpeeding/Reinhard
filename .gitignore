@@ -139,3 +139,6 @@ main.exe
 
 gogo.patch
 *_index.json
+
+# ASDF
+.tool-versions
