@@ -5,8 +5,8 @@ WORKDIR /code
 COPY ./dev-requirements/references.txt ./references.txt
 COPY ./scripts/gen_ref_index.py ./gen_ref_index.py
 
-RUN python -m pip install -r ./references.txt
-RUN python ./gen_ref_index.py default --out-dir ./indexes
+RUN python -m pip install -r ./references.txt && \
+    python ./gen_ref_index.py default --out-dir ./indexes
 
 FROM python:3.12.6
 WORKDIR /reinhard
