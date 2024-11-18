@@ -42,7 +42,6 @@ from typing import Annotated
 
 import hikari
 import tanjun
-import typing_extensions
 from tanchan import doc_parse
 from tanchan.components import buttons
 from tanjun.annotations import Bool
@@ -53,7 +52,7 @@ from tanjun.annotations import Ranged
 from tanjun.annotations import Snowflake
 
 if typing.TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
 MAX_MESSAGE_BULK_DELETE = datetime.timedelta(weeks=2) - datetime.timedelta(minutes=2)
 
@@ -182,7 +181,7 @@ _CLEAR_PERMS = (
 async def clear(
     ctx: tanjun.abc.Context,
     users: collections.Collection[hikari.Snowflake] | None,
-    **kwargs: typing_extensions.Unpack[_IterMessageOptions],
+    **kwargs: typing.Unpack[_IterMessageOptions],
 ) -> None:
     """Clear new messages from chat as a moderator.
 
@@ -404,7 +403,7 @@ async def ban_authors_command(
     ctx: tanjun.abc.Context,
     clear_message_days: Annotated[Int, Ranged(0, 7), Flag(aliases=["-c"])] = 0,
     members_only: Annotated[Bool, Flag(empty_value=True, aliases=["-m"])] = False,
-    **kwargs: typing_extensions.Unpack[_IterMessageOptions],
+    **kwargs: typing.Unpack[_IterMessageOptions],
 ) -> None:
     """Ban the authors of recent messages.
 

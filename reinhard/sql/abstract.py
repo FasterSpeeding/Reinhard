@@ -40,7 +40,7 @@ if typing.TYPE_CHECKING:
     from collections import abc as collections
 
     import hikari
-    from typing_extensions import Self
+    from typing import Self
 
     from . import protos
 

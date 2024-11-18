@@ -52,7 +52,7 @@ from tanchan.components import buttons
 from .. import utility
 
 if typing.TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
 _MessageCommandT = typing.TypeVar("_MessageCommandT", bound=tanjun.MessageCommand[typing.Any])
 _SlashCommandT = typing.TypeVar("_SlashCommandT", bound=tanjun.SlashCommand[typing.Any])

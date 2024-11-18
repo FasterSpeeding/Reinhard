@@ -42,7 +42,7 @@ import typing
 import youtube_dl  # type: ignore
 
 if typing.TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
 _CLIENT_ATTRIBUTE = "REINHARD_YTDL_CLIENT"
 _OUT_DIR = str(pathlib.Path("videos/%(title)s-%(id)s.%(ext)s").absolute())
