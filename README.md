@@ -1,6 +1,6 @@
 # Reinhard
 
-Reference implementation of a Python 3.10+ Hikari-Tanjun bot.
+Reference implementation of a Python 3.12+ Hikari-Tanjun bot.
 
 For more information on the libraries this uses see [Tanjun](https://github.com/FasterSpeeding/Tanjun)
 and [Hikari](https://github.com/hikari-py/hikari)
