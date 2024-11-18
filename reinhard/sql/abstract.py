@@ -38,9 +38,9 @@ from typing import Literal
 if typing.TYPE_CHECKING:
     import asyncio
     from collections import abc as collections
+    from typing import Self
 
     import hikari
-    from typing_extensions import Self
 
     from . import protos
 

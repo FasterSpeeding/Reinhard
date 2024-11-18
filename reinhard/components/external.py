@@ -60,7 +60,7 @@ from .. import config as config_
 from .. import utility
 
 if typing.TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
 YOUTUBE_TYPES = {
     "youtube#video": ("videoId", "https://youtube.com/watch?v="),

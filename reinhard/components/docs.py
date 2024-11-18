@@ -49,7 +49,6 @@ import lunr.exceptions  # type: ignore
 import lunr.index  # type: ignore
 import markdownify  # pyright: ignore[reportMissingTypeStubs]
 import tanjun
-import typing_extensions
 import yuyo
 from tanchan import doc_parse
 from tanchan.components import buttons
@@ -61,7 +60,7 @@ from tanjun.annotations import Str
 from .. import utility
 
 if typing.TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
 docs_group = doc_parse.slash_command_group("docs", "Search relevant document sites.")
 
@@ -310,7 +309,7 @@ def hikari_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
     index: alluka.Injected[utility.Refreshed[HikariIndex]],
-    **kwargs: typing_extensions.Unpack[_DocsOptions],
+    **kwargs: typing.Unpack[_DocsOptions],
 ) -> _CoroT[None]:
     """Search Sake's documentation."""
     return _docs_command(ctx, component_client, index.get_value(), **kwargs)
@@ -339,7 +338,7 @@ def sake_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
     index: alluka.Injected[utility.Refreshed[SakeIndex]],
-    **kwargs: typing_extensions.Unpack[_DocsOptions],
+    **kwargs: typing.Unpack[_DocsOptions],
 ) -> _CoroT[None]:
     """Search Sake's documentation."""
     return _docs_command(ctx, component_client, index.get_value(), **kwargs)
@@ -368,7 +367,7 @@ def tanjun_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
     index: alluka.Injected[utility.Refreshed[TanjunIndex]],
-    **kwargs: typing_extensions.Unpack[_DocsOptions],
+    **kwargs: typing.Unpack[_DocsOptions],
 ) -> _CoroT[None]:
     """Search Tanjun's documentation."""
     return _docs_command(ctx, component_client, index.get_value(), **kwargs)
@@ -397,7 +396,7 @@ def yuyo_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
     index: alluka.Injected[utility.Refreshed[YuyoIndex]],
-    **kwargs: typing_extensions.Unpack[_DocsOptions],
+    **kwargs: typing.Unpack[_DocsOptions],
 ) -> _CoroT[None]:
     """Search Yuyo's documentation."""
     return _docs_command(ctx, component_client, index.get_value(), **kwargs)
@@ -426,7 +425,7 @@ def arc_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
     index: alluka.Injected[utility.Refreshed[ArcIndex]],
-    **kwargs: typing_extensions.Unpack[_DocsOptions],
+    **kwargs: typing.Unpack[_DocsOptions],
 ) -> _CoroT[None]:
     """Search Arc's documentation."""
     return _docs_command(ctx, component_client, index.get_value(), **kwargs)
@@ -455,7 +454,7 @@ def crescent_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
     index: alluka.Injected[utility.Refreshed[CrescentIndex]],
-    **kwargs: typing_extensions.Unpack[_DocsOptions],
+    **kwargs: typing.Unpack[_DocsOptions],
 ) -> _CoroT[None]:
     """Search Crescent's documentation."""
     return _docs_command(ctx, component_client, index.get_value(), **kwargs)
@@ -484,7 +483,7 @@ def miru_docs_command(
     ctx: tanjun.abc.Context,
     component_client: alluka.Injected[yuyo.ComponentClient],
     index: alluka.Injected[utility.Refreshed[MiruIndex]],
-    **kwargs: typing_extensions.Unpack[_DocsOptions],
+    **kwargs: typing.Unpack[_DocsOptions],
 ) -> _CoroT[None]:
     """Search Miru's documentation."""
     return _docs_command(ctx, component_client, index.get_value(), **kwargs)

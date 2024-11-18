@@ -45,7 +45,7 @@ import dotenv
 import hikari
 
 if typing.TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
 ConfigT = typing.TypeVar("ConfigT", bound="Config")
 DefaultT = typing.TypeVar("DefaultT")

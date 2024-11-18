@@ -48,7 +48,7 @@ from collections import abc as collections
 
 
 if typing.TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
 _LOGGER = logging.getLogger("hikari.reinhard.reference_index")
 
