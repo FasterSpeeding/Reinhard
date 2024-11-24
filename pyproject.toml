@@ -2,7 +2,7 @@
 include         = ".*py$"
 line-length     = 120
 skip-magic-trailing-comma = true
-target-version  = ["py312"]
+target-version  = ["py313"]
 
 [tool.codespell]
 ignore-regex = "nd|swith"
@@ -44,11 +44,10 @@ force_single_line = true
 default_sessions = ["reformat", "verify-markup", "flake8", "spell-check", "type-check"]
 hide = ["build", "generate_docs", "publish", "slot-check", "test", "test_coverage", "test_publish", "verify_types"]
 top_level_targets = ["./noxfile.py", "./reinhard"]
-# TODO: allow 3.13 once the dependencies are updated.
-version_constraint = "3.12,<3.13"
+version_constraint = "3.13,<3.14"
 
 [tool.piped.github_actions."*"]
-default_py_ver = "3.12"
+default_py_ver = "3.13"
 
 [tool.piped.github_actions.docker_publish]
 [tool.piped.github_actions.freeze_for_pr]
@@ -63,7 +62,7 @@ default_py_ver = "3.12"
 [tool.pyright]
 include = ["reinhard"]
 
-pythonVersion = "3.12"
+pythonVersion = "3.13"
 typeCheckingMode = "strict"
 reportMissingModuleSource = "error"  # Is only "warning" on strict mode.
 
