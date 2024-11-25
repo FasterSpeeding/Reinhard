@@ -223,15 +223,15 @@ pyyaml==6.0.2 ; python_version >= "3.12" and python_version < "3.13" \
 rich==13.9.4 ; python_version >= "3.12" and python_version < "3.13" \
     --hash=sha256:439594978a49a09530cff7ebc4b5c7103ef57baf48d5ea3184f21d9a2befa098 \
     --hash=sha256:6049d5e6ec054bf2779ab3358186963bac2ea89175919d699e378b99738c2a90
-setuptools==75.5.0 ; python_version >= "3.12" and python_version < "3.13" \
-    --hash=sha256:5c4ccb41111392671f02bb5f8436dfc5a9a7185e80500531b133f5775c4163ef \
-    --hash=sha256:87cb777c3b96d638ca02031192d40390e0ad97737e27b6b4fa831bea86f2f829
+setuptools==75.6.0 ; python_version >= "3.12" and python_version < "3.13" \
+    --hash=sha256:8199222558df7c86216af4f84c30e9b34a61d8ba19366cc914424cdbd28252f6 \
+    --hash=sha256:ce74b49e8f7110f9bf04883b730f4765b774ef3ef28f722cce7c273d253aaf7d
 stdlib-list==0.11.0 ; python_version >= "3.12" and python_version < "3.13" \
     --hash=sha256:8bf8decfffaaf273d4cfeb5bd852b910a00dec1037dcf163576803622bccf597 \
     --hash=sha256:b74a7b643a77a12637e907f3f62f0ab9f67300bce4014f6b2d3c8b4c8fd63c66
-stevedore==5.3.0 ; python_version >= "3.12" and python_version < "3.13" \
-    --hash=sha256:1efd34ca08f474dad08d9b19e934a22c68bb6fe416926479ba29e5013bcc8f78 \
-    --hash=sha256:9a64265f4060312828151c204efbe9b7a9852a0d9228756344dbc7e4023e375a
+stevedore==5.4.0 ; python_version >= "3.12" and python_version < "3.13" \
+    --hash=sha256:79e92235ecb828fe952b6b8b0c6c87863248631922c8e8e0fa5b17b232c4514d \
+    --hash=sha256:b0be3c4748b3ea7b854b265dcb4caa891015e442416422be16f8b31756107857
 tryceratops==2.4.1 ; python_version >= "3.12" and python_version < "3.13" \
     --hash=sha256:271b92367be89b243918a56361618607d2a9aa4aa4ba766ecfabd5f98c00480c \
     --hash=sha256:fbfc14650004e27cd1e55ebb7c76b43ced04a4d3b4cbe42aac9d71e4623ed84d
