@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2025, Faster Speeding
@@ -36,6 +35,7 @@ __all__: list[str] = ["load_external"]
 import datetime
 import enum
 import hashlib
+import http
 import logging
 import time
 import typing
@@ -44,7 +44,6 @@ from collections import abc as collections
 from typing import Annotated
 
 import aiohttp
-import alluka
 import hikari
 import tanjun
 import yuyo
@@ -56,11 +55,13 @@ from tanjun.annotations import Greedy
 from tanjun.annotations import Str
 from tanjun.annotations import str_field
 
-from .. import config as config_
-from .. import utility
+from reinhard import config as config_
+from reinhard import utility
 
 if typing.TYPE_CHECKING:
     from typing import Self
+
+    import alluka
 
 YOUTUBE_TYPES = {
     "youtube#video": ("videoId", "https://youtube.com/watch?v="),
@@ -75,7 +76,7 @@ SPOTIFY_RESOURCE_TYPES = ("track", "album", "artist", "playlist")
 
 
 class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType]]):
-    __slots__ = ("_author", "_session", "_buffer", "_next_page_token", "_parameters")
+    __slots__ = ("_author", "_buffer", "_next_page_token", "_parameters", "_session")
 
     def __init__(
         self, author: hikari.Snowflakeish, session: aiohttp.ClientSession, parameters: dict[str, str | int]
@@ -106,7 +107,8 @@ class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
 
             else:
                 if retry.is_depleted:
-                    raise RuntimeError(f"Youtube request passed max_retries with params:\n {parameters!r}") from None
+                    error_message = f"Youtube request passed max_retries with params:\n {parameters!r}"
+                    raise RuntimeError(error_message) from None
 
                 raise StopAsyncIteration from None
 
@@ -127,11 +129,12 @@ class YoutubePaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
                 return yuyo.Page(f"{response_type[1]}{page['id'][response_type[0]]}")
 
         kind: str = page["id"]["kind"]  # pyright: ignore[reportPossiblyUnboundVariable, reportUnknownVariableType]
-        raise RuntimeError(f"Got unexpected 'kind' from youtube {kind}")
+        error_message = f"Got unexpected 'kind' from youtube {kind}"
+        raise RuntimeError(error_message)
 
 
 class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType]]):
-    __slots__ = ("_acquire_authorization", "_author", "_session", "_buffer", "_offset", "_parameters")
+    __slots__ = ("_acquire_authorization", "_author", "_buffer", "_offset", "_parameters", "_session")
 
     _limit: typing.Final[int] = 50
 
@@ -175,9 +178,8 @@ class SpotifyPaginator(collections.AsyncIterator[tuple[str, hikari.UndefinedType
                     break
 
             else:
-                raise tanjun.CommandError(
-                    f"Couldn't fetch {resource_type} in time", component=buttons.delete_row(self._author)
-                ) from None
+                error_message = f"Couldn't fetch {resource_type} in time"
+                raise tanjun.CommandError(error_message, component=buttons.delete_row(self._author)) from None
 
             # TODO: Used to be catching (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError)
             # here and logging it
@@ -277,7 +279,8 @@ async def youtube(
             safe_search = not channel_is_nsfw
 
         elif not safe_search and not channel_is_nsfw:
-            raise tanjun.CommandError("Cannot disable safe search in a sfw channel", component=buttons.delete_row(ctx))
+            error_message = "Cannot disable safe search in a sfw channel"
+            raise tanjun.CommandError(error_message, component=buttons.delete_row(ctx))
 
     parameters: dict[str, str | int] = {
         "key": tokens.google,
@@ -311,7 +314,8 @@ async def youtube(
         if not first_response:
             # data["pageInfo"]["totalResults"] will not reliably be `0` when no data is returned and they don't use 404
             # for that so we'll just check to see if nothing is being returned.
-            raise tanjun.CommandError(f"Couldn't find `{query}`.", component=buttons.delete_row(ctx))
+            error_message = f"Couldn't find `{query}`."
+            raise tanjun.CommandError(error_message, component=buttons.delete_row(ctx))
 
         message = await ctx.respond(**first_response.to_kwargs(), components=paginator.rows, ensure_result=True)
         component_client.register_executor(paginator, message=message)
@@ -342,7 +346,8 @@ async def moe_command(
             break
 
     else:
-        raise tanjun.CommandError("Couldn't get an image in time", component=buttons.delete_row(ctx)) from None
+        error_message = "Couldn't get an image in time"
+        raise tanjun.CommandError(error_message, component=buttons.delete_row(ctx)) from None
 
     try:
         data = (await response.json())["data"]
@@ -373,34 +378,31 @@ async def query_nekos_life(
     # We cannot consistently rely on this behaviour either as any internal server errors will likely return an
     # actual 5xx response.
     try:
-        status_code = int(data["msg"])  # type: ignore
+        status_code = int(data["msg"])  # type: ignore  # noqa: PGH003
     except (LookupError, ValueError, TypeError):
         status_code = response.status
 
-    if status_code == 404:
-        raise tanjun.CommandError("Query not found.", component=buttons.delete_row(ctx)) from None
+    if status_code == http.StatusCode.NOT_FOUND:
+        error_message = "Query not found."
+        raise tanjun.CommandError(error_message, component=buttons.delete_row(ctx)) from None
 
-    if status_code >= 500 or data is None or response_key not in data:
-        raise tanjun.CommandError(
-            "Unable to fetch image at the moment due to server error or malformed response.",
-            component=buttons.delete_row(ctx),
-        ) from None
+    if status_code >= http.StatusCode.INTERNAL_SERVER_ERROR or data is None or response_key not in data:
+        error_message = "Unable to fetch image at the moment due to server error or malformed response."
+        raise tanjun.CommandError(error_message, component=buttons.delete_row(ctx)) from None
 
-    if status_code >= 300:
-        raise tanjun.CommandError(
-            f"Unable to fetch image due to unexpected error {status_code}", component=buttons.delete_row(ctx)
-        ) from None
+    if status_code >= http.StatusCode.MULTIPLE_CHOICES:
+        error_message = f"Unable to fetch image due to unexpected error {status_code}"
+        raise tanjun.CommandError(error_message, component=buttons.delete_row(ctx)) from None
 
     result = data[response_key]
     assert isinstance(result, str)
     return result
 
 
-def _build_spotify_auth(
-    config: alluka.Injected[config_.Tokens], ctx: alluka.Injected[tanjun.abc.Context]
-) -> utility.ClientCredentialsOauth2:
+def _build_spotify_auth(config: alluka.Injected[config_.Tokens]) -> utility.ClientCredentialsOauth2:
     if not config.spotify_id or not config.spotify_secret:
-        raise tanjun.MissingDependencyError("Missing spotify secret and/or client id", None)
+        error_message = "Missing spotify secret and/or client id"
+        raise tanjun.MissingDependencyError(error_message, None)
 
     return utility.ClientCredentialsOauth2(
         "https://accounts.spotify.com/api/token", config.spotify_id, config.spotify_secret
@@ -461,9 +463,8 @@ async def spotify(
 
     else:
         if not first_response:
-            raise tanjun.CommandError(
-                f"Couldn't find {resource_type.value}", component=buttons.delete_row(ctx)
-            ) from None
+            error_message = f"Couldn't find {resource_type.value}"
+            raise tanjun.CommandError(error_message, component=buttons.delete_row(ctx)) from None
 
         message = await ctx.respond(**first_response.to_kwargs(), components=paginator.rows, ensure_result=True)
         component_client.register_executor(paginator, message=message)

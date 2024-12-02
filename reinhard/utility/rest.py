@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2025, Faster Speeding
@@ -33,23 +32,26 @@ from __future__ import annotations
 __all__: list[str] = ["AIOHTTPStatusHandler", "ClientCredentialsOauth2", "fetch_resource"]
 
 import datetime
+import http
 import logging
 import time
 import typing
 from collections import abc as collections
 
 import aiohttp
-import alluka
 import tanjun
 from tanchan.components import buttons
 from yuyo import backoff
 
 if typing.TYPE_CHECKING:
+    import alluka
     import hikari
 
 
-_ValueT = typing.TypeVar("_ValueT")
 _LOGGER = logging.getLogger("hikari.reinhard.rest_utility")
+
+_EXPIRE_OFFSET = datetime.timedelta(minutes=2).total_seconds()
+_MAX_RETRIES = 10
 
 
 class AIOHTTPStatusHandler(backoff.ErrorManager):
@@ -76,10 +78,10 @@ class AIOHTTPStatusHandler(backoff.ErrorManager):
             self._backoff_handler.finish()
             return False
 
-        if exception.status >= 500:
+        if exception.status >= http.StatusCode.INTERNAL_SERVER_ERROR:
             return False
 
-        if exception.status == 429:
+        if exception.status == http.StatusCode.TOO_MANY_REQUESTS:
             if isinstance(exception.headers, collections.Iterable):
                 headers_iter = exception.headers
 
@@ -94,19 +96,18 @@ class AIOHTTPStatusHandler(backoff.ErrorManager):
                     continue
 
                 retry_after = float(value)
-                if retry_after <= 10:
+                if retry_after <= _MAX_RETRIES:
                     self._backoff_handler.set_next_backoff(retry_after)
 
                 break
 
             return False
 
-        if self._on_404 is not None and exception.status == 404:
+        if self._on_404 is not None and exception.status == http.StatusCode.NOT_FOUND:
             if isinstance(self._on_404, str):
                 raise tanjun.CommandError(self._on_404, component=buttons.delete_row(self._author)) from None
 
-            else:
-                self._on_404()
+            self._on_404()
 
         return True
 
@@ -146,10 +147,10 @@ class ClientCredentialsOauth2:
 
         response = await session.post(self._path, data={"grant_type": "client_credentials"}, auth=self._authorization)
 
-        if 200 <= response.status < 300:
+        if http.StatusCode.OK <= response.status < http.StatusCode.MULTIPLE_CHOICES:
             try:
                 data = await response.json()
-                expire = round(time.time()) + data["expires_in"] - 120
+                expire = round(time.time()) + data["expires_in"] - _EXPIRE_OFFSET
                 token = data["access_token"]
 
             except (aiohttp.ContentTypeError, aiohttp.ClientPayloadError, ValueError, KeyError, TypeError) as exc:
@@ -171,4 +172,5 @@ class ClientCredentialsOauth2:
             )
 
         # TODO: replace delete_after with public delete button.
-        raise tanjun.CommandError("Couldn't authenticate", delete_after=datetime.timedelta(minutes=1))
+        error_message = "Couldn't authenticate"
+        raise tanjun.CommandError(error_message, delete_after=datetime.timedelta(minutes=1))

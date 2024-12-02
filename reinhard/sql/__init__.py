@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2025, Faster Speeding
@@ -37,17 +36,19 @@ import asyncpg
 
 
 def script_getter_factory(key: str) -> property:  # Could just make this retrieve the file.
-    """
-    A script_getter factory that allows for pre-setting the script key/name. This is used to map out expected script
-    using explicit properties and to handle errors for when the modules aren't loaded.
+    """Create a property which gets a script by name/key.
+
+    This is used to map out expected script using explicit properties and to
+    handle errors for when the modules aren't loaded.
     """
 
     def get_script(self: CachedScripts) -> str:
-        """Used to get a loaded script using it's key/name."""
+        """Get a loaded script using it's key/name."""
         try:
             return self.scripts[key]
         except KeyError:
-            raise AttributeError(f"Unable to get unloaded script '{key}'.") from None
+            error_message = f"Unable to get unloaded script '{key}'."
+            raise AttributeError(error_message) from None
 
     return property(get_script)
 
@@ -71,13 +72,15 @@ class CachedScripts:
             The string path of the file to load.
         """
         if not file_path.name.endswith(".sql"):
-            raise ValueError("File must be of type 'sql'")
+            error_message = "File must be of type 'sql'"
+            raise ValueError(error_message)
 
         with file_path.open("r") as file:
             name = file_path.name[:-4]
 
             if name in self.scripts:
-                raise RuntimeError(f"Script {name!r} already loaded.")  # TODO: allow overwriting?
+                error_message = f"Script {name!r} already loaded."
+                raise RuntimeError(error_message)  # TODO: allow overwriting?
 
             self.scripts[name] = file.read()
 
@@ -116,4 +119,5 @@ async def initialise_schema(sql_scripts: CachedScripts, conn: asyncpg.Connection
     try:
         await conn.execute(sql_scripts.schema)
     except asyncpg.PostgresError as exc:
-        raise RuntimeError("Failed to initialise database.") from exc
+        error_message = "Failed to initialise database."
+        raise RuntimeError(error_message) from exc

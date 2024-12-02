@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2025, Faster Speeding
@@ -32,22 +31,21 @@
 from __future__ import annotations
 
 import ast
-import click
-
 import importlib
-import inspect
-import logging
-import json
 import importlib.metadata
+import inspect
+import json
+import logging
 import pathlib
 import re
 import sys
 import types
 import typing
-from collections import abc as collections
 
+import click
 
 if typing.TYPE_CHECKING:
+    from collections import abc as collections
     from typing import Self
 
 _LOGGER = logging.getLogger("hikari.reinhard.reference_index")
@@ -106,8 +104,7 @@ def _split_by_tl_commas(string: str) -> collections.Iterator[str]:
         elif char == "]":
             depth -= 1
 
-    else:
-        yield string[last_comma:].strip()
+    yield string[last_comma:].strip()
 
 
 _TYPING_IMPORTS = {"t", "typing"}
@@ -139,19 +136,21 @@ class ReferenceIndex:
     """
 
     __slots__ = (
-        "_aliases",
         "_alias_search_tree",
+        "_aliases",
+        "_indexed_modules",
         "_is_tracking_3rd_party",
         "_is_tracking_builtins",
-        "_indexed_modules",
         "_module_imports",
         "_object_paths_to_uses",
         "_object_search_tree",
         "_top_level_modules",
-        "_version"
+        "_version",
     )
 
-    def __init__(self, *, track_builtins: bool = False, track_3rd_party: bool = False, version: str = "unknown") -> None:
+    def __init__(
+        self, *, track_builtins: bool = False, track_3rd_party: bool = False, version: str = "unknown"
+    ) -> None:
         self._aliases: dict[str, str] = {}
         self._alias_search_tree: dict[str, typing.Any] = {}
         self._is_tracking_3rd_party = track_3rd_party
@@ -234,12 +233,13 @@ class ReferenceIndex:
             else:
                 continue
 
-            for imported_from, imported_name, depth in current:
+            for raw_imported_from, imported_name, depth in current:
                 if depth:
-                    imported_from = _process_relative_import(imported_from, module_name, depth)
+                    imported_from = _process_relative_import(raw_imported_from, module_name, depth)
 
                 else:
                     assert imported_from is not None
+                    imported_from = raw_imported_from
 
                 if self._is_tracking_3rd_party or imported_from.split(".", 1)[0] in self._top_level_modules:
                     imports[imported_name] = imported_from
@@ -252,17 +252,17 @@ class ReferenceIndex:
             outer, inner = match.groups()
             self._handle_annotation(module_name, path, outer)
 
-            for value in _split_by_tl_commas(inner):
+            for raw_value in _split_by_tl_commas(inner):
                 # For Callables we'll get a list of types as the generic's first argument.
-                if value.startswith("[") and value.endswith("]"):
-                    value = value.removeprefix("[").removesuffix("]")
+                if raw_value.startswith("[") and raw_value.endswith("]"):
+                    value = raw_value.removeprefix("[").removesuffix("]")
                     # ... is a wildcard type and cannot be resolved in this context.
                     if value != "...":
                         for sub_annotation in _split_by_tl_commas(value):
                             self._handle_annotation(module_name, path, sub_annotation)
 
                 else:
-                    self._handle_annotation(module_name, path, value)
+                    self._handle_annotation(module_name, path, raw_value)
 
             return True
 
@@ -291,7 +291,7 @@ class ReferenceIndex:
         except AttributeError:
             return path_to
 
-        if isinstance(value, (types.MethodType, types.FunctionType, type, classmethod)):
+        if isinstance(value, types.MethodType | types.FunctionType | type | classmethod):
             resolved_path = f"{value.__module__}.{value.__qualname__}"
 
         elif isinstance(value, property) and value.fget:
@@ -338,8 +338,7 @@ class ReferenceIndex:
             # If we hit this statement then this indicates that the annotation
             # refers to a 3rd party type and that we aren't tracking 3rd party
             # types so this can be safely ignored.
-            else:
-                _LOGGER.debug("Ignoring %r annotation from out-of-scope library at %r", annotation, path)
+            _LOGGER.debug("Ignoring %r annotation from out-of-scope library at %r", annotation, path)
 
         else:
             # If we got this far then it is either located in the current
@@ -362,7 +361,7 @@ class ReferenceIndex:
         *,
         path: str | None = None,
     ) -> bool:
-        if isinstance(obj, (types.MethodType, types.FunctionType, classmethod)):
+        if isinstance(obj, types.MethodType | types.FunctionType | classmethod):
             if return_type := obj.__annotations__.get("return"):
                 path = f"{path}()" if path else f"{obj.__module__}.{obj.__qualname__}()"
                 self._handle_annotation(obj.__module__, path, return_type)
@@ -528,7 +527,7 @@ class ReferenceIndex:
         _LOGGER.info("Scanning %s", module.__name__)
         module_members = dict[str, typing.Any](filter(_is_public_key, inspect.getmembers(module)))
         for name, obj in module_members.items():
-            if isinstance(obj, (types.FunctionType, types.MethodType, type, classmethod)):
+            if isinstance(obj, types.FunctionType | types.MethodType | type | classmethod):
                 self._add_alias(f"{module.__name__}.{name}", f"{obj.__module__}.{obj.__qualname__}")
                 self._recurse_module(obj)
 
@@ -580,9 +579,9 @@ class ReferenceIndex:
             recursive=recursive,
         )
 
+
 @click.group()
-def gen() -> None:
-    ...
+def gen() -> None: ...
 
 
 @click.option("--out-dir", "-o", default=pathlib.Path("./"), type=click.Path(dir_okay=True, path_type=pathlib.Path))
@@ -592,7 +591,15 @@ def default(out_dir: pathlib.Path) -> None:
     assert override.callback
     override.callback(out=out_dir / "hikari_index.json", index=["hikari"], scan=["hikari"], package="hikari")
 
-    for lib, package in (("sake", "hikari-sake"), ("tanjun", "hikari-tanjun"), ("yuyo", "hikari-yuyo"), ("lightbulb", "hikari-lightbulb"), ("arc", "hikari-arc"), ("crescent", "hikari-crescent"), ("miru", "hikari-miru")):
+    for lib, package in (
+        ("sake", "hikari-sake"),
+        ("tanjun", "hikari-tanjun"),
+        ("yuyo", "hikari-yuyo"),
+        ("lightbulb", "hikari-lightbulb"),
+        ("arc", "hikari-arc"),
+        ("crescent", "hikari-crescent"),
+        ("miru", "hikari-miru"),
+    ):
         override.callback(out_dir / f"{lib}_index.json", index=[lib, "hikari"], scan=[lib], package=package)
 
 
@@ -607,6 +614,7 @@ def override(
     out: pathlib.Path,
     index: list[str],
     scan: list[str],
+    *,
     skip_builtins: bool = False,
     skip_3rd_party: bool = False,
     package: str | None = None,

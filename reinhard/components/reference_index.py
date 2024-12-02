@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2025, Faster Speeding
@@ -39,20 +38,21 @@ import logging
 import os
 import pathlib
 import typing
-from collections import abc as collections
 
-import alluka
 import hikari
 import hikari.events
 import hikari.interactions
 import tanjun
-import yuyo
 from tanchan.components import buttons
 
-from .. import utility
+from reinhard import utility
 
 if typing.TYPE_CHECKING:
+    from collections import abc as collections
     from typing import Self
+
+    import alluka
+    import yuyo
 
 _MessageCommandT = typing.TypeVar("_MessageCommandT", bound=tanjun.MessageCommand[typing.Any])
 _SlashCommandT = typing.TypeVar("_SlashCommandT", bound=tanjun.SlashCommand[typing.Any])
@@ -63,7 +63,9 @@ _INDEXES_DIR = pathlib.Path(os.environ.get("REINHARD_INDEX_DIR", "./"))
 _LOGGER = logging.getLogger("hikari.reinhard.reference_index")
 
 
-def _search_tree(index: dict[str, typing.Any], path: str, partial_search: bool = False) -> collections.Iterator[str]:
+def _search_tree(
+    index: dict[str, typing.Any], path: str, /, *, partial_search: bool = False
+) -> collections.Iterator[str]:
     for char in path.rsplit(".", 1)[-1].lower():
         if new_position := index.get(char):
             index = new_position
@@ -134,10 +136,11 @@ class ReferenceIndex:
         if result := next(_search_tree(self._alias_search_tree, path), None):
             result = self._aliases[result]
             return result, self._object_paths_to_uses[result]
+        return None
 
-    def search_paths(self, path: str, /, partial_search: bool = False) -> collections.Iterator[str]:
-        yield from _search_tree(self._object_search_tree, path, True)
-        yield from _search_tree(self._alias_search_tree, path, True)
+    def search_paths(self, path: str, /) -> collections.Iterator[str]:
+        yield from _search_tree(self._object_search_tree, path, partial_search=True)
+        yield from _search_tree(self._alias_search_tree, path, partial_search=True)
 
     def get_references(self, path: str, /) -> collections.Sequence[str] | None:
         """Get the tracked references for a type by its absolute path.
@@ -159,6 +162,7 @@ class ReferenceIndex:
 
         if alias := self._aliases.get(path):
             return self._object_paths_to_uses[alias]
+        return None
 
 
 reference_group = tanjun.slash_command_group("references", "Find the references for a type in a library")
@@ -177,22 +181,23 @@ class _IndexCommand:
         self,
         ctx: tanjun.abc.Context,
         path: str,
+        *,
         absolute: bool,
         public: bool,
         component_client: alluka.Injected[yuyo.ComponentClient],
     ) -> None:
         if absolute:
             if not (result := self.index.get_references(path)):
-                raise tanjun.CommandError(
-                    f"No references found for the absolute path `{path}`", component=buttons.delete_row(ctx)
-                )
+                error_message = f"No references found for the absolute path `{path}`"
+                raise tanjun.CommandError(error_message, component=buttons.delete_row(ctx))
 
             full_path = path
             uses = result
 
         else:
             if not (result := self.index.search(path)):
-                raise tanjun.CommandError(f"No references found for `{path}`", component=buttons.delete_row(ctx))
+                error_message = f"No references found for `{path}`"
+                raise tanjun.CommandError(error_message, component=buttons.delete_row(ctx))
 
             full_path, uses = result
 
@@ -218,7 +223,9 @@ class _IndexAutocomplete:
     index: ReferenceIndex
 
     async def __call__(self, ctx: tanjun.abc.AutocompleteContext, value: str) -> None:
-        await ctx.set_choices({entry: entry for entry, _ in zip(self.index.search_paths(value), range(25))})
+        await ctx.set_choices(
+            {entry: entry for entry, _ in zip(self.index.search_paths(value), range(25), strict=False)}
+        )
 
 
 def _with_index_message_options(command: _MessageCommandT) -> _MessageCommandT:
