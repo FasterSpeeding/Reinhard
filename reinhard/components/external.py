@@ -382,15 +382,15 @@ async def query_nekos_life(
     except (LookupError, ValueError, TypeError):
         status_code = response.status
 
-    if status_code == http.StatusCode.NOT_FOUND:
+    if status_code == http.HTTPStatus.NOT_FOUND:
         error_message = "Query not found."
         raise tanjun.CommandError(error_message, component=buttons.delete_row(ctx)) from None
 
-    if status_code >= http.StatusCode.INTERNAL_SERVER_ERROR or data is None or response_key not in data:
+    if status_code >= http.HTTPStatus.INTERNAL_SERVER_ERROR or data is None or response_key not in data:
         error_message = "Unable to fetch image at the moment due to server error or malformed response."
         raise tanjun.CommandError(error_message, component=buttons.delete_row(ctx)) from None
 
-    if status_code >= http.StatusCode.MULTIPLE_CHOICES:
+    if status_code >= http.HTTPStatus.MULTIPLE_CHOICES:
         error_message = f"Unable to fetch image due to unexpected error {status_code}"
         raise tanjun.CommandError(error_message, component=buttons.delete_row(ctx)) from None
 

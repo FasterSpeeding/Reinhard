@@ -243,7 +243,7 @@ class FullConfig(Config):
             ),
             mention_prefix=_cast_or_else(os.environ, "MENTION_PREFIX", _str_to_bool, default=True),
             owner_only=_cast_or_else(os.environ, "OWNER_ONLY", _str_to_bool, default=False),
-            prefixes=_cast_or_else(os.environ, "PREFIXES", lambda v: set(map(str, v)), set[str]()),
+            prefixes=_cast_or_else(os.environ, "PREFIXES", lambda v: set(map(str, v)), default=set[str]()),
             ptf=PTFConfig.from_env() if os.getenv("PTF_USERNAME") else None,
             tokens=Tokens.from_env(),
             declare_global_commands=_cast_or_else(
