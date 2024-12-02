@@ -14,7 +14,7 @@ WORKDIR /code
 
 COPY ./pyproject.toml ./
 COPY ./uv.lock ./
-COPY --from=install /workspace/.venv ./venv
+COPY --from=install /code/.venv ./venv
 
 RUN uv sync --frozen --group references && \
     ./venv/bin/python ./gen_ref_index.py default --out-dir ./indexes
@@ -23,7 +23,7 @@ FROM registry.access.redhat.com/ubi9/python-312@sha256:d1244378f7ab72506d8d91cad
 WORKDIR /reinhard
 
 COPY --from=gen_ref_indexes /code/indexes ./indexes
-COPY --from=install /workspace/.venv ./venv
+COPY --from=install /code/.venv ./venv
 COPY ./reinhard ./reinhard
 COPY ./main.py ./main.py
 
