@@ -8,7 +8,9 @@ COPY ./uv.lock ./
 RUN pip install uv && \
     uv sync --frozen --only-group main
 
-FROM install as gen_ref_indexes
+FROM install AS gen_ref_indexes
+
+WORKDIR /code
 
 COPY ./scripts/gen_ref_index.py ./gen_ref_index.py
 
@@ -25,4 +27,4 @@ COPY ./reinhard ./reinhard
 COPY ./main.py ./main.py
 
 ENV REINHARD_INDEX_DIR=/reinhard/indexes
-ENTRYPOINT ["./venv/bin/python", "-O", "main.py]
+ENTRYPOINT ["./venv/bin/python", "-O", "main.py"]
