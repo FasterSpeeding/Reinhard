@@ -1,3 +1,70 @@
+[project]
+name = "Reinhard"
+description = "Reinhard Discord bot"
+# TODO: allow 3.13 once the dependencies are updated.
+requires-python = ">=3.12,<3.13"
+version = "0.1.0"
+
+[dependency-groups]
+main = [
+    "asyncpg>=0.27",
+    "python-dotenv>=0.21.1",
+    "hikari[speedups]>=2.0.0.dev116",
+    "hikari-sake>=1.0.6",
+    "hikari-tanjun>=2.12",
+    "hikari-yuyo>=1.9.0a1",
+    "lunr>=0.6.2",
+    "markdownify>=0.11.6",
+    "psutil>=5.9.4",
+    "tanchan>=0.4",
+    "uvloop>=0.17; platform_system != 'Windows'",
+    "uvicorn>=0.20",
+    "youtube_dl>=2021.12.17",  # TODO: get rid of
+]
+docs = [
+    "markdown-include>=0.8",
+    "mkdocs>=1.4.2",
+    "mkdocstrings[python]>=0.19",
+    "mkdocs-material>=8.5.11",
+    "mkdocs-minify-plugin>=0.6.4",
+]
+freeze-locks = ["uv"]
+lint = [
+    "codespell>=2.2.2",
+    "pre-commit-hooks>=4.4",
+    "slotscheck>=0.16.1",
+    "ruff",
+]
+references = [
+    "click",
+    "hikari-arc",
+    "hikari-crescent",
+    "hikari-lightbulb",
+    "hikari-miru",
+    "hikari-sake",
+    "hikari-tanjun",
+    "hikari-yuyo",
+]
+reformat = [
+    "black>=22.10.0",
+    "isort>=5.11.3",
+    "pre-commit-hooks>=4.4",
+    "pycln>=2.1.2",
+    "sort-all>=1.2",
+]
+templating = ["Jinja2>=3.1.2"]
+type-checking = [
+    "mypy>=0.991",
+    "nox",
+    "pyright>=1.1.285",
+    {include-group = "main"},
+    {include-group = "references"},
+    "asyncpg-stubs>=0.27",
+    "PyYAML>=6.0",
+    "types-PyYAML>=6.0.12.2",
+    "types-psutil>=5.9.5.6",
+]
+
 [tool.black]
 include         = ".*py$"
 line-length     = 120
@@ -7,45 +74,14 @@ target-version  = ["py312"]
 [tool.codespell]
 ignore-regex = "nd|swith"
 
-[tool.flake8]
-count = true
-max-complexity = 20
-max-function-length = 130
-# Technically this is 120, but black has a policy of "1 or 2 over is fine if it is tidier", so we have to raise this.
-max-line-length = 130
-show_source = false
-statistics = false
-accept-encodings = "utf-8"
-docstring-convention = "numpy"
-ignore = [
-    "A002",    # Argument is shadowing a python builtin.
-    "A003",    # Class attribute is shadowing a python builtin.
-    "CFQ002",  # Function has too many arguments.
-    "CFQ004",  # Function has too many returns.
-    "E402",    # Module level import not at top of file (isn't compatible with our import style).
-    "IFS001",  # "use a oneliner here".
-    "T101",    # TO-DO comment detection (T102 is FIX-ME and T103 is XXX).
-    "W503",    # line break before binary operator.
-    "W504",    # line break before binary operator (again, I guess).
-    "S101",    # Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.
-    "E203",    # whitespace before ':'
-    "E231",    # missing whitespace after ','
-    "TRY003",  # Avoid specifying long messages outside the exception class
-    "E701",    # Incompatible with black: E701 multiple statements on one line (colon)
-    "E704",    # Incompatible with black: E704 multiple statements on one line (def)
-]
-per-file-ignores = ["noxfile.py: D100, FA101, F401, F403, INP001"]
-
 [tool.isort]
 profile = "black"
 force_single_line = true
 
 [tool.piped]
-default_sessions = ["reformat", "verify-markup", "flake8", "spell-check", "type-check"]
+default_sessions = ["reformat", "verify-markup", "lint", "spell-check", "type-check"]
 hide = ["build", "generate_docs", "publish", "slot-check", "test", "test_coverage", "test_publish", "verify_types"]
-top_level_targets = ["./noxfile.py", "./reinhard"]
-# TODO: allow 3.13 once the dependencies are updated.
-version_constraint = "3.12,<3.13"
+top_level_targets = ["./noxfile.py", "./reinhard", "./scripts"]
 
 [tool.piped.github_actions."*"]
 default_py_ver = "3.12"
@@ -58,10 +94,9 @@ default_py_ver = "3.12"
 [tool.piped.github_actions.type_check]
 [tool.piped.github_actions.update_licence]
 [tool.piped.github_actions.upgrade_locks]
-[tool.piped.github_actions.verify_locks]
 
 [tool.pyright]
-include = ["reinhard"]
+include = ["reinhard", "scripts"]
 
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
@@ -85,3 +120,81 @@ reportUnknownArgumentType = "warning"  # Pretty much the same as reportUnknownMe
 reportUnknownParameterType = "warning"  # Pretty much the same as reportUnknownMemberType
 reportUnusedFunction = "warning"  # This assumes decorator calls don't load a function into something for usage
 reportImportCycles = "warning"                  # This isn't necessarily an issue if it's type checking only.
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "ANN401",  # Dynamically typed expressions (typing.Any) are disallowed in ``
+    "COM812",  # Trailing comma missing (incompatible with black)
+    "D102",    # Missing docstring in public method
+    "D105",    # Missing docstring in magic method
+    "FIX002",  # Line contains TODO, consider resolving the issue
+    "I001",    # [*] Import block is un-sorted or un-formatted
+    "N818",    # Exception name `FailedModuleUnload` should be named with an Error suffix
+    "PYI041",  # Use `float` instead of `int | float`
+    "S101",    # Use of `assert` detected
+    "SIM105",  # Use `contextlib.suppress(Error)` instead of `try`-`except`-`pass`
+    "SIM108",  # Use ternary operator `` instead of `if`-`else`-block
+    "TD002",   # Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<author_name>: ...`
+    "TD003",   # Missing issue link on the line following this TODO
+]
+
+[tool.ruff.lint.per-file-ignores]
+"docs_src/**/*.py" = [
+    "ARG001",  # Unused function argument: ``
+    "B008",    # Do not perform function call `` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+    "D100",    # Missing docstring in public module
+    "D101",    # Missing docstring in public class
+    "D102",    # Missing docstring in public method
+    "D103",    # Missing docstring in public function
+    "FBT002",  # Boolean default positional argument in function definition
+    "F841",    # Local variable `` is assigned to but never used
+    "INP001",  # File `` is part of an implicit namespace package. Add an `__init__.py`.
+    "N806",    # Variable `` in function should be lowercase
+    "PIE790",  # [*] Unnecessary `...` literal
+    "PYI013",  # [*] Non-empty class body must not contain `...`
+    "T201",    # `print` found
+]
+"examples/**/*.py" = [
+    "B008",    # Do not perform function call `` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+    "D100",    # Missing docstring in public module
+    "D101",    # Missing docstring in public class
+    "D102",    # Missing docstring in public method
+    "D103",    # Missing docstring in public function
+    "FBT001",  # Boolean-typed positional argument in function definition
+    "PIE790",  # [*] Unnecessary `...` literal
+    "PYI013",  # [*] Non-empty class body must not contain `...`
+]
+"noxfile.py" = [
+    "F403",  # `from noxfile import *` used; unable to detect undefined name
+]
+"tests/**/*.py" = [
+    "D100",     # Missing docstring in public module
+    "D101",     # Missing docstring in public class
+    "D102",     # Missing docstring in public method
+    "D103",     # Missing docstring in public function
+    "D104",     # Missing docstring in public package
+    "FBT001",   # Boolean-typed positional argument in function definition
+    "FBT002",   # Boolean default positional argument in function definition
+    "FBT003",   # Boolean positional value in function call
+    "PLR0915",  # Too many statements
+    "PGH003",   # Use specific rule codes when ignoring type issues
+    "PLR2004",  # Magic value used in comparison, consider replacing `` with a constant variable
+    "SLF001",   # Private member accessed: ``
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 20
+
+[tool.ruff.lint.pycodestyle]
+# Technically this is 120, but black has a policy of "1 or 2 over is fine if it is tidier", so we have to raise this.
+max-line-length = 130
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.pylint]
+max-args = 20
+max-branches = 20
+max-returns = 15
+max-statements = 100
