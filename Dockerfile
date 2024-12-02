@@ -1,4 +1,4 @@
-FROM python:3.12.6 as gen_ref_indexes
+FROM python:3.12.6 AS gen_ref_indexes
 
 WORKDIR /code
 
