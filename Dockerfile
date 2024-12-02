@@ -15,7 +15,7 @@ WORKDIR /code
 COPY ./scripts/gen_ref_index.py ./gen_ref_index.py
 
 RUN uv sync --frozen --group references && \
-    ./venv/bin/python ./gen_ref_index.py default --out-dir ./indexes
+    /code/venv/bin/python ./gen_ref_index.py default --out-dir ./indexes
 
 FROM registry.access.redhat.com/ubi9/python-312@sha256:1d8846b7c6558a50b434f1ea76131f200dcdd92cfaf16b81996003b14657b491
 
