@@ -238,7 +238,7 @@ class ReferenceIndex:
                     imported_from = _process_relative_import(raw_imported_from, module_name, depth)
 
                 else:
-                    assert imported_from is not None
+                    assert raw_imported_from is not None
                     imported_from = raw_imported_from
 
                 if self._is_tracking_3rd_party or imported_from.split(".", 1)[0] in self._top_level_modules:

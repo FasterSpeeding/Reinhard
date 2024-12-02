@@ -78,10 +78,10 @@ class AIOHTTPStatusHandler(backoff.ErrorManager):
             self._backoff_handler.finish()
             return False
 
-        if exception.status >= http.StatusCode.INTERNAL_SERVER_ERROR:
+        if exception.status >= http.HTTPStatus.INTERNAL_SERVER_ERROR:
             return False
 
-        if exception.status == http.StatusCode.TOO_MANY_REQUESTS:
+        if exception.status == http.HTTPStatus.TOO_MANY_REQUESTS:
             if isinstance(exception.headers, collections.Iterable):
                 headers_iter = exception.headers
 
@@ -103,7 +103,7 @@ class AIOHTTPStatusHandler(backoff.ErrorManager):
 
             return False
 
-        if self._on_404 is not None and exception.status == http.StatusCode.NOT_FOUND:
+        if self._on_404 is not None and exception.status == http.HTTPStatus.NOT_FOUND:
             if isinstance(self._on_404, str):
                 raise tanjun.CommandError(self._on_404, component=buttons.delete_row(self._author)) from None
 
@@ -147,7 +147,7 @@ class ClientCredentialsOauth2:
 
         response = await session.post(self._path, data={"grant_type": "client_credentials"}, auth=self._authorization)
 
-        if http.StatusCode.OK <= response.status < http.StatusCode.MULTIPLE_CHOICES:
+        if http.HTTPStatus.OK <= response.status < http.HTTPStatus.MULTIPLE_CHOICES:
             try:
                 data = await response.json()
                 expire = round(time.time()) + data["expires_in"] - _EXPIRE_OFFSET
