@@ -290,7 +290,7 @@ name = "click"
 version = "8.1.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "platform_system == 'Windows'" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b9/2e/0090cbf739cee7d23781ad4b89a9894a41538e4fcf4c31dcdd705b78eb8b/click-8.1.8.tar.gz", hash = "sha256:ed53c9d8990d83c2a27deae68e4ee337473f6330c040a31d4225c9574d16096a", size = 226593 }
 wheels = [
@@ -686,7 +686,7 @@ version = "1.6.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
-    { name = "colorama", marker = "platform_system == 'Windows'" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
     { name = "ghp-import" },
     { name = "jinja2" },
     { name = "markdown" },
@@ -1199,7 +1199,7 @@ main = [
     { name = "python-dotenv" },
     { name = "tanchan" },
     { name = "uvicorn" },
-    { name = "uvloop", marker = "platform_system != 'Windows'" },
+    { name = "uvloop", marker = "sys_platform != 'win32'" },
     { name = "youtube-dl" },
 ]
 references = [
@@ -1246,7 +1246,7 @@ type-checking = [
     { name = "types-psutil" },
     { name = "types-pyyaml" },
     { name = "uvicorn" },
-    { name = "uvloop", marker = "platform_system != 'Windows'" },
+    { name = "uvloop", marker = "sys_platform != 'win32'" },
     { name = "youtube-dl" },
 ]
 
@@ -1279,7 +1279,7 @@ main = [
     { name = "python-dotenv", specifier = ">=0.21.1" },
     { name = "tanchan", specifier = ">=0.4" },
     { name = "uvicorn", specifier = ">=0.20" },
-    { name = "uvloop", marker = "platform_system != 'Windows'", specifier = ">=0.17" },
+    { name = "uvloop", marker = "sys_platform != 'win32'", specifier = ">=0.17" },
     { name = "youtube-dl", specifier = ">=2021.12.17" },
 ]
 references = [
@@ -1327,7 +1327,7 @@ type-checking = [
     { name = "types-psutil", specifier = ">=5.9.5.6" },
     { name = "types-pyyaml", specifier = ">=6.0.12.2" },
     { name = "uvicorn", specifier = ">=0.20" },
-    { name = "uvloop", marker = "platform_system != 'Windows'", specifier = ">=0.17" },
+    { name = "uvloop", marker = "sys_platform != 'win32'", specifier = ">=0.17" },
     { name = "youtube-dl", specifier = ">=2021.12.17" },
 ]
 
