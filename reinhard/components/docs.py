@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2025, Faster Speeding
@@ -41,12 +40,11 @@ import typing
 from collections import abc as collections
 from typing import Annotated
 
-import aiohttp
 import alluka
 import hikari
-import lunr  # type: ignore
-import lunr.exceptions  # type: ignore
-import lunr.index  # type: ignore
+import lunr  # type: ignore  # noqa: PGH003
+import lunr.exceptions  # type: ignore  # noqa: PGH003
+import lunr.index  # type: ignore  # noqa: PGH003
 import markdownify  # pyright: ignore[reportMissingTypeStubs]
 import tanjun
 import yuyo
@@ -57,16 +55,21 @@ from tanjun.annotations import Flag
 from tanjun.annotations import Name
 from tanjun.annotations import Str
 
-from .. import utility
+from reinhard import utility
 
 if typing.TYPE_CHECKING:
     from typing import Self
+
+    import aiohttp
 
 docs_group = doc_parse.slash_command_group("docs", "Search relevant document sites.")
 
 _T = typing.TypeVar("_T")
 _CoroT = collections.Coroutine[typing.Any, typing.Any, _T]
 _DocIndexT = typing.TypeVar("_DocIndexT", bound="DocIndex")
+
+_MAX_CHARS = 500
+_MAX_LINES = 11
 
 
 def hash_path(value: str, /) -> str:
@@ -89,10 +92,10 @@ class DocEntry:
 
         split_text = text.split("\n", 10)
         text = "\n".join(split_text[:10]).rstrip()
-        if len(text) >= 500:
+        if len(text) >= _MAX_CHARS:
             text = text[:497] + "..."
 
-        elif len(split_text) == 11:
+        elif len(split_text) == _MAX_LINES:
             text = text + "\n..."
 
         self.hashed_location = hash_path(location)
@@ -176,7 +179,8 @@ class DocIndex(abc.ABC):
             results: list[dict[str, str]] = self._search_index.search(search_path)
         except lunr.exceptions.QueryParseError as exc:
             reason: str = exc.args[0]
-            raise tanjun.CommandError(f"Invalid query: `{reason}`", component=buttons.delete_row(ctx)) from None
+            error_message = f"Invalid query: `{reason}`"
+            raise tanjun.CommandError(error_message, component=buttons.delete_row(ctx)) from None
 
         return (self._data[entry["ref"]] for entry in results)
 
@@ -185,6 +189,8 @@ async def _docs_command(
     ctx: tanjun.abc.Context,
     component_client: yuyo.ComponentClient,
     index: DocIndex,
+    /,
+    *,
     path: str | None = None,
     public: bool = False,
     return_list: bool = False,
@@ -240,7 +246,7 @@ def make_autocomplete(index_type: type[DocIndex]) -> tanjun.abc.AutocompleteSig[
             await ctx.set_choices(
                 {
                     entry.title: entry.hashed_location
-                    for entry, _ in zip(index.get_value().search(ctx, value), range(25))
+                    for entry, _ in zip(index.get_value().search(ctx, value), range(25), strict=False)
                 }
             )
         except tanjun.CommandError:

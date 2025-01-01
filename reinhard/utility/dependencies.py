@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2025, Faster Speeding
@@ -37,7 +36,6 @@ import logging
 import typing
 
 import aiohttp
-import alluka
 import tanjun
 
 _T = typing.TypeVar("_T")
@@ -46,6 +44,7 @@ _T = typing.TypeVar("_T")
 if typing.TYPE_CHECKING:
     from collections import abc as collections
 
+    import alluka
     import hikari
 
     _CoroT = collections.Coroutine[typing.Any, typing.Any, _T]
@@ -57,7 +56,7 @@ _LOGGER = logging.getLogger("hikari.reinhard")
 class SessionManager:
     """Utility class for managing an `aiohttp.ClientSession` type dependency."""
 
-    __slots__ = ("http_settings", "proxy_settings", "_session", "user_agent")
+    __slots__ = ("_session", "http_settings", "proxy_settings", "user_agent")
 
     def __init__(
         self, http_settings: hikari.impl.HTTPSettings, proxy_settings: hikari.impl.ProxySettings, user_agent: str
@@ -69,13 +68,15 @@ class SessionManager:
 
     def __call__(self) -> aiohttp.ClientSession:
         if not self._session:
-            raise RuntimeError("Session isn't active")
+            error_message = "Session isn't active"
+            raise RuntimeError(error_message)
 
         return self._session
 
     def load_into_client(self, client: tanjun.Client) -> None:
         if client.is_alive:
-            raise RuntimeError("This should be loaded into the client before it has started.")
+            error_message = "This should be loaded into the client before it has started."
+            raise RuntimeError(error_message)
 
         client.add_client_callback(tanjun.ClientCallbackNames.STARTING, self.open).add_client_callback(
             tanjun.ClientCallbackNames.CLOSED, self.close
@@ -87,7 +88,8 @@ class SessionManager:
         This will normally be called by a client callback.
         """
         if self._session:
-            raise RuntimeError("Session already running")
+            error_message = "Session already running"
+            raise RuntimeError(error_message)
 
         # Assert that this is only called within a live event loop
         asyncio.get_running_loop()
@@ -107,7 +109,8 @@ class SessionManager:
 
     async def close(self, client: alluka.Injected[tanjun.Client]) -> None:
         if not self._session:
-            raise RuntimeError("Session not running")
+            error_message = "Session not running"
+            raise RuntimeError(error_message)
 
         session = self._session
         self._session = None

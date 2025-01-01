@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2025, Faster Speeding
@@ -35,7 +34,6 @@ __all__: list[str] = ["loader"]
 import json
 import typing
 
-import alluka
 import hikari
 import tanjun
 from hikari import traits
@@ -46,7 +44,10 @@ from tanjun.annotations import Greedy
 from tanjun.annotations import Positional
 from tanjun.annotations import Str
 
-from .. import utility
+from reinhard import utility
+
+if typing.TYPE_CHECKING:
+    import alluka
 
 component = tanjun.Component(name="sudo", strict=True)
 
@@ -54,7 +55,8 @@ component = tanjun.Component(name="sudo", strict=True)
 @tanjun.as_message_command("error")
 async def error_message_command(_: tanjun.abc.Context) -> None:
     """Command used for testing the current error handling."""
-    raise Exception("This is an exception, get used to it.")  # noqa: TC002
+    error_message = "This is an exception, get used to it."
+    raise RuntimeError(error_message)
 
 
 @tanjun.annotations.with_annotated_args

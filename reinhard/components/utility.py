@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2025, Faster Speeding
@@ -52,7 +51,7 @@ from tanjun.annotations import Str
 from tanjun.annotations import User
 from tanjun.annotations import channel_field
 
-from .. import utility
+from reinhard import utility
 
 
 @doc_parse.with_annotated_args(follow_wrapped=True)
@@ -74,7 +73,8 @@ async def color(
         color = role.color
 
     elif color is None:
-        raise tanjun.CommandError("Either role or color must be provided", component=buttons.delete_row(ctx))
+        error_message = "Either role or color must be provided"
+        raise tanjun.CommandError(error_message, component=buttons.delete_row(ctx))
 
     embed = (
         hikari.Embed(colour=color)
@@ -107,7 +107,7 @@ async def member(ctx: tanjun.abc.Context, member: Member | None = None) -> None:
     roles = {role.id: role for role in map(guild.roles.get, member.role_ids) if role}
     ordered_roles = sorted(((role.position, role) for role in roles.values()), reverse=True)
 
-    roles_repr = "\n".join(map("{0[1].name}: {0[1].id}".format, ordered_roles))  # noqa: FS002
+    roles_repr = "\n".join(map("{0[1].name}: {0[1].id}".format, ordered_roles))
 
     for _, role in ordered_roles:
         if role.colour:
@@ -171,7 +171,8 @@ async def role(ctx: tanjun.abc.Context, role: Role) -> None:
         The role to get information about.
     """
     if role.guild_id != ctx.guild_id:
-        raise tanjun.CommandError("Role not found", component=buttons.delete_row(ctx))
+        error_message = "Role not found"
+        raise tanjun.CommandError(error_message, component=buttons.delete_row(ctx))
 
     permissions = utility.basic_name_grid(role.permissions) or "None"
     role_information = [f"Created: {tanjun.conversion.from_datetime(role.created_at)}", f"Position: {role.position}"]
@@ -238,6 +239,7 @@ async def user(ctx: tanjun.abc.Context, user: User | None = None) -> None:
 async def avatar(
     ctx: tanjun.abc.Context,
     user: hikari.Member | hikari.User | None,
+    *,
     default: Annotated[Bool, Flag(empty_value=True)] = False,
     global_avatar: Annotated[Bool, Name("global"), Flag(empty_value=True)] = False,
 ) -> None:
@@ -289,7 +291,8 @@ async def mentions(
     try:
         message_ = await ctx.rest.fetch_message(channel_id, message)
     except hikari.NotFoundError:
-        raise tanjun.CommandError("Message not found", component=buttons.delete_row(ctx)) from None
+        error_message = "Message not found"
+        raise tanjun.CommandError(error_message, component=buttons.delete_row(ctx)) from None
 
     mentions: str | None = None
     if message_.user_mentions:
@@ -327,7 +330,7 @@ async def members(ctx: tanjun.abc.Context, name: Annotated[Str, Greedy()]) -> No
     await ctx.respond(content=content, component=buttons.delete_row(ctx))
 
 
-def _format_char_line(char: str, to_file: bool) -> str:
+def _format_char_line(char: str, /, *, to_file: bool) -> str:
     code = ord(char)
     name = unicodedata.name(char, "???")
     if to_file:
@@ -336,12 +339,17 @@ def _format_char_line(char: str, to_file: bool) -> str:
     return f"`\\U{code:08x}`/`{char}`: {name} <http://www.fileformat.info/info/unicode/char/{code:x}>"
 
 
+_MAX_CHARS = 20
+_MAX_CONTENT_LENGTH = 2000
+
+
 @doc_parse.with_annotated_args(follow_wrapped=True)
 @tanjun.as_message_command("char")
 @doc_parse.as_slash_command()
 async def char(
     ctx: tanjun.abc.Context,
     characters: Annotated[Str, Greedy()],
+    *,
     file: Annotated[Bool, Flag(aliases=["-f"], empty_value=True)] = False,
 ) -> None:
     """Get information about the UTF-8 characters in the executing message.
@@ -355,15 +363,15 @@ async def char(
     file
         Whether this should send a file response regardless of response length.
     """
-    if len(characters) > 20:
-        file = True  # noqa: VNE002
+    if len(characters) > _MAX_CHARS:
+        file = True
 
     content: hikari.UndefinedOr[str] = hikari.UNDEFINED
-    content = "\n".join(_format_char_line(char, file) for char in characters)
+    content = "\n".join(_format_char_line(char, to_file=file) for char in characters)
     response_file: hikari.UndefinedOr[hikari.Bytes] = hikari.UNDEFINED
 
     # highly doubt this'll ever be over 1990 when file is False but better safe than sorry.
-    if file or len(content) >= 1990:
+    if file or len(content) >= (_MAX_CONTENT_LENGTH - 10):
         response_file = hikari.Bytes(content.encode(), "character-info.md", mimetype="text/markdown; charset=UTF-8")
 
     await ctx.respond(content=content, attachment=response_file, component=buttons.delete_row(ctx))

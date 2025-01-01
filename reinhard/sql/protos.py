@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2025, Faster Speeding
@@ -32,8 +31,10 @@ from __future__ import annotations
 
 __all__: list[str] = []
 
-import datetime
 import typing
+
+if typing.TYPE_CHECKING:
+    import datetime
 
 
 class StarredMessage(typing.Protocol):
@@ -52,7 +53,7 @@ class Star(typing.Protocol):
 
 
 class Guild(typing.Protocol):
-    id: int  # noqa: VNE003
+    id: int
     starboard_channel_id: int | None
     log_members: bool
     member_join_log: int | None

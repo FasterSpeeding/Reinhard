@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2025, Faster Speeding
@@ -47,7 +46,7 @@ if typing.TYPE_CHECKING:
     _OtherValueT = typing.TypeVar("_OtherValueT")
 
 _ValueT_co = typing.TypeVar("_ValueT_co", covariant=True)
-_FieldT_co = typing.TypeVar("_FieldT_co", bound=str, contravariant=True)
+_FieldT_contra = typing.TypeVar("_FieldT_contra", bound=str, contravariant=True)
 
 FilterTypeT = Literal["lt", "le", "eq", "ne", "ge", "gt", "contains"]
 
@@ -86,7 +85,7 @@ class DataError(SQLError): ...
 class AlreadyExistsError(SQLError): ...
 
 
-class DatabaseCollection(typing.Protocol[_FieldT_co, _ValueT_co]):
+class DatabaseCollection(typing.Protocol[_FieldT_contra, _ValueT_co]):
     __slots__ = ()
 
     async def collect(self) -> collections.Collection[_ValueT_co]:
@@ -95,10 +94,10 @@ class DatabaseCollection(typing.Protocol[_FieldT_co, _ValueT_co]):
     async def count(self) -> int:
         raise NotImplementedError
 
-    def filter(self, filter_type: FilterTypeT, *rules: tuple[_FieldT_co, typing.Any]) -> Self:
+    def filter(self, filter_type: FilterTypeT, *rules: tuple[_FieldT_contra, typing.Any]) -> Self:
         raise NotImplementedError
 
-    def filter_truth(self, *fields: _FieldT_co, truth: bool = True) -> Self:
+    def filter_truth(self, *fields: _FieldT_contra, truth: bool = True) -> Self:
         raise NotImplementedError
 
     async def iter(self) -> collections.Iterator[_ValueT_co]:
@@ -113,18 +112,18 @@ class DatabaseCollection(typing.Protocol[_FieldT_co, _ValueT_co]):
     ) -> collections.Iterator[_OtherValueT]:
         raise NotImplementedError
 
-    def order_by(self, field: _FieldT_co, /, ascending: bool = True) -> Self:
+    def order_by(self, field: _FieldT_contra, /, *, ascending: bool = True) -> Self:
         raise NotImplementedError
 
 
-class DatabaseIterator(DatabaseCollection[_FieldT_co, _ValueT_co], typing.Protocol[_FieldT_co, _ValueT_co]):
+class DatabaseIterator(DatabaseCollection[_FieldT_contra, _ValueT_co], typing.Protocol[_FieldT_contra, _ValueT_co]):
     __slots__ = ()
 
     def __await__(self) -> collections.Generator[typing.Any, None, collections.Iterable[_ValueT_co]]:
         raise NotImplementedError
 
 
-class FilteredClear(DatabaseCollection[_FieldT_co, _ValueT_co], typing.Protocol[_FieldT_co, _ValueT_co]):
+class FilteredClear(DatabaseCollection[_FieldT_contra, _ValueT_co], typing.Protocol[_FieldT_contra, _ValueT_co]):
     __slots__ = ()
 
     def __await__(self) -> collections.Generator[typing.Any, None, int]:

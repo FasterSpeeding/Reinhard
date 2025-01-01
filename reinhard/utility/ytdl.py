@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2025, Faster Speeding
@@ -39,7 +38,7 @@ import pathlib
 import threading
 import typing
 
-import youtube_dl  # type: ignore
+import youtube_dl  # type: ignore  # noqa: PGH003
 
 if typing.TYPE_CHECKING:
     from typing import Self
@@ -80,7 +79,8 @@ class YoutubeDownloader:
 
     def close(self) -> None:
         if not self._threads:
-            raise ValueError("Client already closed")
+            error_message = "Client already closed"
+            raise ValueError(error_message)
 
         self._threads.shutdown()
         self._threads = None
@@ -93,12 +93,14 @@ class YoutubeDownloader:
 
     def start(self) -> None:
         if self._threads:
-            raise ValueError("Client already running")
+            error_message = "Client already running"
+            raise ValueError(error_message)
 
         self._threads = concurrent.futures.ThreadPoolExecutor()
 
     async def download(self, url: str, /) -> tuple[pathlib.Path, dict[str, typing.Any]]:
         if not self._threads:
-            raise ValueError("Client is inactive")
+            error_message = "Client is inactive"
+            raise ValueError(error_message)
 
         return await asyncio.get_running_loop().run_in_executor(self._threads, _download, url)

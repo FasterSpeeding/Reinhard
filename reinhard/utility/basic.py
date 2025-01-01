@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2025, Faster Speeding
@@ -42,8 +41,6 @@ __all__: list[str] = [
     "raise_error",
 ]
 
-import datetime
-import enum
 import itertools
 import random
 import typing
@@ -56,6 +53,8 @@ from tanchan.components import buttons
 from . import constants
 
 if typing.TYPE_CHECKING:
+    import datetime
+    import enum
     from collections import abc as collections
 
     _ValueT = typing.TypeVar("_ValueT")
@@ -109,11 +108,11 @@ def prettify_date(date: datetime.datetime, /) -> str:
 def prettify_index(index: int, max_digit_count: int, /) -> str:
     name = str(index).zfill(max_digit_count)
     match index % 10:
-        case 1 if index % 100 != 11:
+        case 1 if index % 100 != 11:  # noqa: PLR2004
             return f"{name}st"
-        case 2 if index % 100 != 12:
+        case 2 if index % 100 != 12:  # noqa: PLR2004
             return f"{name}nd"
-        case 3 if index % 100 != 13:
+        case 3 if index % 100 != 13:  # noqa: PLR2004
             return f"{name}rd"
         case _:
             return f"{name}th"
@@ -200,7 +199,7 @@ class FileCallback:
         pressed.
     """
 
-    __slots__ = ("_custom_id", "_files", "_make_files", "_post_components", "__weakref__")
+    __slots__ = ("__weakref__", "_custom_id", "_files", "_make_files", "_post_components")
 
     def __init__(
         self,

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2025, Faster Speeding
@@ -40,7 +39,6 @@ if __name__ == "__main__":
 
     except ImportError:
         print("Running without pyjion")
-        pass
 
     try:
         import uvloop  # type: ignore

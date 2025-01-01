@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2025, Faster Speeding
@@ -37,10 +36,9 @@ import importlib.metadata
 import math
 import platform
 import time
-from collections import abc as collections
+import typing
 from typing import Annotated
 
-import alluka
 import hikari
 import psutil
 import tanjun
@@ -48,10 +46,15 @@ from hikari import snowflakes
 from tanchan import doc_parse
 from tanchan.components import buttons
 
-from .. import utility
+from reinhard import utility
+
+if typing.TYPE_CHECKING:
+    from collections import abc as collections
+
+    import alluka
 
 try:
-    import alluka_rust  # type: ignore
+    import alluka_rust  # type: ignore   # noqa: PGH003
 
     alluka_rust_ver = "v" + importlib.metadata.version("alluka_rust")
 
@@ -61,7 +64,7 @@ except ImportError:
     alluka_rust_ver = None
 
 try:
-    import rukari  # type: ignore
+    import rukari  # type: ignore   # noqa: PGH003
 
     rukari_ver: str | None = "v" + importlib.metadata.version("rukari")
 
@@ -81,8 +84,8 @@ async def about(
     bot: alluka.Injected[hikari.ShardAware | None],
 ) -> None:
     """Get basic information about the current bot instance."""
-    start_date = datetime.datetime.fromtimestamp(process.create_time())
-    uptime = datetime.datetime.now() - start_date
+    start_date = datetime.datetime.fromtimestamp(process.create_time(), tz=datetime.UTC)
+    uptime = datetime.datetime.now(tz=datetime.UTC) - start_date
     memory_usage: float = process.memory_full_info().uss / 1024**2
     memory_percent: float = process.memory_percent()
 
@@ -166,7 +169,8 @@ def cache_check(ctx: tanjun.abc.Context) -> bool:
     if ctx.cache:
         return True
 
-    raise tanjun.CommandError("Client is cache-less", component=buttons.delete_row(ctx))
+    error_message = "Client is cache-less"
+    raise tanjun.CommandError(error_message, component=buttons.delete_row(ctx))
 
 
 @tanjun.with_check(cache_check, follow_wrapped=True)
@@ -179,8 +183,8 @@ async def cache(
     process: Annotated[psutil.Process, tanjun.cached_inject(psutil.Process)],
 ) -> None:
     """Get general information about this bot's cache."""
-    start_date = datetime.datetime.fromtimestamp(process.create_time())
-    uptime = datetime.datetime.now() - start_date
+    start_date = datetime.datetime.fromtimestamp(process.create_time(), tz=datetime.UTC)
+    uptime = datetime.datetime.now(tz=datetime.UTC) - start_date
     memory_usage: float = process.memory_full_info().uss / 1024**2
     memory_percent: float = process.memory_percent()
 
@@ -200,7 +204,7 @@ async def cache(
 
     storage_time_taken = time.perf_counter() - storage_start_time
     # This also accounts for the decimal place and 4 decimal places
-    left_pad = math.floor(math.log(max(num for _, num in cache_stats_lines), 10)) + 6
+    left_pad = math.floor(math.log10(max(num for _, num in cache_stats_lines))) + 6
     largest_line = max(len(line) for line, _ in cache_stats_lines)
     cache_stats = "\n".join(
         line + " " * (largest_line + 2 - len(line)) + f"{time_taken:0{left_pad}.4f} ms"
