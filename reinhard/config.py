@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2025, Faster Speeding
@@ -37,14 +36,14 @@ import dataclasses
 import logging
 import os
 import pathlib
-import types
 import typing
-from collections import abc as collections
 
 import dotenv
 import hikari
 
 if typing.TYPE_CHECKING:
+    import types
+    from collections import abc as collections
     from typing import Self
 
 ConfigT = typing.TypeVar("ConfigT", bound="Config")
@@ -54,7 +53,7 @@ ValueT = typing.TypeVar("ValueT")
 
 @typing.overload
 def _cast_or_else(
-    data: collections.Mapping[str, typing.Any], key: str, cast: collections.Callable[[typing.Any], ValueT]
+    data: collections.Mapping[str, typing.Any], key: str, cast: collections.Callable[[typing.Any], ValueT], /
 ) -> ValueT: ...
 
 
@@ -63,6 +62,8 @@ def _cast_or_else(
     data: collections.Mapping[str, typing.Any],
     key: str,
     cast: collections.Callable[[typing.Any], ValueT],
+    /,
+    *,
     default: DefaultT,
 ) -> ValueT | DefaultT: ...
 
@@ -71,6 +72,8 @@ def _cast_or_else(
     data: collections.Mapping[str, typing.Any],
     key: str,
     cast: collections.Callable[[typing.Any], ValueT],
+    /,
+    *,
     default: DefaultT | types.EllipsisType = ...,
 ) -> ValueT | DefaultT:
     try:
@@ -79,7 +82,8 @@ def _cast_or_else(
         if default is not ...:
             return default
 
-    raise KeyError(f"{key!r} required environment/config key missing")
+    error_message = f"{key!r} required environment/config key missing"
+    raise KeyError(error_message)
 
 
 class Config(abc.ABC):
@@ -96,7 +100,7 @@ class Config(abc.ABC):
         raise NotImplementedError
 
 
-def _maybe_up(string: str, up: bool) -> str:
+def _maybe_up(string: str, up: bool) -> str:  # noqa: FBT001
     return string.upper() if up else string
 
 
@@ -116,10 +120,10 @@ class DatabaseConfig(Config):
     def from_mapping(cls, mapping: collections.Mapping[str, typing.Any], /, *, _up_case: bool = False) -> Self:
         return cls(
             password=_cast_or_else(mapping, _maybe_up("database_password", _up_case), str),
-            database=_cast_or_else(mapping, _maybe_up("database", _up_case), str, "postgres"),
-            host=_cast_or_else(mapping, _maybe_up("database_host", _up_case), str, "localhost"),
-            port=_cast_or_else(mapping, _maybe_up("database_port", _up_case), int, 5432),
-            user=_cast_or_else(mapping, _maybe_up("database_user", _up_case), str, "postgres"),
+            database=_cast_or_else(mapping, _maybe_up("database", _up_case), str, default="postgres"),
+            host=_cast_or_else(mapping, _maybe_up("database_host", _up_case), str, default="localhost"),
+            port=_cast_or_else(mapping, _maybe_up("database_port", _up_case), int, default=5432),
+            user=_cast_or_else(mapping, _maybe_up("database_user", _up_case), str, default="postgres"),
         )
 
 
@@ -161,9 +165,9 @@ class Tokens(Config):
     def from_mapping(cls, mapping: collections.Mapping[str, typing.Any], /, *, _up_case: bool = False) -> Self:
         return cls(
             bot=str(mapping[_maybe_up("token", _up_case)]),
-            google=_cast_or_else(mapping, _maybe_up("google", _up_case), str, None),
-            spotify_id=_cast_or_else(mapping, _maybe_up("spotify_id", _up_case), str, None),
-            spotify_secret=_cast_or_else(mapping, _maybe_up("spotify_secret", _up_case), str, None),
+            google=_cast_or_else(mapping, _maybe_up("google", _up_case), str, default=None),
+            spotify_id=_cast_or_else(mapping, _maybe_up("spotify_id", _up_case), str, default=None),
+            spotify_secret=_cast_or_else(mapping, _maybe_up("spotify_secret", _up_case), str, default=None),
         )
 
 
@@ -195,7 +199,8 @@ def _str_to_bool(value: str, /, *, default: ValueT | types.EllipsisType = ...) -
     if default is not ...:
         return default
 
-    raise ValueError(f"{value!r} is not a valid boolean")
+    error_message = f"{value!r} is not a valid boolean"
+    raise ValueError(error_message)
 
 
 def _parse_ids(values: collections.Sequence[int] | str) -> set[hikari.Snowflake]:
@@ -229,33 +234,36 @@ class FullConfig(Config):
         dotenv.load_dotenv()
 
         return cls(
-            cache=_cast_or_else(os.environ, "CACHE", hikari.api.CacheComponents, DEFAULT_CACHE),
+            cache=_cast_or_else(os.environ, "CACHE", hikari.api.CacheComponents, default=DEFAULT_CACHE),
             database=DatabaseConfig.from_env(),
-            emoji_guild=_cast_or_else(os.environ, "EMOJI_GUILD", hikari.Snowflake, None),
-            intents=_cast_or_else(os.environ, "INTENTS", hikari.Intents, DEFAULT_INTENTS),
-            log_level=_cast_or_else(os.environ, "LOG_LEVEL", lambda v: int(v) if v.isdigit() else v, logging.INFO),
-            mention_prefix=_cast_or_else(os.environ, "MENTION_PREFIX", _str_to_bool, True),
-            owner_only=_cast_or_else(os.environ, "OWNER_ONLY", _str_to_bool, False),
-            prefixes=_cast_or_else(os.environ, "PREFIXES", lambda v: set(map(str, v)), set[str]()),
+            emoji_guild=_cast_or_else(os.environ, "EMOJI_GUILD", hikari.Snowflake, default=None),
+            intents=_cast_or_else(os.environ, "INTENTS", hikari.Intents, default=DEFAULT_INTENTS),
+            log_level=_cast_or_else(
+                os.environ, "LOG_LEVEL", lambda v: int(v) if v.isdigit() else v, default=logging.INFO
+            ),
+            mention_prefix=_cast_or_else(os.environ, "MENTION_PREFIX", _str_to_bool, default=True),
+            owner_only=_cast_or_else(os.environ, "OWNER_ONLY", _str_to_bool, default=False),
+            prefixes=_cast_or_else(os.environ, "PREFIXES", lambda v: set(map(str, v)), default=set[str]()),
             ptf=PTFConfig.from_env() if os.getenv("PTF_USERNAME") else None,
             tokens=Tokens.from_env(),
             declare_global_commands=_cast_or_else(
                 os.environ,
                 "DECLARE_GLOBAL_COMMANDS",
                 lambda v: nv if (nv := _str_to_bool(v, default=None)) is not None else hikari.Snowflake(v),
-                True,
+                default=True,
             ),
-            hot_reload=_cast_or_else(os.environ, "HOT_RELOAD", _str_to_bool, False),
-            eval_guilds=_cast_or_else(os.environ, "EVAL_GUILDS", _parse_ids, _DEFAULT_EVAL_GUILDS),
+            hot_reload=_cast_or_else(os.environ, "HOT_RELOAD", _str_to_bool, default=False),
+            eval_guilds=_cast_or_else(os.environ, "EVAL_GUILDS", _parse_ids, default=_DEFAULT_EVAL_GUILDS),
         )
 
     @classmethod
     def from_mapping(cls, mapping: collections.Mapping[str, typing.Any], /) -> Self:
         log_level = mapping.get("log_level", logging.INFO)
-        if not isinstance(log_level, (str, int)):
-            raise TypeError("Invalid log level found in config")
+        if not isinstance(log_level, str | int):
+            error_message = "Invalid log level found in config"
+            raise TypeError(error_message)
 
-        elif isinstance(log_level, str):
+        if isinstance(log_level, str):
             log_level = log_level.upper()
 
         declare_global_commands = mapping.get("declare_global_commands", True)
@@ -263,18 +271,18 @@ class FullConfig(Config):
             declare_global_commands = hikari.Snowflake(declare_global_commands)
 
         return cls(
-            cache=_cast_or_else(mapping, "cache", hikari.api.CacheComponents, DEFAULT_CACHE),
+            cache=_cast_or_else(mapping, "cache", hikari.api.CacheComponents, default=DEFAULT_CACHE),
             database=DatabaseConfig.from_mapping(mapping["database"]),
-            emoji_guild=_cast_or_else(mapping, "emoji_guild", hikari.Snowflake, None),
-            intents=_cast_or_else(mapping, "intents", hikari.Intents, DEFAULT_INTENTS),
+            emoji_guild=_cast_or_else(mapping, "emoji_guild", hikari.Snowflake, default=None),
+            intents=_cast_or_else(mapping, "intents", hikari.Intents, default=DEFAULT_INTENTS),
             log_level=log_level,
             mention_prefix=bool(mapping.get("mention_prefix", True)),
             owner_only=bool(mapping.get("owner_only", False)),
             prefixes=set(map(str, mapping["prefixes"])) if "prefixes" in mapping else set(),
-            ptf=_cast_or_else(mapping, "ptf", PTFConfig.from_mapping, None),
+            ptf=_cast_or_else(mapping, "ptf", PTFConfig.from_mapping, default=None),
             tokens=Tokens.from_mapping(mapping["tokens"]),
             declare_global_commands=declare_global_commands,
-            eval_guilds=_cast_or_else(mapping, "eval_guilds", _parse_ids, _DEFAULT_EVAL_GUILDS),
+            eval_guilds=_cast_or_else(mapping, "eval_guilds", _parse_ids, default=_DEFAULT_EVAL_GUILDS),
         )
 
 
@@ -286,7 +294,8 @@ def get_config_from_file(path: pathlib.Path | None = None, /) -> FullConfig:
         path = pathlib.Path("config.yaml") if not path.exists() else path
 
         if not path.exists():
-            raise RuntimeError("Couldn't find valid yaml or json configuration file")
+            error_message = "Couldn't find valid yaml or json configuration file"
+            raise RuntimeError(error_message)
 
     data = path.read_text()
     return FullConfig.from_mapping(yaml.safe_load(data))
@@ -297,7 +306,8 @@ def load_config() -> FullConfig:
     config_path = pathlib.Path(config_location) if config_location else None
 
     if config_path and not config_path.exists():
-        raise RuntimeError("Invalid configuration given in environment variables")
+        error_message = "Invalid configuration given in environment variables"
+        raise RuntimeError(error_message)
 
     return get_config_from_file(config_path)
 

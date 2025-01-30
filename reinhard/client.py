@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2025, Faster Speeding
@@ -56,7 +55,7 @@ if typing.TYPE_CHECKING:
 
 def _rukari(config: config_.FullConfig | None) -> _GatewayBotProto | None:
     try:
-        import rukari  # type: ignore
+        import rukari  # type: ignore  # noqa: PGH003
 
     except ImportError:
         return None
@@ -172,7 +171,7 @@ def _build(client: tanjun.Client, config: config_.FullConfig) -> tanjun.Client:
     if client.shards:
         yuyo.ReactionClient.from_tanjun(client)
 
-    components_dir = pathlib.Path(".") / "reinhard" / "components"
+    components_dir = pathlib.Path() / "reinhard" / "components"
     if config.hot_reload:
         guilds = (
             config.declare_global_commands if isinstance(config.declare_global_commands, hikari.Snowflake) else None

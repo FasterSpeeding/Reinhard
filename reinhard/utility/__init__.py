@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2025, Faster Speeding
@@ -30,7 +29,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 __all__: list[str] = [
-    # basic.py
     "AIOHTTPStatusHandler",
     "AMARANTH_PINK",
     "ClientCredentialsOauth2",

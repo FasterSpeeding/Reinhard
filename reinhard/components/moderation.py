@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 3-Clause License
 #
 # Copyright (c) 2020-2025, Faster Speeding
@@ -37,7 +36,6 @@ import dataclasses
 import datetime
 import re
 import typing
-from collections import abc as collections
 from typing import Annotated
 
 import hikari
@@ -52,6 +50,7 @@ from tanjun.annotations import Ranged
 from tanjun.annotations import Snowflake
 
 if typing.TYPE_CHECKING:
+    from collections import abc as collections
     from typing import Self
 
 MAX_MESSAGE_BULK_DELETE = datetime.timedelta(weeks=2) - datetime.timedelta(minutes=2)
@@ -59,6 +58,8 @@ MAX_MESSAGE_BULK_DELETE = datetime.timedelta(weeks=2) - datetime.timedelta(minut
 
 def iter_messages(
     ctx: tanjun.abc.Context,
+    /,
+    *,
     count: int | None = None,
     after: hikari.Snowflake | None = None,
     before: hikari.Snowflake | None = None,
@@ -70,17 +71,16 @@ def iter_messages(
     users: collections.Collection[hikari.Snowflake] | None = None,
 ) -> hikari.LazyIterator[hikari.Message]:
     if human_only and bot_only:
-        raise tanjun.CommandError(
-            "Can only specify one of `human_only` or `user_only`", component=buttons.delete_row(ctx)
-        )
+        error_message = "Can only specify one of `human_only` or `user_only`"
+        raise tanjun.CommandError(error_message, component=buttons.delete_row(ctx))
 
     if count is None and after is None:
-        raise tanjun.CommandError(
-            "Must specify `count` when `after` is not specified", component=buttons.delete_row(ctx)
-        )
+        error_message = "Must specify `count` when `after` is not specified"
+        raise tanjun.CommandError(error_message, component=buttons.delete_row(ctx))
 
-    elif count is not None and count <= 0:
-        raise tanjun.CommandError("Count must be greater than 0.", component=buttons.delete_row(ctx))
+    if count is not None and count <= 0:
+        error_message = "Count must be greater than 0."
+        raise tanjun.CommandError(error_message, component=buttons.delete_row(ctx))
 
     if before is None and after is None:
         before = hikari.Snowflake.from_datetime(ctx.created_at)
@@ -112,7 +112,8 @@ def iter_messages(
 
     if users is not None:
         if not users:
-            raise tanjun.CommandError("Must specify at least one user.", component=buttons.delete_row(ctx))
+            error_message = "Must specify at least one user."
+            raise tanjun.CommandError(error_message, component=buttons.delete_row(ctx))
 
         iterator = iterator.filter(lambda message: message.author.id in users)
 
@@ -157,7 +158,7 @@ class _IterMessageOptions(typing.TypedDict, total=False):
 
 
 def _now() -> datetime.datetime:
-    return datetime.datetime.now(tz=datetime.timezone.utc)
+    return datetime.datetime.now(tz=datetime.UTC)
 
 
 _CLEAR_PERMS = (
@@ -193,7 +194,8 @@ async def clear(
     before_too_old = (before := kwargs.get("before")) and now - before.created_at >= MAX_MESSAGE_BULK_DELETE
 
     if after_too_old or before_too_old:
-        raise tanjun.CommandError("Cannot delete messages that are over 14 days old", component=buttons.delete_row(ctx))
+        error_message = "Cannot delete messages that are over 14 days old"
+        raise tanjun.CommandError(error_message, component=buttons.delete_row(ctx))
 
     iterator = (
         iter_messages(ctx, **kwargs, users=users)
@@ -248,7 +250,9 @@ class _MultiBanner:
     failed: dict[hikari.Snowflake, str] = dataclasses.field(default_factory=dict)
 
     @classmethod
-    async def build(cls, ctx: tanjun.abc.Context, reason: str, delete_message_days: int, members_only: bool) -> Self:
+    async def build(
+        cls, ctx: tanjun.abc.Context, /, *, reason: str, delete_message_days: int, members_only: bool
+    ) -> Self:
         assert ctx.member is not None
 
         guild = ctx.get_guild() or await ctx.fetch_guild()
@@ -258,7 +262,8 @@ class _MultiBanner:
         if not ctx.member.role_ids and not is_owner:
             # If they have no role and aren't the guild owner then the role
             # hierarchy would never let them ban anyone.
-            raise tanjun.CommandError("You cannot ban any of these members", component=buttons.delete_row(ctx))
+            error_message = "You cannot ban any of these members"
+            raise tanjun.CommandError(error_message, component=buttons.delete_row(ctx))
 
         if is_owner:
             # If the author is the owner then we don't actually check the role
@@ -308,7 +313,7 @@ class _MultiBanner:
             except hikari.NotFoundError:
                 member = None
 
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 self.failed[target] = str(exc)
                 return
 
@@ -328,7 +333,7 @@ class _MultiBanner:
                 target, reason=self.reason, delete_message_seconds=datetime.timedelta(days=self.delete_message_days)
             )
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             self.failed[target] = str(exc)
 
         else:
@@ -342,18 +347,17 @@ class _MultiBanner:
                 hikari.Bytes(page.encode(), "failed_bans.md", mimetype="text/markdown;charset=UTF-8"),
             )
 
-        elif self.failed:
+        if self.failed:
             page = "Failed bans:\n" + "\n".join(f"* {user_id}: {exc}" for user_id, exc in self.failed.items())
             return (
                 f"Failed to ban {len(self.failed)} member(s)",
                 hikari.Bytes(page.encode(), "failed_bans.md", mimetype="text/markdown;charset=UTF-8"),
             )
 
-        elif self.passed:
+        if self.passed:
             return f"Successfully banned {len(self.passed)} member(s)", hikari.UNDEFINED
 
-        else:
-            return "No members were banned", hikari.UNDEFINED
+        return "No members were banned", hikari.UNDEFINED
 
 
 @doc_parse.with_annotated_args(follow_wrapped=True)
@@ -370,6 +374,7 @@ class _MultiBanner:
 async def multi_ban_command(
     ctx: tanjun.abc.SlashContext | tanjun.abc.MessageContext,
     users: collections.Collection[hikari.Snowflake],
+    *,
     clear_message_days: Annotated[Int, Ranged(0, 7), Flag(aliases=["--clear", "-c"])] = 0,
     members_only: Annotated[Bool, Flag(empty_value=True, aliases=["-m"])] = False,
 ) -> None:
@@ -401,6 +406,7 @@ async def multi_ban_command(
 @ban_group.as_sub_command("authors")
 async def ban_authors_command(
     ctx: tanjun.abc.Context,
+    *,
     clear_message_days: Annotated[Int, Ranged(0, 7), Flag(aliases=["-c"])] = 0,
     members_only: Annotated[Bool, Flag(empty_value=True, aliases=["-m"])] = False,
     **kwargs: typing.Unpack[_IterMessageOptions],
